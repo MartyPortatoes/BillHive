@@ -27,15 +27,14 @@ function buildEmailHtml(opts) {
   // Payment button
   let payButtonHtml = '';
   if (payMethod === 'zelle' && (payId || customZelleUrl)) {
-    const zelleUrl = customZelleUrl ||
-      `https://enroll.zellepay.com/qr-codes?data=${encodeURIComponent(JSON.stringify({ name: personName, token: payId, amount: total.toFixed(2) }))}`;
-    payButtonHtml = `
+    if (customZelleUrl) {
+      payButtonHtml = `
       <tr><td align="center" style="padding:28px 0 8px;">
-        <a href="${zelleUrl}"
+        <a href="${customZelleUrl}"
            style="display:inline-block;background:${accentColor};color:#0c0d0f;text-decoration:none;
                   font-family:Arial,sans-serif;font-weight:700;font-size:15px;
                   padding:14px 36px;border-radius:8px;letter-spacing:.02em;">
-          💰 Pay via Zelle — $${total.toFixed(2)}
+          Pay via Zelle — $${total.toFixed(2)}
         </a>
       </td></tr>
       <tr><td align="center" style="padding:0 0 8px;">
@@ -43,6 +42,21 @@ function buildEmailHtml(opts) {
           Zelle to ${payId}
         </span>
       </td></tr>`;
+    } else {
+      payButtonHtml = `
+      <tr><td align="center" style="padding:28px 0 8px;">
+        <div style="display:inline-block;background:${accentBg};border:1px solid ${accentBorder};
+                    color:${accentColor};font-family:Arial,sans-serif;font-weight:700;font-size:15px;
+                    padding:14px 36px;border-radius:8px;letter-spacing:.02em;">
+          $${total.toFixed(2)} due via Zelle
+        </div>
+      </td></tr>
+      <tr><td align="center" style="padding:0 0 8px;">
+        <span style="font-size:11px;color:#6b7280;font-family:Arial,sans-serif;">
+          Send to ${payId} on Zelle
+        </span>
+      </td></tr>`;
+    }
   } else if (payMethod === 'venmo' && payId) {
     const handle = payId.replace('@', '');
     const note = encodeURIComponent(`Bills ${monthLabel}`);
@@ -53,7 +67,7 @@ function buildEmailHtml(opts) {
            style="display:inline-block;background:${accentColor};color:#0c0d0f;text-decoration:none;
                   font-family:Arial,sans-serif;font-weight:700;font-size:15px;
                   padding:14px 36px;border-radius:8px;letter-spacing:.02em;">
-          💸 Pay via Venmo — $${total.toFixed(2)}
+          Pay via Venmo — $${total.toFixed(2)}
         </a>
       </td></tr>
       <tr><td align="center" style="padding:0 0 8px;">
@@ -165,9 +179,13 @@ function buildEmailHtml(opts) {
         </tr>
 
         <!-- Payment button -->
-        <table width="100%" cellpadding="0" cellspacing="0">
-          ${payButtonHtml}
-        </table>
+        <tr>
+          <td colspan="2">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${payButtonHtml}
+            </table>
+          </td>
+        </tr>
 
         <!-- Footer -->
         <tr>
