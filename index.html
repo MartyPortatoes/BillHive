@@ -148,6 +148,14 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .split-type-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
 .split-type-toggle button{padding:5px 12px;background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
 .split-type-toggle button.active{background:var(--surface3);color:var(--green);}
+.preserve-row{display:flex;align-items:center;gap:8px;padding:10px 0 2px;border-top:1px solid var(--border);margin-top:12px;}
+.preserve-row-label{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;cursor:pointer;user-select:none;}
+.tog{position:relative;width:30px;height:17px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;position:absolute;}
+.tog-slider{position:absolute;inset:0;background:var(--border2);border-radius:17px;transition:.2s;cursor:pointer;}
+.tog-slider:before{content:'';position:absolute;width:11px;height:11px;left:3px;top:3px;background:#9ca3af;border-radius:50%;transition:.2s;}
+.tog input:checked+.tog-slider{background:rgba(168,224,99,.25);border:1px solid var(--green);}
+.tog input:checked+.tog-slider:before{transform:translateX(13px);background:var(--green);}
 
 /* bill total input */
 .total-input-wrap{display:flex;align-items:center;gap:8px;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;}
@@ -971,12 +979,29 @@ function renderBillBody(bill) {
     `;
   }
 
-  return splitTypeToggle + bodyContent;
+  const preserveToggle = `
+    <div class="preserve-row">
+      <label class="tog">
+        <input type="checkbox" id="preserve-${bill.id}" ${bill.preserve ? 'checked' : ''} onchange="togglePreserve('${bill.id}', this.checked)">
+        <span class="tog-slider"></span>
+      </label>
+      <label class="preserve-row-label" for="preserve-${bill.id}">Carry amounts forward each month</label>
+    </div>
+  `;
+
+  return splitTypeToggle + bodyContent + preserveToggle;
 }
 
 function toggleBill(id) {
   const card = document.getElementById(`bill-card-${id}`);
   card.classList.toggle('expanded');
+}
+
+function togglePreserve(billId, val) {
+  const bill = S.bills.find(b => b.id === billId);
+  if (!bill) return;
+  bill.preserve = !!val;
+  save();
 }
 
 function onTotalInput(billId, val) {
@@ -2088,8 +2113,39 @@ document.querySelectorAll('.tab').forEach(tab => {
 document.getElementById('monthSel').addEventListener('change', onMonthChange);
 document.getElementById('yearSel').addEventListener('change', onMonthChange);
 function onMonthChange() {
+  autoFillPreservedBills();
   renderBills();
   recalcAll();
+}
+
+function autoFillPreservedBills() {
+  const key = monthKey();
+  const [y, m] = key.split('-').map(Number);
+  const prevKey = m === 1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  const prevData = S.monthly[prevKey];
+  if (!prevData) return;
+
+  let changed = false;
+  S.bills.forEach(bill => {
+    if (!bill.preserve) return;
+    const curData = S.monthly[key];
+    const hasTotal = (curData?.totals?.[bill.id] ?? 0) > 0;
+    const hasLines = bill.lines.some(l => (curData?.amounts?.[bill.id]?.[l.id] ?? 0) > 0);
+    if (hasTotal || hasLines) return; // already has data this month, don't overwrite
+
+    if (!S.monthly[key]) S.monthly[key] = { totals: {}, amounts: {} };
+    if (prevData.totals?.[bill.id]) {
+      S.monthly[key].totals[bill.id] = prevData.totals[bill.id];
+      changed = true;
+    }
+    if (prevData.amounts?.[bill.id]) {
+      if (!S.monthly[key].amounts) S.monthly[key].amounts = {};
+      S.monthly[key].amounts[bill.id] = { ...prevData.amounts[bill.id] };
+      changed = true;
+    }
+  });
+
+  if (changed) saveMonthNow(key, S.monthly[key]);
 }
 
 // ═══════════════════════════════════════════════
