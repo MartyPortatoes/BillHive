@@ -190,6 +190,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
 /* ── TREND ── */
 .chart-wrap{position:relative;height:200px;}
+.trend-toggle{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px;gap:3px;}
+.trend-toggle-btn{background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.trend-toggle-btn.active{background:var(--surface3);color:var(--text);}
+.trend-toggle-btn:hover:not(.active){color:var(--text);}
 
 /* ── SETTINGS ── */
 .setting-group{margin-bottom:24px;}
@@ -388,20 +392,50 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
 <!-- ════════════════ TRENDS ════════════════ -->
 <div id="page-trends" class="page">
-  <div class="page-title">Trends</div>
-  <div class="page-sub">Month-over-month spend tracking.</div>
-  <div class="card">
-    <div class="card-head"><div class="card-title">Total Bills Over Time</div></div>
-    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-  </div>
-  <div class="grid2">
-    <div class="card">
-      <div class="card-head"><div class="card-title">This Month — Category Breakdown</div></div>
-      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <div class="page-title">Trends</div>
+      <div class="page-sub" style="margin-bottom:0;">Month-over-month spend tracking.</div>
     </div>
+    <div class="trend-toggle" style="margin-top:4px;">
+      <button class="trend-toggle-btn active" id="toggle-person" onclick="setTrendsView('person')">Per Person</button>
+      <button class="trend-toggle-btn" id="toggle-bill" onclick="setTrendsView('bill')">By Bill</button>
+    </div>
+  </div>
+
+  <!-- Per Person view -->
+  <div id="trends-person-view">
     <div class="card">
-      <div class="card-head"><div class="card-title">Historical Log</div></div>
-      <div id="historyLog"></div>
+      <div class="card-head"><div class="card-title">Total Bills Over Time</div></div>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><div class="card-title">This Month — Category Breakdown</div></div>
+        <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Historical Log</div></div>
+        <div id="historyLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- By Bill view -->
+  <div id="trends-bill-view" style="display:none;">
+    <div class="card">
+      <div class="card-head"><div class="card-title">Per-Bill Totals Over Time</div></div>
+      <div class="chart-wrap" style="height:220px;"><canvas id="billTrendChart"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Monthly Household Total</div></div>
+        <div class="chart-wrap"><canvas id="billBarChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Bill Totals — This Month</div></div>
+        <div id="billSummaryLog"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -554,6 +588,8 @@ let S = {
 };
 
 let trendChartInst = null, pieChartInst = null;
+let billTrendChartInst = null, billBarChartInst = null;
+let trendsView = 'person';
 
 // ═══════════════════════════════════════════════
 //  API PERSISTENCE
@@ -1554,6 +1590,23 @@ function markCheck(id) {
 //  TRENDS
 // ═══════════════════════════════════════════════
 function renderTrends() {
+  if (trendsView === 'bill') {
+    renderTrendsBillView();
+  } else {
+    renderTrendsPersonView();
+  }
+}
+
+function setTrendsView(view) {
+  trendsView = view;
+  document.getElementById('toggle-person').classList.toggle('active', view === 'person');
+  document.getElementById('toggle-bill').classList.toggle('active', view === 'bill');
+  document.getElementById('trends-person-view').style.display = view === 'person' ? '' : 'none';
+  document.getElementById('trends-bill-view').style.display = view === 'bill' ? '' : 'none';
+  renderTrends();
+}
+
+function renderTrendsPersonView() {
   const keys = Object.keys(S.monthly).filter(k=>S.monthly[k]._myTotal!==undefined).sort();
   const labels = keys.map(monthLabel);
   const myData = keys.map(k=>S.monthly[k]._myTotal||0);
@@ -1623,6 +1676,103 @@ function renderTrends() {
         <div style="font-family:'Cabinet Grotesk',sans-serif;font-weight:700;color:var(--green)">$${(d._myTotal||0).toFixed(2)}</div>
       </div>`;
     }).join('');
+  }
+}
+
+function getBillTotalForMonth(monthData, bill) {
+  if (!monthData) return 0;
+  if (bill.splitType === 'fixed') {
+    return Object.values(monthData.amounts?.[bill.id] || {}).reduce((s, v) => s + (v || 0), 0);
+  }
+  return monthData.totals?.[bill.id] || 0;
+}
+
+function renderTrendsBillView() {
+  const keys = Object.keys(S.monthly).filter(k => {
+    const d = S.monthly[k];
+    return d && (d._myTotal !== undefined || Object.keys(d.totals || {}).length || Object.keys(d.amounts || {}).length);
+  }).sort();
+  const labels = keys.map(monthLabel);
+
+  const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#767880', font: { family: 'DM Mono', size: 11 } } } },
+    scales: {
+      x: { grid: { color: '#2a2c31' }, ticks: { color: '#767880', font: { family: 'DM Mono', size: 10 } } },
+      y: { grid: { color: '#2a2c31' }, ticks: { color: '#767880', font: { family: 'DM Mono', size: 10 }, callback: v => `$${v}` } }
+    }
+  };
+
+  // Line chart: one line per bill
+  if (billTrendChartInst) billTrendChartInst.destroy();
+  const ctx1 = document.getElementById('billTrendChart');
+  if (ctx1) {
+    const billDatasets = S.bills.map(bill => ({
+      label: bill.name,
+      data: keys.map(k => getBillTotalForMonth(S.monthly[k], bill)),
+      borderColor: bill.color,
+      backgroundColor: 'transparent',
+      tension: .35,
+      pointRadius: 3,
+    })).filter(ds => ds.data.some(v => v > 0));
+
+    billTrendChartInst = new Chart(ctx1, {
+      type: 'line',
+      data: { labels: labels.length ? labels : ['No data'], datasets: billDatasets.length ? billDatasets : [{ label: 'No data', data: [0] }] },
+      options: chartDefaults,
+    });
+  }
+
+  // Stacked bar chart: household total per month, segmented by bill
+  if (billBarChartInst) billBarChartInst.destroy();
+  const ctx2 = document.getElementById('billBarChart');
+  if (ctx2) {
+    const barDatasets = S.bills.map(bill => ({
+      label: bill.name,
+      data: keys.map(k => getBillTotalForMonth(S.monthly[k], bill)),
+      backgroundColor: bill.color + 'cc',
+      borderColor: bill.color,
+      borderWidth: 1,
+    })).filter(ds => ds.data.some(v => v > 0));
+
+    billBarChartInst = new Chart(ctx2, {
+      type: 'bar',
+      data: { labels: labels.length ? labels : ['No data'], datasets: barDatasets.length ? barDatasets : [{ label: 'No data', data: [0] }] },
+      options: {
+        ...chartDefaults,
+        scales: {
+          x: { ...chartDefaults.scales.x, stacked: true },
+          y: { ...chartDefaults.scales.y, stacked: true },
+        },
+      },
+    });
+  }
+
+  // Bill summary log: current month per-bill breakdown
+  const log = document.getElementById('billSummaryLog');
+  if (log) {
+    const k = monthKey();
+    const md = S.monthly[k];
+    const grandTotal = S.bills.reduce((s, bill) => s + getBillTotalForMonth(md, bill), 0);
+    if (!md || grandTotal === 0) {
+      log.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No data for this month yet.</div>';
+      return;
+    }
+    log.innerHTML = S.bills.map(bill => {
+      const total = getBillTotalForMonth(md, bill);
+      if (!total) return '';
+      return `<div class="sum-row" style="padding:8px 0;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${bill.color};flex-shrink:0;"></div>
+          <div style="font-size:12px;">${bill.name}</div>
+        </div>
+        <div style="font-family:'Cabinet Grotesk',sans-serif;font-weight:700;color:${bill.color};">$${total.toFixed(2)}</div>
+      </div>`;
+    }).filter(Boolean).join('') +
+    `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Grand Total</div>
+      <div style="font-family:'Cabinet Grotesk',sans-serif;font-weight:900;font-size:16px;color:var(--green);">$${grandTotal.toFixed(2)}</div>
+    </div>`;
   }
 }
 
