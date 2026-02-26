@@ -1396,6 +1396,7 @@ async function openPersonEmail(personId) {
         total:       d.total,
         payMethod:   person.payMethod,
         payId:       person.payId || '',
+        zelleUrl:    person.zelleUrl || '',
       })
     });
     const data = await res.json();
@@ -1431,9 +1432,14 @@ function openZelle(personId) {
   const person = getPerson(personId);
   const owes = computePersonOwes();
   const amt = (owes[personId]?.total || 0).toFixed(2);
-  const url = person.payId
-    ? 'https://enroll.zellepay.com/qr-codes?data=' + encodeURIComponent(JSON.stringify({name:person.name,token:person.payId,amount:amt}))
-    : 'https://www.zellepay.com/';
+  let url;
+  if (person.zelleUrl) {
+    url = person.zelleUrl;
+  } else if (person.payId) {
+    url = 'https://enroll.zellepay.com/qr-codes?data=' + encodeURIComponent(JSON.stringify({name:person.name,token:person.payId,amount:amt}));
+  } else {
+    url = 'https://www.zellepay.com/';
+  }
   window.open(url, '_blank');
   toast('Zelle opened — request $' + amt + ' from ' + person.name);
 }
@@ -1955,9 +1961,16 @@ function renderPeopleConfig() {
         <option value="venmo" ${p.payMethod==='venmo'?'selected':''}>Venmo</option>
         <option value="manual"${p.payMethod==='manual'?'selected':''}>Manual</option>
       </select>
-      ${p.payMethod==='zelle'||p.payMethod==='venmo'
-        ? `<input type="text" value="${p.payId||''}" placeholder="${p.payMethod==='zelle'?'phone/email':'@handle'}"
+      ${p.payMethod==='venmo'
+        ? `<input type="text" value="${p.payId||''}" placeholder="@handle"
                oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
+        : p.payMethod==='zelle'
+        ? `<div style="display:flex;flex-direction:column;gap:3px;">
+             <input type="text" value="${p.payId||''}" placeholder="phone / email"
+                    oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">
+             <input type="url" value="${p.zelleUrl||''}" placeholder="Custom Zelle URL (optional)"
+                    oninput="S.people[${idx}].zelleUrl=this.value" style="font-size:10px;">
+           </div>`
         : `<div></div>`}
       <input type="email" value="${p.email||''}" placeholder="email for notifications"
              oninput="S.people[${idx}].email=this.value" style="font-size:11px;">

@@ -219,7 +219,7 @@ app.post('/api/email/test', async (req, res) => {
 
 // POST /api/email/send — send bill summary to a person
 app.post('/api/email/send', async (req, res) => {
-  const { to, greeting, personName, accentColor, monthLabel, bills, total, payMethod, payId } = req.body;
+  const { to, greeting, personName, accentColor, monthLabel, bills, total, payMethod, payId, zelleUrl } = req.body;
   if (!to) return res.status(400).json({ error: 'recipient (to) required' });
 
   const row = stmts.getEmailCfg.get(req.userId);
@@ -229,7 +229,7 @@ app.post('/api/email/send', async (req, res) => {
 
   const { html, text } = buildEmailHtml({
     greeting, personName, accentColor,
-    monthLabel, bills, total, payMethod, payId,
+    monthLabel, bills, total, payMethod, payId, zelleUrl,
     fromName: cfg.fromName || 'BillFlow',
   });
 

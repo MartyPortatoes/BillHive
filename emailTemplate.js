@@ -10,13 +10,14 @@
  * @param {number} opts.total         — total owed
  * @param {string} opts.payMethod     — 'zelle' | 'venmo' | 'manual' | 'none'
  * @param {string} opts.payId         — zelle phone/email or venmo @handle
+ * @param {string} opts.zelleUrl      — custom Zelle URL (overrides default enroll.zellepay.com link)
  * @param {number} opts.payAmount     — amount for deep link
  * @param {string} opts.fromName      — sender display name
  */
 function buildEmailHtml(opts) {
   const {
     greeting, personName, accentColor = '#a8e063',
-    monthLabel, bills, total, payMethod, payId, fromName = 'BillFlow',
+    monthLabel, bills, total, payMethod, payId, zelleUrl: customZelleUrl, fromName = 'BillFlow',
   } = opts;
 
   // Slightly lighten accent for subtle backgrounds
@@ -25,9 +26,9 @@ function buildEmailHtml(opts) {
 
   // Payment button
   let payButtonHtml = '';
-  if (payMethod === 'zelle' && payId) {
-    const zelleData = encodeURIComponent(JSON.stringify({ name: personName, token: payId, amount: total.toFixed(2) }));
-    const zelleUrl = `https://enroll.zellepay.com/qr-codes?data=${zelleData}`;
+  if (payMethod === 'zelle' && (payId || customZelleUrl)) {
+    const zelleUrl = customZelleUrl ||
+      `https://enroll.zellepay.com/qr-codes?data=${encodeURIComponent(JSON.stringify({ name: personName, token: payId, amount: total.toFixed(2) }))}`;
     payButtonHtml = `
       <tr><td align="center" style="padding:28px 0 8px;">
         <a href="${zelleUrl}"
