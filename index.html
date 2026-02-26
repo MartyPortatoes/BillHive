@@ -2144,7 +2144,7 @@ function showPrompt(title, placeholder, cb) {
   _modalCb = cb; _modalMode = 'prompt';
   document.getElementById('modal-title').textContent = title;
   const inp = document.getElementById('modal-input');
-  inp.style.display = ''; inp.value = ''; inp.placeholder = placeholder || '';
+  inp.style.display = 'block'; inp.value = ''; inp.placeholder = placeholder || '';
   document.getElementById('modal-ok-btn').textContent = 'OK';
   document.getElementById('modal-ok-btn').className = 'btn btn-green btn-sm';
   document.getElementById('modal-cancel-btn').style.display = '';
