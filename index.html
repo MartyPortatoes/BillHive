@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0c0d0f;
+  --surface:  #141518;
+  --surface2: #1c1e22;
+  --surface3: #242629;
+  --border:   #2a2c31;
+  --border2:  #34373d;
+  --text:     #e4e5e8;
+  --muted:    #767880;
+  --muted2:   #4a4c52;
+  --green:    #a8e063;
+  --blue:     #5bc4f5;
+  --orange:   #f5a623;
+  --pink:     #f06292;
+  --purple:   #b39ddb;
+  --red:      #ef5350;
+  --yellow:   #ffd54f;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh;line-height:1.5;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── LAYOUT ── */
+#app{display:grid;grid-template-rows:56px 44px 1fr;height:100vh;overflow:hidden;}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-mark{width:32px;height:32px;border-radius:8px;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;}
+.logo-mark svg{display:block;}
+.logo-mark::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,transparent 60%);}
+.logo-wordmark{display:flex;flex-direction:column;gap:0px;}
+.logo-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:900;font-size:19px;letter-spacing:-0.5px;line-height:1;color:var(--text);}
+.logo-name span{color:var(--green);}
+.logo-sub{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);line-height:1;margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.month-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;}
+.month-pill select,.month-pill input{background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;cursor:pointer;}
+.month-pill input{width:52px;}
+
+/* ── TABS ── */
+nav{display:flex;padding:0 28px;border-bottom:1px solid var(--border);background:var(--bg);overflow-x:auto;flex-shrink:0;}
+.tab{padding:0 16px;height:44px;display:flex;align-items:center;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--green);border-bottom-color:var(--green);}
+.tab .badge{background:var(--surface3);border-radius:10px;padding:1px 6px;font-size:10px;color:var(--muted);}
+
+/* ── MAIN SCROLL ── */
+main{overflow-y:auto;padding:24px 28px;}
+.page{display:none;max-width:960px;margin:0 auto;animation:fadein .2s ease;}
+.page.active{display:block;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── TYPOGRAPHY ── */
+.page-title{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.3px;margin-bottom:4px;}
+.page-sub{color:var(--muted);font-size:11px;margin-bottom:24px;}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+
+/* ── INPUTS ── */
+input[type=text],input[type=number],input[type=email],select,textarea{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:8px 10px;font-family:'DM Mono',monospace;font-size:12px;border-radius:6px;
+  outline:none;width:100%;transition:border-color .15s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--green);}
+input::placeholder{color:var(--muted2);}
+select option{background:var(--surface2);}
+input[type=range]{accent-color:var(--green);width:100%;margin:0;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:6px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;text-decoration:none;}
+.btn-green{background:var(--green);color:#0c0d0f;}
+.btn-green:hover{background:#bcf07a;}
+.btn-blue{background:var(--blue);color:#0c0d0f;}
+.btn-blue:hover{background:#79d4ff;}
+.btn-orange{background:var(--orange);color:#0c0d0f;}
+.btn-orange:hover{background:#ffb940;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
+.btn-ghost:hover{border-color:var(--border2);background:var(--surface2);}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+.btn-xs{padding:3px 8px;font-size:10px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+
+/* ── PILL TAGS ── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;letter-spacing:.06em;font-weight:500;}
+.pill-green{background:rgba(168,224,99,.15);color:var(--green);border:1px solid rgba(168,224,99,.25);}
+.pill-blue{background:rgba(91,196,245,.15);color:var(--blue);border:1px solid rgba(91,196,245,.25);}
+.pill-orange{background:rgba(245,166,35,.15);color:var(--orange);border:1px solid rgba(245,166,35,.25);}
+.pill-purple{background:rgba(179,157,219,.15);color:var(--purple);border:1px solid rgba(179,157,219,.25);}
+.pill-pink{background:rgba(240,98,146,.15);color:var(--pink);border:1px solid rgba(240,98,146,.25);}
+.pill-muted{background:var(--surface3);color:var(--muted);border:1px solid var(--border);}
+
+/* ── DIVIDER ── */
+hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
+
+/* ── BILLS ── */
+.bill-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;transition:border-color .2s;}
+.bill-card:hover{border-color:var(--border2);}
+.bill-card.expanded{border-color:var(--border2);}
+.bill-header{display:grid;grid-template-columns:1fr 160px 160px 40px;gap:10px;align-items:center;padding:14px 18px;cursor:pointer;user-select:none;}
+.bill-header:hover{background:rgba(255,255,255,.02);}
+.bill-name-wrap{display:flex;align-items:center;gap:10px;}
+.bill-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.bill-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:14px;}
+.bill-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+.bill-total-display{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:18px;color:var(--text);text-align:right;}
+.bill-total-display.has-val{color:var(--green);}
+.bill-my-share{font-size:11px;color:var(--muted);text-align:right;}
+.bill-expand-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s;flex-shrink:0;}
+.bill-expand-btn:hover{border-color:var(--border2);color:var(--text);}
+.bill-body{padding:0 18px 18px;border-top:1px solid var(--border);display:none;}
+.bill-card.expanded .bill-body{display:block;}
+.bill-card.expanded .bill-expand-btn{background:var(--surface2);color:var(--text);}
+
+/* ── LINE ITEMS ── */
+.line-items-head{display:grid;grid-template-columns:180px 1fr 130px 130px 28px;gap:8px;padding:10px 0 6px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.line-item{display:grid;grid-template-columns:180px 1fr 130px 130px 28px;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border);}
+.line-item select{font-size:11px;}
+.line-item-owed{font-size:12px;color:var(--green);text-align:right;font-weight:500;}
+.line-item-owed.is-mine{color:var(--muted);}
+.remove-line{width:24px;height:24px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s;flex-shrink:0;}
+.remove-line:hover{border-color:var(--red);color:var(--red);}
+.add-line-row{padding-top:10px;}
+
+/* split config */
+.split-config{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.split-config label{font-size:11px;color:var(--muted);}
+.split-type-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.split-type-toggle button{padding:5px 12px;background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
+.split-type-toggle button.active{background:var(--surface3);color:var(--green);}
+
+/* bill total input */
+.total-input-wrap{display:flex;align-items:center;gap:8px;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;}
+.total-input-wrap label{font-size:11px;color:var(--muted);white-space:nowrap;}
+.total-input-wrap input{max-width:140px;}
+.total-breakdown{flex:1;font-size:11px;color:var(--muted);text-align:right;}
+
+/* ── SUMMARY ROW ── */
+.sum-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.sum-row:last-child{border-bottom:none;}
+.sum-label{color:var(--muted);font-size:12px;}
+.sum-val{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:16px;color:var(--green);}
+.sum-val.big{font-size:22px;}
+.sum-val.orange{color:var(--orange);}
+.sum-val.blue{color:var(--blue);}
+.sum-val.muted{color:var(--muted);}
+
+/* ── PERSON CARDS in summary ── */
+.person-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;position:relative;overflow:hidden;}
+.person-summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.pscard-wife::before{background:var(--green);}
+.pscard-dad::before{background:var(--orange);}
+.pscard-other::before{background:var(--purple);}
+.ps-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:16px;margin-bottom:2px;}
+.ps-amount{font-family:'Cabinet Grotesk',sans-serif;font-weight:900;font-size:28px;line-height:1;margin:8px 0;}
+.ps-bills{font-size:10px;color:var(--muted);}
+
+/* ── CHECKLIST ── */
+.check-item{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:border-color .15s;margin-bottom:8px;}
+.check-item:hover{border-color:var(--border2);}
+.check-item.done{opacity:.5;}
+.check-item.done .check-label{text-decoration:line-through;}
+.check-box{width:18px;height:18px;border:1px solid var(--border2);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
+.check-item.done .check-box{background:var(--green);border-color:var(--green);color:#0c0d0f;}
+.check-label{font-size:12px;flex:1;}
+.check-meta{font-size:10px;color:var(--muted);}
+
+/* ── EMAIL PREVIEW ── */
+.email-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.9;white-space:pre-wrap;max-height:280px;overflow-y:auto;color:var(--text);}
+
+/* ── TREND ── */
+.chart-wrap{position:relative;height:200px;}
+
+/* ── SETTINGS ── */
+.setting-group{margin-bottom:24px;}
+.setting-group-title{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.setting-row{display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border);}
+.setting-row:last-child{border-bottom:none;}
+.setting-label{font-size:12px;color:var(--muted);padding-top:8px;}
+.setting-hint{font-size:10px;color:var(--muted2);margin-top:4px;}
+
+/* person config rows */
+.person-row{display:grid;grid-template-columns:36px 1fr 120px 120px 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.person-row:last-child{border-bottom:none;}
+.person-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border2);cursor:pointer;flex-shrink:0;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 16px;border-radius:8px;font-size:12px;transform:translateY(60px);opacity:0;transition:all .25s;z-index:9999;display:flex;align-items:center;gap:8px;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast .toast-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;}
+
+/* ── SEND & RECEIVE ── */
+.sr-section-label{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.sr-section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
+.sr-section-icon.receive{background:rgba(91,196,245,.15);color:var(--blue);border:1px solid rgba(91,196,245,.25);}
+.sr-section-icon.send{background:rgba(168,224,99,.15);color:var(--green);border:1px solid rgba(168,224,99,.25);}
+.sr-section-title{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:16px;}
+.sr-section-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* person receive card */
+.receive-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+.receive-card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none;transition:background .15s;}
+.receive-card-head:hover{background:rgba(255,255,255,.02);}
+.receive-person{display:flex;align-items:center;gap:10px;}
+.receive-person-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.receive-person-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:15px;}
+.receive-person-method{font-size:10px;color:var(--muted);margin-top:1px;}
+.receive-amount{font-family:'Cabinet Grotesk',sans-serif;font-weight:900;font-size:22px;}
+.receive-actions{display:flex;align-items:center;gap:8px;}
+.receive-body{display:none;border-top:1px solid var(--border);padding:16px 18px;background:var(--surface2);}
+.receive-card.open .receive-body{display:block;}
+.receive-card.open .receive-expand{transform:rotate(180deg);}
+.receive-expand{transition:transform .2s;font-size:11px;color:var(--muted);padding:4px 6px;background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;}
+.receive-bill-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.receive-bill-row:last-child{border-bottom:none;}
+
+/* send / pay bill cards */
+.send-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px;}
+.send-card-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.send-bill-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.send-bill-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:14px;}
+.send-bill-amount{font-size:12px;color:var(--muted);margin-top:1px;}
+.send-card-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.send-url-input{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 8px;font-family:'DM Mono',monospace;font-size:10px;border-radius:5px;width:180px;outline:none;transition:border-color .15s,color .15s;}
+.send-url-input:focus{border-color:var(--green);color:var(--text);}
+.send-url-input.has-url{color:var(--text);}
+.covered-by-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:3px;font-size:9px;letter-spacing:.06em;background:rgba(168,224,99,.12);color:var(--green);border:1px solid rgba(168,224,99,.2);}
+.em-field-group{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:10px;}
+.em-field-group-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px;}
+.status-ok{color:var(--green)!important;}
+.status-err{color:#f87171!important;}
+
+/* ── EMPTY STATE ── */
+.empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:12px;}
+.empty-icon{font-size:32px;margin-bottom:8px;}
+
+/* ── MOBILE ── */
+@media(max-width:680px){
+  header,nav,main{padding-left:14px;padding-right:14px;}
+  .grid2,.grid3{grid-template-columns:1fr;}
+  .bill-header{grid-template-columns:1fr 100px 32px;}
+  .bill-my-share{display:none;}
+  .line-items-head,.line-item{grid-template-columns:120px 1fr 100px 28px;}
+  .line-item-owed{display:none;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="3" width="10" height="2" rx="1" fill="#0c0d0f"/>
+        <rect x="2" y="7" width="14" height="2" rx="1" fill="#0c0d0f"/>
+        <rect x="2" y="11" width="8" height="2" rx="1" fill="#0c0d0f"/>
+        <circle cx="14" cy="13" r="3" fill="#0c0d0f" opacity="0.25"/>
+        <path d="M13 13l1 1 2-2" stroke="#0c0d0f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="logo-wordmark">
+      <div class="logo-name">Bill<span>Flow</span></div>
+      <div class="logo-sub">household manager</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--muted);">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 10c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <span id="currentUser">local</span>
+    </div>
+    <div class="month-pill">
+      <select id="monthSel">
+        <option value="0">January</option><option value="1">February</option>
+        <option value="2">March</option><option value="3">April</option>
+        <option value="4">May</option><option value="5">June</option>
+        <option value="6">July</option><option value="7">August</option>
+        <option value="8">September</option><option value="9">October</option>
+        <option value="10">November</option><option value="11">December</option>
+      </select>
+      <input type="number" id="yearSel" value="2025" min="2020" max="2035">
+    </div>
+  </div>
+</header>
+
+<nav>
+  <div class="tab active" data-page="bills">📋 Bills <span class="badge" id="tab-badge-bills">0</span></div>
+  <div class="tab" data-page="summary">💰 Summary</div>
+  <div class="tab" data-page="sendpay">📤 Send &amp; Receive</div>
+  <div class="tab" data-page="trends">📈 Trends</div>
+  <div class="tab" data-page="settings">⚙️ Settings</div>
+</nav>
+
+<main>
+
+<!-- ════════════════ BILLS ════════════════ -->
+<div id="page-bills" class="page active">
+  <div class="page-title">Bills</div>
+  <div class="page-sub">Enter amounts pulled from your bank, Verizon portal, or mortgage site.</div>
+  <div id="billsList"></div>
+  <div style="margin-top:8px;">
+    <button class="btn btn-ghost btn-sm" onclick="addNewBill()">＋ Add Bill</button>
+  </div>
+</div>
+
+<!-- ════════════════ SUMMARY ════════════════ -->
+<div id="page-summary" class="page">
+  <div class="page-title">Summary</div>
+  <div class="page-sub">What everyone owes this month.</div>
+
+  <div class="grid2" id="personSummaryCards" style="margin-bottom:16px;"></div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">My Total Outlay</div></div>
+    <div id="myOutlaySummary"></div>
+    <hr>
+    <div class="sum-row">
+      <div class="sum-label">Total I'm paying this month</div>
+      <div class="sum-val big" id="myGrandTotal">$0.00</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">Full Bill Breakdown</div></div>
+    <div id="fullBreakdown"></div>
+  </div>
+</div>
+
+<!-- ════════════════ SEND & RECEIVE ════════════════ -->
+<div id="page-sendpay" class="page">
+  <div class="page-title">Send &amp; Receive</div>
+  <div class="page-sub">Collect from others and pay your bills — all in one place.</div>
+
+  <!-- RECEIVE SECTION -->
+  <div class="sr-section-label">
+    <div class="sr-section-icon receive">↓</div>
+    <div>
+      <div class="sr-section-title">Receive</div>
+      <div class="sr-section-sub">Notify people what they owe and request payment</div>
+    </div>
+  </div>
+
+  <div id="receiveCards"></div>
+
+  <!-- SEND SECTION -->
+  <div class="sr-section-label" style="margin-top:28px;">
+    <div class="sr-section-icon send">↑</div>
+    <div>
+      <div class="sr-section-title">Send</div>
+      <div class="sr-section-sub">Pay your bills — add a URL to each bill to get a one-click Pay button</div>
+    </div>
+  </div>
+
+  <div id="sendCards"></div>
+
+  <!-- CHECKLIST -->
+  <div class="sr-section-label" style="margin-top:28px;">
+    <div class="sr-section-icon" style="background:var(--surface3);color:var(--muted);">✓</div>
+    <div>
+      <div class="sr-section-title">Monthly Checklist</div>
+      <div class="sr-section-sub">Track what's been done this month</div>
+    </div>
+  </div>
+  <div class="card">
+    <div id="checklist"></div>
+  </div>
+</div>
+
+<!-- ════════════════ TRENDS ════════════════ -->
+<div id="page-trends" class="page">
+  <div class="page-title">Trends</div>
+  <div class="page-sub">Month-over-month spend tracking.</div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Total Bills Over Time</div></div>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-head"><div class="card-title">This Month — Category Breakdown</div></div>
+      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">Historical Log</div></div>
+      <div id="historyLog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ SETTINGS ════════════════ -->
+<div id="page-settings" class="page">
+  <div class="page-title">Settings</div>
+  <div class="page-sub">Configure people, payment methods, and bill defaults.</div>
+
+  <div class="card">
+    <div class="setting-group">
+      <div class="setting-group-title">People</div>
+      <div id="peopleConfig"></div>
+      <div class="action-row">
+        <button class="btn btn-ghost btn-sm" onclick="addPerson()">＋ Add Person</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="setting-group">
+      <div class="setting-group-title">Email Relay</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+        Configure a mail provider so BillFlow can send HTML bill summaries directly. API keys are stored server-side and never exposed to the browser.
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">Provider<div class="setting-hint">How emails are sent</div></div>
+        <select id="em-provider" onchange="renderEmailProviderFields()" style="font-size:12px;">
+          <option value="">— disabled —</option>
+          <option value="smtp">SMTP (Gmail, Outlook, self-hosted…)</option>
+          <option value="mailgun">Mailgun</option>
+          <option value="sendgrid">SendGrid</option>
+          <option value="resend">Resend</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label">From Name<div class="setting-hint">Sender display name</div></div>
+        <input type="text" id="em-fromName" placeholder="e.g. Marty" style="font-size:12px;">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">From Email<div class="setting-hint">Sender address</div></div>
+        <input type="email" id="em-fromEmail" placeholder="you@yourdomain.com" style="font-size:12px;">
+      </div>
+
+      <!-- Dynamic provider fields -->
+      <div id="emailProviderFields"></div>
+
+      <div class="action-row" style="margin-top:12px;">
+        <button class="btn btn-green btn-sm" onclick="saveEmailConfig()">Save Email Config</button>
+        <button class="btn btn-ghost btn-sm" onclick="testEmailConfig()">Send Test Email</button>
+        <span id="emailConfigStatus" style="font-size:11px;color:var(--muted);"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-person greeting config -->
+  <div class="card">
+    <div class="setting-group">
+      <div class="setting-group-title">Email Greetings</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Custom opening line per person in their bill email.</div>
+      <div id="greetingConfig"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="setting-group">
+      <div class="setting-group-title">Bill Defaults</div>
+      <div id="billConfig"></div>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-green" onclick="saveSettings()">Save Settings</button>
+    <button class="btn btn-ghost" onclick="exportData()">Export Backup</button>
+    <label class="btn btn-ghost" style="cursor:pointer;">
+      Import Backup
+      <input type="file" accept=".json" style="display:none" onchange="importData(this.files[0])">
+    </label>
+    <button class="btn btn-danger btn-sm" onclick="clearAll()">Reset All</button>
+  </div>
+</div>
+
+</main>
+</div><!-- #app -->
+
+<div id="toast"><div class="toast-dot"></div><span id="toastMsg"></span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const PERSON_COLORS = ['#a8e063','#5bc4f5','#f5a623','#f06292','#b39ddb','#80cbc4','#ffcc80'];
+
+let S = {
+  settings: { myEmail: '' },
+  people: [
+    { id:'me',   name:'Me',   color:'#a8e063', payMethod:'none',   payId:'', email:'' },
+    { id:'wife', name:'Wife', color:'#5bc4f5', payMethod:'zelle',  payId:'', email:'' },
+    { id:'dad',  name:'Dad',  color:'#f5a623', payMethod:'venmo',  payId:'', email:'' },
+    { id:'mom',  name:'Mom',  color:'#b39ddb', payMethod:'manual', payId:'', email:'' },
+  ],
+  bills: [
+    {
+      id:'electric', name:'Electric', icon:'⚡', color:'#ffd54f',
+      splitType:'pct',  // 'pct' | 'fixed'
+      lines:[
+        { id:'l1', desc:'Electric', personId:'me',   value:50 },
+        { id:'l2', desc:'Electric', personId:'wife', value:50 },
+      ]
+    },
+    {
+      id:'gas', name:'Gas / Heating', icon:'🔥', color:'#ff8a65',
+      splitType:'pct',
+      lines:[
+        { id:'l1', desc:'Gas', personId:'me',   value:50 },
+        { id:'l2', desc:'Gas', personId:'wife', value:50 },
+      ]
+    },
+    {
+      id:'internet', name:'Internet', icon:'📶', color:'#5bc4f5',
+      splitType:'pct',
+      lines:[
+        { id:'l1', desc:'Internet', personId:'me',   value:50 },
+        { id:'l2', desc:'Internet', personId:'wife', value:50 },
+      ]
+    },
+    {
+      id:'mortgage', name:'Mortgage', icon:'🏠', color:'#a8e063',
+      splitType:'fixed', remainderLineId:'l1',
+      lines:[
+        { id:'l1', desc:'Mortgage', personId:'me', value:0 },
+      ]
+    },
+    {
+      id:'verizon', name:'Verizon', icon:'📱', color:'#f06292',
+      splitType:'fixed', remainderLineId:'l1',
+      lines:[
+        { id:'l1', desc:'Your line',  personId:'me',   value:0, coveredById:null },
+        { id:'l2', desc:'Wife line',  personId:'wife', value:0, coveredById:'me'  },
+        { id:'l3', desc:'Dad line',   personId:'dad',  value:0, coveredById:null  },
+        { id:'l4', desc:'Mom line',   personId:'mom',  value:0, coveredById:'dad' },
+      ]
+    },
+  ],
+  monthly: {},   // key: "YYYY-MM" → { totals:{billId:number}, amounts:{billId:{lineId:number}} }
+  checklist: {}, // key: "YYYY-MM" → { itemId: bool }
+};
+
+let trendChartInst = null, pieChartInst = null;
+
+// ═══════════════════════════════════════════════
+//  API PERSISTENCE
+// ═══════════════════════════════════════════════
+const API = '/api';
+let _saveTimer = null;
+let _currentUser = 'local';
+
+// Debounced save — batches rapid keystrokes into one API call
+function save() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => _flushState(), 600);
+}
+
+async function _flushState() {
+  try {
+    await fetch(`${API}/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        settings: S.settings,
+        people:   S.people,
+        bills:    S.bills,
+        checklist: S.checklist,
+      })
+    });
+  } catch(e) { console.warn('State save failed:', e); }
+}
+
+async function saveMonthNow(key, data) {
+  try {
+    await fetch(`${API}/months/${key}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) { console.warn('Month save failed:', e); }
+}
+
+async function load() {
+  try {
+    // Load config state
+    const stateRes = await fetch(`${API}/state`);
+    if (stateRes.ok) {
+      const parsed = await stateRes.json();
+      if (parsed.settings)  Object.assign(S.settings, parsed.settings);
+      if (parsed.people)    S.people   = parsed.people;
+      if (parsed.bills)     S.bills    = parsed.bills;
+      if (parsed.checklist) S.checklist = parsed.checklist;
+    }
+    // Load all months for trend data
+    const monthsRes = await fetch(`${API}/months`);
+    if (monthsRes.ok) {
+      S.monthly = await monthsRes.json();
+    }
+    // Identify current user
+    const healthRes = await fetch(`${API}/health`);
+    if (healthRes.ok) {
+      const h = await healthRes.json();
+      _currentUser = h.user;
+      const userEl = document.getElementById('currentUser');
+      if (userEl) userEl.textContent = _currentUser;
+    }
+  } catch(e) {
+    console.warn('Load failed (API unreachable?):', e);
+    showBanner('⚠ Cannot reach API — running in offline mode', 'warning');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MONTH KEY
+// ═══════════════════════════════════════════════
+function monthKey() {
+  const m = parseInt(document.getElementById('monthSel').value);
+  const y = parseInt(document.getElementById('yearSel').value);
+  return `${y}-${String(m+1).padStart(2,'0')}`;
+}
+function monthLabel(key) {
+  if (!key) return '';
+  const [y,m] = key.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${names[parseInt(m)-1]} ${y}`;
+}
+function monthLabelLong(key) {
+  if (!key) return '';
+  const [y,m] = key.split('-');
+  const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${names[parseInt(m)-1]} ${y}`;
+}
+
+// ═══════════════════════════════════════════════
+//  DATA HELPERS
+// ═══════════════════════════════════════════════
+function getMonthData() {
+  const k = monthKey();
+  if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
+  return S.monthly[k];
+}
+function getBillTotal(billId) { return getMonthData().totals[billId] || 0; }
+function getLineAmount(billId, lineId) { return (getMonthData().amounts[billId] || {})[lineId] || 0; }
+function setLineAmount(billId, lineId, val) {
+  const md = getMonthData();
+  if (!md.amounts[billId]) md.amounts[billId] = {};
+  md.amounts[billId][lineId] = val;
+}
+function setBillTotal(billId, val) { getMonthData().totals[billId] = val; }
+
+function getPerson(id) { return S.people.find(p=>p.id===id) || {id:id, name:id, color:'#767880'}; }
+
+// Compute what each person owes/pays for a bill
+function computeBillSplit(bill) {
+  const total = getBillTotal(bill.id);
+  const result = {}; // personId → amount
+  S.people.forEach(p => result[p.id] = 0);
+  result['me'] = result['me'] || 0;
+
+  if (bill.splitType === 'fixed') {
+    // Non-remainder lines use stored amounts; remainder = total - sum of others
+    const fixedTotal = getBillTotal(bill.id);
+    const remainId = bill.remainderLineId || (bill.lines[0] && bill.lines[0].id) || '';
+    const otherSum = bill.lines.filter(l=>l.id!==remainId).reduce((s,l)=>s+getLineAmount(bill.id,l.id),0);
+    const remainderVal = Math.max(0, fixedTotal - otherSum);
+    bill.lines.forEach(line => {
+      const amt = line.id === remainId ? remainderVal : getLineAmount(bill.id, line.id);
+      // If someone else is covering this line, charge the payer instead
+      const payerId = line.coveredById || line.personId;
+      if (!result[payerId]) result[payerId] = 0;
+      result[payerId] += amt;
+    });
+  } else {
+    // pct: lines have %, total entered separately
+    bill.lines.forEach(line => {
+      const amt = total * (line.value / 100);
+      const payerId = line.coveredById || line.personId;
+      if (!result[payerId]) result[payerId] = 0;
+      result[payerId] += amt;
+    });
+  }
+  return result;
+}
+
+// What does each person owe ME across all bills?
+function computePersonOwes() {
+  const owes = {};
+  S.people.forEach(p => owes[p.id] = { total:0, bills:[] });
+
+  S.bills.forEach(bill => {
+    const split = computeBillSplit(bill);
+    Object.entries(split).forEach(([personId, amt]) => {
+      if (personId === 'me' || !amt) return;
+      if (!owes[personId]) owes[personId] = { total:0, bills:[] };
+      owes[personId].total += amt;
+      // Build a note about who they're covering
+      const coveredLines = bill.lines.filter(l => l.coveredById === personId);
+      const coveringNames = [...new Set(coveredLines.map(l => getPerson(l.personId).name))];
+      const coverNote = coveringNames.length ? ' (covers ' + coveringNames.join(', ') + ')' : '';
+      owes[personId].bills.push({ name: bill.name + coverNote, amount: amt });
+    });
+  });
+  return owes;
+}
+
+// What I pay total
+function computeMyTotal() {
+  let total = 0;
+  S.bills.forEach(bill => {
+    const split = computeBillSplit(bill);
+    total += split['me'] || 0;
+  });
+  return total;
+}
+
+// ═══════════════════════════════════════════════
+//  BILLS PAGE
+// ═══════════════════════════════════════════════
+function renderBills() {
+  const container = document.getElementById('billsList');
+  container.innerHTML = '';
+  let filled = 0;
+
+  S.bills.forEach(bill => {
+    const total = getBillTotal(bill.id);
+    if (total > 0 || bill.splitType === 'fixed') {
+      // Check if any fixed line has a value
+      if (bill.splitType === 'fixed') {
+        const hasVal = bill.lines.some(l => getLineAmount(bill.id, l.id) > 0);
+        if (hasVal) filled++;
+      } else {
+        if (total > 0) filled++;
+      }
+    }
+
+    const split = computeBillSplit(bill);
+    const myShare = split['me'] || 0;
+    const billTotal = bill.splitType === 'fixed'
+      ? bill.lines.reduce((s,l) => s + getLineAmount(bill.id, l.id), 0)
+      : total;
+
+    const card = document.createElement('div');
+    card.className = 'bill-card';
+    card.id = `bill-card-${bill.id}`;
+
+    const totalDisplay = billTotal > 0
+      ? `<div class="bill-total-display has-val">$${billTotal.toFixed(2)}</div>`
+      : `<div class="bill-total-display">—</div>`;
+    const myShareDisplay = billTotal > 0
+      ? `<div class="bill-my-share">my share: $${myShare.toFixed(2)}</div>`
+      : `<div class="bill-my-share">—</div>`;
+
+    // Build participants pills — show payers (covered-by) with arrow indicator
+    const participants = [...new Set(bill.lines.map(l=>l.personId))];
+    const payers = [...new Set(bill.lines.filter(l=>l.coveredById && l.coveredById !== l.personId).map(l=>l.coveredById))];
+    const allShown = [...new Set([...participants, ...payers])];
+    const pillsHtml = allShown.map(pid => {
+      const p = getPerson(pid);
+      const isCoverer = payers.includes(pid) && !participants.includes(pid);
+      const colorClass = pid==='me'?'pill-green':pid==='wife'?'pill-blue':pid==='dad'?'pill-orange':'pill-purple';
+      return `<span class="pill ${colorClass}">${isCoverer ? '↑ ' : ''}${p.name}</span>`;
+    }).join(' ');
+
+    card.innerHTML = `
+      <div class="bill-header" onclick="toggleBill('${bill.id}')">
+        <div class="bill-name-wrap">
+          <div class="bill-icon" style="background:${bill.color}22;color:${bill.color}">${bill.icon}</div>
+          <div>
+            <div class="bill-name">${bill.name}</div>
+            <div class="bill-sub">${pillsHtml} &nbsp;<span style="color:var(--muted2);font-size:10px">${bill.splitType==='pct'?'% split':'fixed split'}</span></div>
+          </div>
+        </div>
+        ${totalDisplay}
+        ${myShareDisplay}
+        <button class="bill-expand-btn" onclick="event.stopPropagation();toggleBill('${bill.id}')">▾</button>
+      </div>
+      <div class="bill-body">
+        ${renderBillBody(bill)}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
+  recalcAll();
+}
+
+function renderBillBody(bill) {
+  const splitTypeToggle = `
+    <div class="split-config">
+      <span class="split-label">Split type:</span>
+      <div class="split-type-toggle">
+        <button class="${bill.splitType==='pct'?'active':''}" onclick="setSplitType('${bill.id}','pct')">% Percent</button>
+        <button class="${bill.splitType==='fixed'?'active':''}" onclick="setSplitType('${bill.id}','fixed')">$ Fixed</button>
+      </div>
+      <button class="btn btn-danger btn-xs" style="margin-left:auto" onclick="removeBill('${bill.id}')">Remove Bill</button>
+    </div>
+  `;
+
+  let bodyContent = '';
+
+  if (bill.splitType === 'pct') {
+    // Enter one total, then % per line
+    const total = getBillTotal(bill.id);
+    const pctSum = bill.lines.reduce((s,l)=>s+l.value,0);
+    const pctOk = Math.abs(pctSum - 100) < 0.01;
+
+    bodyContent = `
+      <div class="total-input-wrap" style="margin-top:12px;">
+        <label>Total Bill ($)</label>
+        <input type="number" placeholder="0.00" step="0.01" value="${total||''}"
+               oninput="onTotalInput('${bill.id}', this.value)" style="max-width:140px;">
+        <div class="total-breakdown">
+          ${pctOk ? '' : `<span style="color:var(--orange)">⚠ percentages sum to ${pctSum}%</span>`}
+        </div>
+      </div>
+      <div class="line-items-head" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;">
+        <div>Description</div><div>Responsible</div><div style="text-align:right">%</div><div style="text-align:right">Amount</div><div>Covered By</div><div></div>
+      </div>
+      ${bill.lines.map(line => {
+        const lineAmt = total * (line.value/100);
+        const coveredBy = line.coveredById || '';
+        const isCovered = !!coveredBy && coveredBy !== line.personId;
+        const coverer = isCovered ? getPerson(coveredBy) : null;
+        return `
+          <div class="line-item" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;${isCovered?'background:rgba(168,224,99,.04);':''}">
+            <input type="text" value="${line.desc}" placeholder="Description"
+                   oninput="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
+            <select onchange="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
+            </select>
+            <input type="number" value="${line.value}" min="0" max="100" step="0.1"
+                   oninput="updateLinePct('${bill.id}','${line.id}',this.value)"
+                   style="text-align:right;font-size:12px;">
+            <div class="line-item-owed ${line.personId==='me'?'is-mine':''}" style="text-align:right;">
+              ${total ? `$${lineAmt.toFixed(2)}` : '—'}
+            </div>
+            <select onchange="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+                    style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
+              <option value="">— none —</option>
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
+            </select>
+            <button class="remove-line" onclick="removeLine('${bill.id}','${line.id}')">✕</button>
+          </div>`;
+      }).join('')}
+      <div class="add-line-row">
+        <button class="btn btn-ghost btn-xs" onclick="addLine('${bill.id}')">＋ Add Line</button>
+      </div>
+    `;
+  } else {
+    // Fixed: total input + per-line amounts, one line is the remainder absorber
+    const fixedTotal = getBillTotal(bill.id);
+    const remainId = bill.remainderLineId || (bill.lines[0] && bill.lines[0].id) || '';
+    const remainLine = bill.lines.find(l=>l.id===remainId) || bill.lines[0] || {};
+    const remainderPerson = getPerson(remainLine.personId || 'me');
+    const otherSum = bill.lines.filter(l=>l.id!==remainId).reduce((s,l)=>s+getLineAmount(bill.id,l.id),0);
+    const remainderVal = Math.max(0, fixedTotal - otherSum);
+
+    bodyContent = `
+      <div class="total-input-wrap" style="margin-top:12px;">
+        <label>Total Bill ($)</label>
+        <input type="number" placeholder="0.00" step="0.01" value="${fixedTotal||''}"
+               oninput="onTotalInput('${bill.id}', this.value)" style="max-width:140px;">
+        <div class="total-breakdown" style="font-size:11px;color:var(--muted);">
+          ${fixedTotal > 0 ? 'Remainder → <span style="color:'+remainderPerson.color+'">'+remainderPerson.name+'</span>' : 'Enter total, then adjust lines below'}
+        </div>
+      </div>
+      <div class="line-items-head" style="grid-template-columns:24px 150px 1fr 120px 130px 28px;">
+        <div title="R = remainder absorber" style="cursor:default">R</div>
+        <div>Description</div><div>Responsible</div>
+        <div style="text-align:right">Amount ($)</div><div>Covered By</div><div></div>
+      </div>
+      ${bill.lines.map(line => {
+        const isRemainder = line.id === remainId;
+        const lineAmt = isRemainder ? remainderVal : getLineAmount(bill.id, line.id);
+        const rColor = isRemainder ? 'var(--green)' : 'var(--border2)';
+        const rBg    = isRemainder ? 'var(--green)' : 'transparent';
+        const rTxt   = isRemainder ? '#0c0d0f' : 'var(--muted)';
+        const coveredBy = line.coveredById || '';
+        const isCovered = !!coveredBy && coveredBy !== line.personId;
+        return `
+          <div class="line-item" style="grid-template-columns:24px 150px 1fr 120px 130px 28px;${isCovered?'background:rgba(168,224,99,.04);':''}">
+            <div style="display:flex;align-items:center;justify-content:center;">
+              <button title="${isRemainder ? 'Remainder absorber — click to move' : 'Make this line absorb the remainder'}"
+                onclick="setRemainderLine('${bill.id}','${line.id}')"
+                style="width:20px;height:20px;border-radius:50%;border:2px solid ${rColor};background:${rBg};
+                       cursor:pointer;font-size:9px;color:${rTxt};font-family:DM Mono,monospace;font-weight:500;">R</button>
+            </div>
+            <input type="text" value="${line.desc}" placeholder="Description"
+                   oninput="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
+            <select onchange="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
+            </select>
+            ${isRemainder
+              ? `<div id="remainder-display-${bill.id}"
+                      style="text-align:right;font-size:13px;color:var(--green);font-weight:600;padding-right:10px;display:flex;align-items:center;justify-content:flex-end;">
+                   ${fixedTotal > 0 ? '$'+remainderVal.toFixed(2) : '—'}
+                 </div>`
+              : `<input type="number" value="${lineAmt||''}" placeholder="0.00" step="0.01"
+                        oninput="onFixedLineInput('${bill.id}','${line.id}',this.value)"
+                        style="text-align:right;font-size:12px;" id="fixed-line-input-${bill.id}-${line.id}">`
+            }
+            <select onchange="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+                    style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
+              <option value="">— none —</option>
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
+            </select>
+            <button class="remove-line" onclick="removeLine('${bill.id}','${line.id}')">✕</button>
+          </div>`;
+      }).join('')}
+      <div class="add-line-row" style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-ghost btn-xs" onclick="addLine('${bill.id}')">+ Add Line</button>
+        <span style="font-size:10px;color:var(--muted2)">R = remainder absorber &nbsp;·&nbsp; Covered By = who actually pays you</span>
+      </div>
+    `;
+  }
+
+  return splitTypeToggle + bodyContent;
+}
+
+function toggleBill(id) {
+  const card = document.getElementById(`bill-card-${id}`);
+  card.classList.toggle('expanded');
+}
+
+function onTotalInput(billId, val) {
+  setBillTotal(billId, parseFloat(val)||0);
+  updateBillComputedDisplays(billId);
+  recalcAll();
+  save();
+}
+function onFixedLineInput(billId, lineId, val) {
+  setLineAmount(billId, lineId, parseFloat(val)||0);
+  updateBillComputedDisplays(billId);
+  recalcAll();
+  save();
+}
+function setRemainderLine(billId, lineId) {
+  const bill = S.bills.find(b=>b.id===billId);
+  if (!bill) return;
+  bill.remainderLineId = lineId;
+  refreshBillBody(billId);
+  recalcAll();
+  save();
+  toast('Remainder line updated');
+}
+
+// Update only the read-only computed values inside a bill card (amounts, totals, header)
+// WITHOUT touching any input elements — preserves focus and cursor position
+function updateBillComputedDisplays(billId) {
+  const bill = S.bills.find(b=>b.id===billId);
+  if (!bill) return;
+  const card = document.getElementById('bill-card-'+billId);
+  if (!card) return;
+
+  const split = computeBillSplit(bill);
+  const billTotal = getBillTotal(bill.id);
+  const myShare = split['me']||0;
+
+  // Update card header
+  const totalEl = card.querySelector('.bill-total-display');
+  if (totalEl) {
+    totalEl.textContent = billTotal>0 ? '$'+billTotal.toFixed(2) : '—';
+    totalEl.classList.toggle('has-val', billTotal>0);
+  }
+  const myEl = card.querySelector('.bill-my-share');
+  if (myEl) myEl.textContent = billTotal>0 ? 'my share: $'+myShare.toFixed(2) : '—';
+
+  // Update per-line computed amount spans (class line-item-owed)
+  if (bill.splitType==='pct') {
+    const total = getBillTotal(bill.id);
+    const owedEls = card.querySelectorAll('.line-item-owed');
+    bill.lines.forEach((line, i) => {
+      if (owedEls[i]) {
+        const amt = total*(line.value/100);
+        owedEls[i].textContent = total ? '$'+amt.toFixed(2) : '—';
+      }
+    });
+    // Update pct warning
+    const pctSum = bill.lines.reduce((s,l)=>s+l.value,0);
+    const warnEl = card.querySelector('.total-breakdown');
+    if (warnEl) warnEl.innerHTML = Math.abs(pctSum-100)<0.01 ? '' : '<span style="color:var(--orange)">⚠ percentages sum to '+pctSum+'%</span>';
+  }
+
+  // Fixed bills: update remainder display div and hint text (no inputs touched)
+  if (bill.splitType==='fixed') {
+    const fixedTotal = getBillTotal(bill.id);
+    const remainId = bill.remainderLineId || (bill.lines[0] && bill.lines[0].id) || '';
+    const otherSum = bill.lines.filter(l=>l.id!==remainId).reduce((s,l)=>s+getLineAmount(bill.id,l.id),0);
+    const remainderVal = Math.max(0, fixedTotal - otherSum);
+
+    const remDisplay = card.querySelector('#remainder-display-'+billId);
+    if (remDisplay) remDisplay.textContent = fixedTotal > 0 ? '$'+remainderVal.toFixed(2) : '—';
+
+    const hint = card.querySelector('.total-breakdown');
+    const remainLine = bill.lines.find(l=>l.id===remainId) || bill.lines[0] || {};
+    const remPerson = getPerson(remainLine.personId || 'me');
+    if (hint) hint.innerHTML = fixedTotal > 0
+      ? 'Remainder → <span style="color:'+remPerson.color+'">'+remPerson.name+'</span>'
+      : 'Enter total, then adjust lines below';
+  }
+}
+function updateLineDesc(billId, lineId, val) {
+  const bill = S.bills.find(b=>b.id===billId);
+  const line = bill?.lines.find(l=>l.id===lineId);
+  if (line) { line.desc = val; save(); }
+}
+function updateLinePersonId(billId, lineId, val) {
+  const bill = S.bills.find(b=>b.id===billId);
+  const line = bill?.lines.find(l=>l.id===lineId);
+  if (line) { line.personId = val; refreshBillBody(billId); recalcAll(); save(); }
+}
+function updateLinePct(billId, lineId, val) {
+  const bill = S.bills.find(b=>b.id===billId);
+  const line = bill?.lines.find(l=>l.id===lineId);
+  if (line) { line.value = parseFloat(val)||0; updateBillComputedDisplays(billId); recalcAll(); save(); }
+}
+function updateLineCoveredBy(billId, lineId, val) {
+  const bill = S.bills.find(b=>b.id===billId);
+  const line = bill?.lines.find(l=>l.id===lineId);
+  if (!line) return;
+  // Store null when "none" selected, or self is chosen — treat as uncovered
+  line.coveredById = (val === '' || val === line.personId) ? null : val;
+  refreshBillBody(billId);
+  recalcAll();
+  save();
+  const payer = line.coveredById ? getPerson(line.coveredById).name : null;
+  if (payer) toast(getPerson(line.personId).name + "'s line covered by " + payer);
+}
+function setSplitType(billId, type) {
+  const bill = S.bills.find(b=>b.id===billId);
+  if (bill) { bill.splitType = type; refreshBillBody(billId); recalcAll(); save(); }
+}
+function addLine(billId) {
+  const bill = S.bills.find(b=>b.id===billId);
+  if (!bill) return;
+  bill.lines.push({ id:'l'+Date.now(), desc:'', personId:'me', value:0, coveredById:null });
+  refreshBillBody(billId);
+  save();
+}
+function removeLine(billId, lineId) {
+  const bill = S.bills.find(b=>b.id===billId);
+  if (!bill) return;
+  bill.lines = bill.lines.filter(l=>l.id!==lineId);
+  refreshBillBody(billId);
+  recalcAll();
+  save();
+}
+function removeBill(billId) {
+  if (!confirm('Remove this bill?')) return;
+  S.bills = S.bills.filter(b=>b.id!==billId);
+  renderBills();
+  save();
+}
+function addNewBill() {
+  const name = prompt('Bill name?');
+  if (!name) return;
+  S.bills.push({
+    id: 'bill_'+Date.now(),
+    name, icon:'💵', color:'#a8e063',
+    splitType:'pct', remainderLineId:'l1',
+    lines:[
+      {id:'l1', desc:name, personId:'me',   value:50},
+      {id:'l2', desc:name, personId:'wife', value:50},
+    ]
+  });
+  renderBills();
+  // Expand new bill
+  const last = S.bills[S.bills.length-1];
+  const card = document.getElementById(`bill-card-${last.id}`);
+  if (card) card.classList.add('expanded');
+  save();
+  toast('Bill added — configure it below!');
+}
+
+function refreshBillBody(billId) {
+  const card = document.getElementById(`bill-card-${billId}`);
+  if (!card) return;
+  const bill = S.bills.find(b=>b.id===billId);
+  if (!bill) return;
+  const body = card.querySelector('.bill-body');
+  if (body) body.innerHTML = renderBillBody(bill);
+  // Update header totals
+  const split = computeBillSplit(bill);
+  const myShare = split['me'] || 0;
+  const billTotal = bill.splitType === 'fixed'
+    ? bill.lines.reduce((s,l) => s + getLineAmount(bill.id, l.id), 0)
+    : getBillTotal(bill.id);
+  const totalEl = card.querySelector('.bill-total-display');
+  if (totalEl) {
+    totalEl.textContent = billTotal > 0 ? `$${billTotal.toFixed(2)}` : '—';
+    totalEl.classList.toggle('has-val', billTotal > 0);
+  }
+  const myEl = card.querySelector('.bill-my-share');
+  if (myEl) myEl.textContent = billTotal > 0 ? `my share: $${myShare.toFixed(2)}` : '—';
+}
+
+// ═══════════════════════════════════════════════
+//  RECALC ALL (summary + sendpay)
+// ═══════════════════════════════════════════════
+function recalcAll() {
+  saveMonthSnapshot();
+  renderSummary();
+  renderSendPay();
+  updateTabBadge();
+}
+
+function saveMonthSnapshot() {
+  const k = monthKey();
+  if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
+  S.monthly[k]._myTotal = computeMyTotal();
+  const owes = computePersonOwes();
+  S.monthly[k]._owes = {};
+  Object.entries(owes).forEach(([pid, d]) => {
+    S.monthly[k]._owes[pid] = d.total;
+  });
+  // Persist month data to API (fire and forget)
+  saveMonthNow(k, S.monthly[k]);
+  // Also persist config state
+  save();
+}
+
+function updateTabBadge() {
+  let filled = 0;
+  S.bills.forEach(bill => {
+    if (bill.splitType === 'fixed') {
+      if (bill.lines.some(l => getLineAmount(bill.id, l.id) > 0)) filled++;
+    } else {
+      if (getBillTotal(bill.id) > 0) filled++;
+    }
+  });
+  document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
+}
+
+// ═══════════════════════════════════════════════
+//  SUMMARY PAGE
+// ═══════════════════════════════════════════════
+function renderSummary() {
+  const owes = computePersonOwes();
+  const myTotal = computeMyTotal();
+
+  // Person cards (people who owe me, excluding me)
+  const cardsContainer = document.getElementById('personSummaryCards');
+  if (!cardsContainer) return;
+  cardsContainer.innerHTML = '';
+  S.people.filter(p => p.id !== 'me').forEach(person => {
+    const d = owes[person.id] || { total:0, bills:[] };
+    if (d.total === 0) return;
+    const colorClass = person.id==='wife'?'pscard-wife':person.id==='dad'?'pscard-dad':'pscard-other';
+    const billList = d.bills.map(b=>`${b.name}: $${b.amount.toFixed(2)}`).join(' · ');
+    const card = document.createElement('div');
+    card.className = `person-summary-card ${colorClass}`;
+    card.style.setProperty('--pc', person.color);
+    card.innerHTML = `
+      <div class="ps-name" style="color:${person.color}">${person.name}</div>
+      <div class="ps-amount">$${d.total.toFixed(2)}</div>
+      <div class="ps-bills">${billList || 'No bills assigned'}</div>
+    `;
+    cardsContainer.appendChild(card);
+  });
+  if (cardsContainer.children.length === 0) {
+    cardsContainer.innerHTML = `<div class="empty" style="grid-column:span 2"><div class="empty-icon">👥</div>No one owes you anything yet — enter bill amounts on the Bills tab.</div>`;
+  }
+
+  // My outlay
+  const myOutlay = document.getElementById('myOutlaySummary');
+  if (myOutlay) {
+    let html = '';
+    S.bills.forEach(bill => {
+      const split = computeBillSplit(bill);
+      const mine = split['me'] || 0;
+      if (mine > 0) {
+        html += `<div class="sum-row"><span class="sum-label">${bill.icon} ${bill.name}</span><span class="sum-val" style="font-size:14px;">$${mine.toFixed(2)}</span></div>`;
+      }
+    });
+    myOutlay.innerHTML = html || `<div style="color:var(--muted);font-size:12px;padding:12px 0">No amounts entered yet.</div>`;
+  }
+  const myGrand = document.getElementById('myGrandTotal');
+  if (myGrand) myGrand.textContent = `$${myTotal.toFixed(2)}`;
+
+  // Full breakdown
+  const fb = document.getElementById('fullBreakdown');
+  if (fb) {
+    let html = '';
+    S.bills.forEach(bill => {
+      const split = computeBillSplit(bill);
+      const billTotal = bill.splitType==='fixed'
+        ? bill.lines.reduce((s,l)=>s+getLineAmount(bill.id,l.id),0)
+        : getBillTotal(bill.id);
+      if (billTotal === 0) return;
+      html += `<div style="margin-bottom:16px;">
+        <div style="font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${bill.icon} ${bill.name} — $${billTotal.toFixed(2)} total</div>`;
+      S.people.forEach(p => {
+        const amt = split[p.id] || 0;
+        if (!amt) return;
+        html += `<div class="sum-row" style="padding:6px 0 6px 12px;">
+          <span class="sum-label" style="color:${p.color}">${p.name}</span>
+          <span style="font-size:13px;color:${p.color}">$${amt.toFixed(2)}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    fb.innerHTML = html || `<div style="color:var(--muted);font-size:12px;padding:12px 0">Enter bill amounts to see breakdown.</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  SEND & RECEIVE
+// ═══════════════════════════════════════════════
+
+function renderSendPay() {
+  renderReceiveCards();
+  renderSendCards();
+  renderChecklist();
+}
+
+// ── RECEIVE section ────────────────────────────
+function renderReceiveCards() {
+  const container = document.getElementById('receiveCards');
+  if (!container) return;
+  const owes = computePersonOwes();
+
+  const people = S.people.filter(p => p.id !== 'me' && (owes[p.id]?.total || 0) > 0);
+  if (!people.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">👥</div>No one owes you anything yet — enter bill amounts on the Bills tab.</div>`;
+    return;
+  }
+
+  container.innerHTML = people.map(person => {
+    const d = owes[person.id] || { total:0, bills:[] };
+    const payDesc = person.payMethod === 'zelle'
+      ? 'Zelle · ' + (person.payId || 'set ID in Settings')
+      : person.payMethod === 'venmo'
+      ? 'Venmo · ' + (person.payId || 'set handle in Settings')
+      : 'Manual';
+    const emailDesc = person.email ? person.email : '(no email — add in Settings)';
+
+    let payBtn = '';
+    if (person.payMethod === 'zelle') {
+      payBtn = `<button class="btn btn-blue btn-sm" onclick="openZelle('${person.id}');markCheck('zelle_${person.id}')">💰 Zelle</button>`;
+    } else if (person.payMethod === 'venmo') {
+      payBtn = `<button class="btn btn-orange btn-sm" onclick="openVenmo('${person.id}');markCheck('venmo_${person.id}')">💸 Venmo</button>`;
+    }
+
+    const emailBtn = person.email
+      ? `<button class="btn btn-ghost btn-sm" onclick="openPersonEmail('${person.id}')">✉️ Email</button>`
+      : `<button class="btn btn-ghost btn-sm" style="opacity:.4;cursor:default" title="Add email in Settings">✉️ Email</button>`;
+
+    const greetingLine = person.greeting || ('Hi ' + person.name + ',');
+    const billRows = d.bills.map(b =>
+      `<div class="receive-bill-row"><span style="color:var(--muted)">${b.name}</span><span style="color:var(--text)">$${b.amount.toFixed(2)}</span></div>`
+    ).join('');
+
+    return `
+      <div class="receive-card" id="rc-${person.id}">
+        <div class="receive-card-head" onclick="toggleReceiveCard('${person.id}')">
+          <div class="receive-person">
+            <div class="receive-person-dot" style="background:${person.color}"></div>
+            <div>
+              <div class="receive-person-name" style="color:${person.color}">${person.name}</div>
+              <div class="receive-person-method">${payDesc}</div>
+            </div>
+          </div>
+          <div class="receive-actions">
+            <div class="receive-amount" style="color:${person.color}">$${d.total.toFixed(2)}</div>
+            ${emailBtn}
+            ${payBtn}
+            <button class="receive-expand" onclick="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
+          </div>
+        </div>
+        <div class="receive-body">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Bill Breakdown</div>
+          ${billRows}
+          <div style="margin-top:16px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Email preview</div>
+            <div class="email-box" style="font-size:11px;max-height:160px;white-space:pre-wrap;">${buildPersonEmail(person.id)}</div>
+            <div class="action-row">
+              <button class="btn btn-ghost btn-sm" onclick="openPersonEmail('${person.id}')">✉️ Open in Mail</button>
+              <button class="btn btn-ghost btn-sm" onclick="copyPersonEmail('${person.id}')">📋 Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleReceiveCard(personId) {
+  const card = document.getElementById('rc-' + personId);
+  if (card) card.classList.toggle('open');
+}
+
+function buildPersonEmail(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const d = owes[personId] || { total:0, bills:[] };
+  const k = monthKey();
+
+  const greeting = person.greeting || ('Hi ' + person.name + ',');
+  let payHint = '';
+  if (person.payMethod === 'zelle') payHint = "I'll send you a Zelle request for this amount.";
+  else if (person.payMethod === 'venmo') payHint = "I'll send you a Venmo request for this amount.";
+  else payHint = "Please send your share when you get a chance.";
+
+  let lines = [
+    greeting,
+    '',
+    "Here's your share of the bills for " + monthLabelLong(k) + ':',
+    '',
+  ];
+  d.bills.forEach(b => {
+    lines.push('  ' + b.name.padEnd(22) + ' $' + b.amount.toFixed(2));
+  });
+  lines.push('');
+  lines.push('  ' + '─'.repeat(29));
+  lines.push('  Total you owe:        $' + d.total.toFixed(2));
+  lines.push('');
+  lines.push(payHint);
+  lines.push('');
+  lines.push('Thanks!');
+  return lines.join('\n');
+}
+
+async function openPersonEmail(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const d = owes[personId] || { total:0, bills:[] };
+  if (!person.email) {
+    toast('Add an email address for ' + person.name + ' in Settings → People');
+    return;
+  }
+
+  // Show sending indicator
+  const btns = document.querySelectorAll(`[onclick*="openPersonEmail('${personId}')"]`);
+  btns.forEach(b => { b.textContent = '⏳ Sending…'; b.disabled = true; });
+
+  try {
+    const res = await fetch(`${API}/email/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to:          person.email,
+        personName:  person.name,
+        greeting:    person.greeting || '',
+        accentColor: person.color,
+        monthLabel:  monthLabelLong(monthKey()),
+        bills:       d.bills,
+        total:       d.total,
+        payMethod:   person.payMethod,
+        payId:       person.payId || '',
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      markCheck('email_' + personId);
+      toast('✓ Email sent to ' + person.name + ' (' + person.email + ')');
+      btns.forEach(b => { b.textContent = '✓ Sent'; b.style.color = 'var(--green)'; });
+    } else {
+      // Fall back to mailto if API not configured
+      if (data.error && data.error.includes('No email provider')) {
+        const body = buildPersonEmail(personId);
+        const subject = encodeURIComponent('Bills for ' + monthLabelLong(monthKey()));
+        window.open('mailto:' + person.email + '?subject=' + subject + '&body=' + encodeURIComponent(body));
+        toast('No relay configured — opening mail client instead');
+        btns.forEach(b => { b.textContent = '✉️ Email'; b.disabled = false; });
+      } else {
+        toast('✗ Send failed: ' + (data.error || 'Unknown error'));
+        btns.forEach(b => { b.textContent = '✉️ Email'; b.disabled = false; });
+      }
+    }
+  } catch(e) {
+    toast('✗ ' + e.message);
+    btns.forEach(b => { b.textContent = '✉️ Email'; b.disabled = false; });
+  }
+}
+
+function copyPersonEmail(personId) {
+  navigator.clipboard.writeText(buildPersonEmail(personId))
+    .then(() => toast('Email copied!'));
+}
+
+function openZelle(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const amt = (owes[personId]?.total || 0).toFixed(2);
+  const url = person.payId
+    ? 'https://enroll.zellepay.com/qr-codes?data=' + encodeURIComponent(JSON.stringify({name:person.name,token:person.payId,amount:amt}))
+    : 'https://www.zellepay.com/';
+  window.open(url, '_blank');
+  toast('Zelle opened — request $' + amt + ' from ' + person.name);
+}
+
+function openVenmo(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const amt = (owes[personId]?.total || 0).toFixed(2);
+  const handle = (person.payId||'').replace('@','');
+  const note = encodeURIComponent('Bills ' + monthLabel(monthKey()));
+  const url = handle
+    ? 'https://venmo.com/' + handle + '?txn=charge&amount=' + amt + '&note=' + note
+    : 'https://venmo.com/';
+  window.open(url, '_blank');
+  toast('Venmo opened — request $' + amt + ' from ' + person.name);
+}
+
+// ── SEND section ────────────────────────────────
+function renderSendCards() {
+  const container = document.getElementById('sendCards');
+  if (!container) return;
+
+  if (!S.bills.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📋</div>No bills configured yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = S.bills.map(bill => {
+    const split = computeBillSplit(bill);
+    const myAmt = split['me'] || 0;
+    const billTotal = getBillTotal(bill.id) || bill.lines.reduce((s,l)=>s+getLineAmount(bill.id,l.id),0);
+    const url = bill.payUrl || '';
+    const hasUrl = url.length > 0;
+
+    const payBtn = hasUrl
+      ? `<a class="btn btn-green btn-sm" href="${url}" target="_blank" onclick="markCheck('pay_${bill.id}')">Pay ↗</a>`
+      : `<span style="font-size:10px;color:var(--muted2)">Add URL to get Pay button</span>`;
+
+    return `
+      <div class="send-card">
+        <div class="send-card-left">
+          <div class="send-bill-icon" style="background:${bill.color}22;color:${bill.color}">${bill.icon}</div>
+          <div>
+            <div class="send-bill-name">${bill.name}</div>
+            <div class="send-bill-amount">${billTotal > 0 ? 'My share: $' + myAmt.toFixed(2) + ' of $' + billTotal.toFixed(2) : 'No amount entered'}</div>
+          </div>
+        </div>
+        <div class="send-card-right">
+          <input type="url" class="send-url-input ${hasUrl ? 'has-url' : ''}"
+                 placeholder="https://your-bank.com/pay"
+                 value="${url}"
+                 oninput="updateBillPayUrl('${bill.id}', this.value)"
+                 title="Payment portal URL for this bill">
+          ${payBtn}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updateBillPayUrl(billId, url) {
+  const bill = S.bills.find(b => b.id === billId);
+  if (!bill) return;
+  bill.payUrl = url.trim();
+  // Update the pay button in-place without re-rendering the whole list
+  const card = [...document.querySelectorAll('.send-card')].find(c => c.querySelector(`[oninput*="${billId}"]`));
+  if (card) {
+    const right = card.querySelector('.send-card-right');
+    const input = right.querySelector('input');
+    const hasUrl = bill.payUrl.length > 0;
+    input.classList.toggle('has-url', hasUrl);
+    // Replace everything after the input
+    const existingBtn = right.querySelector('a.btn, span');
+    if (existingBtn) existingBtn.remove();
+    if (hasUrl) {
+      const a = document.createElement('a');
+      a.className = 'btn btn-green btn-sm';
+      a.href = bill.payUrl;
+      a.target = '_blank';
+      a.textContent = 'Pay ↗';
+      a.onclick = () => markCheck('pay_' + billId);
+      right.appendChild(a);
+    } else {
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:10px;color:var(--muted2)';
+      span.textContent = 'Add URL to get Pay button';
+      right.appendChild(span);
+    }
+  }
+  save();
+}
+
+// ── CHECKLIST ───────────────────────────────────
+function buildChecklistDefs() {
+  const defs = [
+    { id:'enter', label:'Enter all bill amounts', meta:'Bills tab' },
+  ];
+  // Dynamic per-person receive items
+  const owes = computePersonOwes();
+  S.people.filter(p=>p.id!=='me').forEach(person => {
+    const d = owes[person.id] || { total:0 };
+    if (d.total === 0) return;
+    if (person.payMethod === 'zelle') {
+      defs.push({ id:'zelle_'+person.id, label:'Send Zelle request to '+person.name, meta:'Receive ↑' });
+    } else if (person.payMethod === 'venmo') {
+      defs.push({ id:'venmo_'+person.id, label:'Send Venmo request to '+person.name, meta:'Receive ↑' });
+    }
+    defs.push({ id:'email_'+person.id, label:'Email bill summary to '+person.name, meta:'Receive ↑' });
+  });
+  // Dynamic per-bill pay items
+  S.bills.forEach(bill => {
+    if (bill.payUrl) {
+      defs.push({ id:'pay_'+bill.id, label:'Pay '+bill.name, meta:'Send ↑' });
+    }
+  });
+  return defs;
+}
+
+function renderChecklist() {
+  const k = monthKey();
+  const done = S.checklist[k] || {};
+  const el = document.getElementById('checklist');
+  if (!el) return;
+  const defs = buildChecklistDefs();
+  if (!defs.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">Checklist items appear automatically as you add bills and people.</div>';
+    return;
+  }
+  el.innerHTML = defs.map(item => `
+    <div class="check-item ${done[item.id]?'done':''}" onclick="toggleCheck('${item.id}')">
+      <div class="check-box">${done[item.id]?'✓':''}</div>
+      <div class="check-label">${item.label}</div>
+      <div class="check-meta">${item.meta}</div>
+    </div>
+  `).join('');
+}
+
+function toggleCheck(id) {
+  const k = monthKey();
+  if (!S.checklist[k]) S.checklist[k] = {};
+  S.checklist[k][id] = !S.checklist[k][id];
+  save();
+  renderChecklist();
+}
+
+function markCheck(id) {
+  const k = monthKey();
+  if (!S.checklist[k]) S.checklist[k] = {};
+  S.checklist[k][id] = true;
+  save();
+  renderChecklist();
+}
+
+// ═══════════════════════════════════════════════
+//  TRENDS
+// ═══════════════════════════════════════════════
+function renderTrends() {
+  const keys = Object.keys(S.monthly).filter(k=>S.monthly[k]._myTotal!==undefined).sort();
+  const labels = keys.map(monthLabel);
+  const myData = keys.map(k=>S.monthly[k]._myTotal||0);
+
+  // per-person lines
+  const datasets = [
+    { label:'My Total', data:myData, borderColor:'#a8e063', backgroundColor:'rgba(168,224,99,.1)', tension:.35, fill:true },
+  ];
+  S.people.filter(p=>p.id!=='me').forEach(p => {
+    const data = keys.map(k => (S.monthly[k]._owes||{})[p.id] || 0);
+    if (data.some(v=>v>0)) {
+      datasets.push({ label:`${p.name} owes`, data, borderColor:p.color, backgroundColor:'transparent', tension:.35 });
+    }
+  });
+
+  const chartDefaults = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:'#767880', font:{ family:'DM Mono', size:11 } } } },
+    scales:{
+      x:{ grid:{ color:'#2a2c31' }, ticks:{ color:'#767880', font:{ family:'DM Mono', size:10 } } },
+      y:{ grid:{ color:'#2a2c31' }, ticks:{ color:'#767880', font:{ family:'DM Mono', size:10 }, callback:v=>`$${v}` } }
+    }
+  };
+
+  if (trendChartInst) trendChartInst.destroy();
+  const ctx1 = document.getElementById('trendChart');
+  if (ctx1) {
+    trendChartInst = new Chart(ctx1, {
+      type:'line', data:{ labels:labels.length?labels:['No data'], datasets }, options:chartDefaults
+    });
+  }
+
+  // Pie
+  if (pieChartInst) pieChartInst.destroy();
+  const ctx2 = document.getElementById('pieChart');
+  if (ctx2) {
+    const k = monthKey();
+    const pieLabels = [], pieData = [], pieColors = [];
+    S.bills.forEach(bill => {
+      const total = bill.splitType==='fixed'
+        ? bill.lines.reduce((s,l)=>s+getLineAmount(bill.id,l.id),0)
+        : getBillTotal(bill.id);
+      if (total > 0) { pieLabels.push(bill.name); pieData.push(total); pieColors.push(bill.color); }
+    });
+    pieChartInst = new Chart(ctx2, {
+      type:'doughnut',
+      data:{ labels:pieLabels.length?pieLabels:['No data'], datasets:[{ data:pieLabels.length?pieData:[1], backgroundColor:pieColors.length?pieColors:['#2a2c31'], borderWidth:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:'#767880', font:{ family:'DM Mono', size:10 }, boxWidth:10, padding:8 } } } }
+    });
+  }
+
+  // History log
+  const log = document.getElementById('historyLog');
+  if (log) {
+    if (!keys.length) { log.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No history yet.</div>'; return; }
+    log.innerHTML = [...keys].reverse().map(k => {
+      const d = S.monthly[k];
+      const owesStr = Object.entries(d._owes||{}).filter(([,v])=>v>0).map(([pid,v])=>{
+        const p = getPerson(pid);
+        return `<span style="color:${p.color}">${p.name}: $${v.toFixed(2)}</span>`;
+      }).join(' · ');
+      return `<div class="sum-row" style="padding:8px 0;">
+        <div>
+          <div style="font-size:12px;">${monthLabel(k)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">${owesStr||'—'}</div>
+        </div>
+        <div style="font-family:'Cabinet Grotesk',sans-serif;font-weight:700;color:var(--green)">$${(d._myTotal||0).toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════
+function renderSettings() {
+  loadEmailConfig();
+  renderPeopleConfig();
+  renderGreetingConfig();
+  renderBillConfig();
+}
+
+// ── Email config UI ───────────────────────────────────────────────────────────
+let _emailCfgLoaded = false;
+
+async function loadEmailConfig() {
+  if (_emailCfgLoaded) return; // only load once per session
+  try {
+    const res = await fetch(`${API}/email/config`);
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (!cfg) return;
+    _emailCfgLoaded = true;
+    if (cfg.provider)   document.getElementById('em-provider').value   = cfg.provider;
+    if (cfg.fromName)   document.getElementById('em-fromName').value   = cfg.fromName;
+    if (cfg.fromEmail)  document.getElementById('em-fromEmail').value  = cfg.fromEmail;
+    renderEmailProviderFields(cfg);
+  } catch(e) { console.warn('Could not load email config:', e); }
+}
+
+function renderEmailProviderFields(cfg) {
+  const provider = document.getElementById('em-provider').value;
+  const el = document.getElementById('emailProviderFields');
+  if (!el) return;
+  if (!provider) { el.innerHTML = ''; return; }
+
+  const v = (key, placeholder) =>
+    `<input type="text" id="em-${key}" placeholder="${placeholder}" value="${cfg&&cfg[key]||''}"
+            style="font-size:12px;" autocomplete="off">`;
+  const pw = (key, placeholder) =>
+    `<input type="password" id="em-${key}" placeholder="${placeholder}" value="${cfg&&cfg[key]||''}"
+            style="font-size:12px;" autocomplete="new-password">`;
+
+  const fields = {
+    smtp: `
+      <div class="em-field-group">
+        <div class="em-field-group-title">SMTP Settings</div>
+        <div class="setting-row"><div class="setting-label">Host</div>${v('smtpHost','smtp.gmail.com')}</div>
+        <div class="setting-row"><div class="setting-label">Port<div class="setting-hint">587=TLS · 465=SSL · 25=plain</div></div>${v('smtpPort','587')}</div>
+        <div class="setting-row"><div class="setting-label">Username</div>${v('smtpUser','you@gmail.com')}</div>
+        <div class="setting-row"><div class="setting-label">Password<div class="setting-hint">App password for Gmail</div></div>${pw('smtpPass','app password')}</div>
+      </div>`,
+    mailgun: `
+      <div class="em-field-group">
+        <div class="em-field-group-title">Mailgun Settings</div>
+        <div class="setting-row"><div class="setting-label">API Key</div>${pw('mailgunApiKey','key-••••••••••••')}</div>
+        <div class="setting-row"><div class="setting-label">Domain<div class="setting-hint">Your sending domain</div></div>${v('mailgunDomain','mg.yourdomain.com')}</div>
+        <div class="setting-row">
+          <div class="setting-label">Region</div>
+          <select id="em-mailgunRegion" style="font-size:12px;">
+            <option value="us" ${cfg&&cfg.mailgunRegion==='eu'?'':'selected'}>US</option>
+            <option value="eu" ${cfg&&cfg.mailgunRegion==='eu'?'selected':''}>EU</option>
+          </select>
+        </div>
+      </div>`,
+    sendgrid: `
+      <div class="em-field-group">
+        <div class="em-field-group-title">SendGrid Settings</div>
+        <div class="setting-row"><div class="setting-label">API Key</div>${pw('sendgridApiKey','SG.••••••••••••')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Ensure your from email is a verified sender in SendGrid.</div>
+      </div>`,
+    resend: `
+      <div class="em-field-group">
+        <div class="em-field-group-title">Resend Settings</div>
+        <div class="setting-row"><div class="setting-label">API Key</div>${pw('resendApiKey','re_••••••••••••')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Ensure your from domain is verified in Resend.</div>
+      </div>`,
+  };
+  el.innerHTML = fields[provider] || '';
+}
+
+function getEmailConfigFromForm() {
+  const provider = document.getElementById('em-provider').value;
+  const cfg = {
+    provider,
+    fromName:  document.getElementById('em-fromName').value.trim(),
+    fromEmail: document.getElementById('em-fromEmail').value.trim(),
+  };
+  const providerFields = {
+    smtp:      ['smtpHost','smtpPort','smtpUser','smtpPass'],
+    mailgun:   ['mailgunApiKey','mailgunDomain','mailgunRegion'],
+    sendgrid:  ['sendgridApiKey'],
+    resend:    ['resendApiKey'],
+  };
+  (providerFields[provider]||[]).forEach(f => {
+    const el = document.getElementById('em-'+f);
+    if (el) cfg[f] = el.value.trim();
+  });
+  return cfg;
+}
+
+async function saveEmailConfig() {
+  const cfg = getEmailConfigFromForm();
+  const statusEl = document.getElementById('emailConfigStatus');
+  statusEl.textContent = 'Saving…';
+  statusEl.className = '';
+  try {
+    const res = await fetch(`${API}/email/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    });
+    if (res.ok) {
+      _emailCfgLoaded = false; // force reload next time
+      statusEl.textContent = '✓ Saved';
+      statusEl.className = 'status-ok';
+      toast('Email config saved!');
+    } else {
+      const err = await res.json();
+      statusEl.textContent = '✗ ' + (err.error || 'Failed');
+      statusEl.className = 'status-err';
+    }
+  } catch(e) {
+    statusEl.textContent = '✗ ' + e.message;
+    statusEl.className = 'status-err';
+  }
+}
+
+async function testEmailConfig() {
+  const statusEl = document.getElementById('emailConfigStatus');
+  statusEl.textContent = 'Sending test…';
+  statusEl.className = '';
+  try {
+    const res = await fetch(`${API}/email/test`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      statusEl.textContent = '✓ ' + data.message;
+      statusEl.className = 'status-ok';
+      toast('Test email sent!');
+    } else {
+      statusEl.textContent = '✗ ' + (data.error || 'Failed');
+      statusEl.className = 'status-err';
+    }
+  } catch(e) {
+    statusEl.textContent = '✗ ' + e.message;
+    statusEl.className = 'status-err';
+  }
+}
+
+function renderGreetingConfig() {
+  const el = document.getElementById('greetingConfig');
+  if (!el) return;
+  el.innerHTML = S.people.filter(p => p.id !== 'me').map((p, i) => {
+    const idx = S.people.indexOf(p);
+    return `
+      <div class="setting-row">
+        <div class="setting-label" style="color:${p.color}">
+          ${p.name}
+          <div class="setting-hint">Opening line in their email</div>
+        </div>
+        <input type="text" value="${p.greeting||''}"
+               placeholder="Hi ${p.name},"
+               oninput="S.people[${idx}].greeting=this.value"
+               style="font-size:12px;">
+      </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:12px;">Add people above first.</div>';
+}
+
+function renderPeopleConfig() {
+  const el = document.getElementById('peopleConfig');
+  if (!el) return;
+  el.innerHTML = S.people.map((p,idx) => `
+    <div class="person-row" style="grid-template-columns:36px 1fr 110px 130px 130px 36px;">
+      <div class="person-color-dot" style="background:${p.color}" title="Click to change color" onclick="cyclePeopleColor(${idx})"></div>
+      <input type="text" value="${p.name}" oninput="S.people[${idx}].name=this.value" placeholder="Name" style="font-size:12px;">
+      <select onchange="S.people[${idx}].payMethod=this.value;renderPeopleConfig();" style="font-size:11px;">
+        <option value="none"  ${p.payMethod==='none' ?'selected':''}>No payment</option>
+        <option value="zelle" ${p.payMethod==='zelle'?'selected':''}>Zelle</option>
+        <option value="venmo" ${p.payMethod==='venmo'?'selected':''}>Venmo</option>
+        <option value="manual"${p.payMethod==='manual'?'selected':''}>Manual</option>
+      </select>
+      ${p.payMethod==='zelle'||p.payMethod==='venmo'
+        ? `<input type="text" value="${p.payId||''}" placeholder="${p.payMethod==='zelle'?'phone/email':'@handle'}"
+               oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
+        : `<div></div>`}
+      <input type="email" value="${p.email||''}" placeholder="email for notifications"
+             oninput="S.people[${idx}].email=this.value" style="font-size:11px;">
+      ${p.id==='me'
+        ? `<div style="text-align:center;font-size:10px;color:var(--muted2)">you</div>`
+        : `<button class="btn btn-danger btn-xs" style="padding:4px 6px;" onclick="removePerson(${idx})">✕</button>`}
+    </div>
+  `).join('');
+}
+
+function cyclePeopleColor(idx) {
+  const cur = PERSON_COLORS.indexOf(S.people[idx].color);
+  S.people[idx].color = PERSON_COLORS[(cur+1) % PERSON_COLORS.length];
+  renderPeopleConfig();
+}
+
+function addPerson() {
+  S.people.push({ id:'p'+Date.now(), name:'New Person', color:PERSON_COLORS[S.people.length%PERSON_COLORS.length], payMethod:'manual', payId:'', email:'' });
+  renderPeopleConfig();
+}
+
+function removePerson(idx) {
+  if (!confirm(`Remove ${S.people[idx].name}?`)) return;
+  S.people.splice(idx,1);
+  renderPeopleConfig();
+}
+
+function renderBillConfig() {
+  const el = document.getElementById('billConfig');
+  if (!el) return;
+  el.innerHTML = S.bills.map((bill,idx) => `
+    <div style="display:grid;grid-template-columns:36px 1fr 60px 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+      <input type="text" value="${bill.icon}" oninput="S.bills[${idx}].icon=this.value" style="text-align:center;font-size:16px;width:36px;padding:4px;" maxlength="2">
+      <input type="text" value="${bill.name}" oninput="S.bills[${idx}].name=this.value" style="font-size:12px;">
+      <input type="color" value="${bill.color}" oninput="S.bills[${idx}].color=this.value" style="width:60px;height:32px;border:none;background:transparent;cursor:pointer;padding:0;">
+      <button class="btn btn-danger btn-xs" onclick="removeBillFromSettings(${idx})">✕</button>
+    </div>
+  `).join('') + '<div style="padding-top:8px;font-size:10px;color:var(--muted)">Tip: Edit bill lines and splits on the Bills tab.</div>';
+}
+
+function removeBillFromSettings(idx) {
+  if (!confirm(`Remove "${S.bills[idx].name}"?`)) return;
+  S.bills.splice(idx,1);
+  renderBillConfig();
+  save();
+}
+
+function saveSettings() {
+  save();
+  renderBills();
+  renderSendPay();
+  toast('Settings saved!');
+}
+
+function exportData() {
+  window.open(`${API}/export`, '_blank');
+}
+
+async function importData(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const res = await fetch(`${API}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) { toast('Import successful — reloading...'); setTimeout(()=>location.reload(), 1200); }
+    else toast('Import failed');
+  } catch(e) { toast('Import error: ' + e.message); }
+}
+
+async function clearAll() {
+  if (!confirm('Reset ALL data for user "' + _currentUser + '"? This cannot be undone.')) return;
+  // Clear state keys
+  await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{}}) });
+  location.reload();
+}
+
+// Add mortgage URL/provider to settings
+Object.assign(S.settings, { mortgageUrl:'', mortgageProvider:'' });
+
+// ═══════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    const page = tab.dataset.page;
+    document.getElementById(`page-${page}`).classList.add('active');
+    if (page==='summary') renderSummary();
+    if (page==='sendpay') renderSendPay();
+    if (page==='trends') renderTrends();
+    if (page==='settings') renderSettings();
+  });
+});
+
+document.getElementById('monthSel').addEventListener('change', onMonthChange);
+document.getElementById('yearSel').addEventListener('change', onMonthChange);
+function onMonthChange() {
+  renderBills();
+  recalcAll();
+}
+
+// ═══════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════
+function toast(msg) {
+  document.getElementById('toastMsg').textContent = msg;
+  const el = document.getElementById('toast');
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+async function init() {
+  const now = new Date();
+  document.getElementById('monthSel').value = now.getMonth();
+  document.getElementById('yearSel').value = now.getFullYear();
+  showBanner('Loading...', 'info');
+  await load();
+  hideBanner();
+  renderBills();
+  recalcAll();
+}
+
+function showBanner(msg, type) {
+  let el = document.getElementById('banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'banner';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;padding:8px 20px;font-size:12px;text-align:center;font-family:DM Mono,monospace;transition:all .3s;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = type === 'warning' ? '#f5a62388' : '#a8e06322';
+  el.style.color = type === 'warning' ? '#f5a623' : '#a8e063';
+  el.style.display = 'block';
+}
+function hideBanner() {
+  const el = document.getElementById('banner');
+  if (el) el.style.display = 'none';
+}
+
+init();
+</script>
+</body>
+</html>
