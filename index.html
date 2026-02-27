@@ -214,7 +214,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* person config rows */
 .person-row{display:grid;grid-template-columns:36px 1fr 120px 120px 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
 .person-row:last-child{border-bottom:none;}
-.person-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border2);cursor:pointer;flex-shrink:0;}
+.person-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border2);cursor:pointer;flex-shrink:0;padding:2px;background:transparent;}
+.person-color-dot::-webkit-color-swatch-wrapper{padding:0;}
+.person-color-dot::-webkit-color-swatch{border:none;border-radius:50%;}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 16px;border-radius:8px;font-size:12px;transform:translateY(60px);opacity:0;transition:all .25s;z-index:9999;display:flex;align-items:center;gap:8px;}
@@ -2005,7 +2007,9 @@ function renderPeopleConfig() {
   if (!el) return;
   el.innerHTML = S.people.map((p,idx) => `
     <div class="person-row" style="grid-template-columns:36px 1fr 110px 130px 130px 36px;">
-      <div class="person-color-dot" style="background:${p.color}" title="Click to change color" onclick="cyclePeopleColor(${idx})"></div>
+      <input type="color" class="person-color-dot" value="${p.color}" title="Pick color"
+             oninput="S.people[${idx}].color=this.value"
+             onchange="S.people[${idx}].color=this.value;save()">
       <input type="text" value="${p.name}" oninput="S.people[${idx}].name=this.value" placeholder="Name" style="font-size:12px;">
       <select onchange="S.people[${idx}].payMethod=this.value;renderPeopleConfig();" style="font-size:11px;">
         <option value="none"   ${p.payMethod==='none'   ?'selected':''}>No payment</option>
