@@ -1,5 +1,5 @@
 /**
- * BillFlow email dispatch module
+ * BillHive email dispatch module
  * Supports: Mailgun, SendGrid, Resend, SMTP (nodemailer)
  *
  * Config shape (stored encrypted in DB under key 'emailConfig'):

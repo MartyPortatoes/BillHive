@@ -16,8 +16,8 @@
  */
 function buildEmailHtml(opts) {
   const {
-    greeting, personName, accentColor = '#a8e063',
-    monthLabel, bills, total, payMethod, payId, zelleUrl: customZelleUrl, fromName = 'BillFlow',
+    greeting, personName, accentColor = '#F5A800',
+    monthLabel, bills, total, payMethod, payId, zelleUrl: customZelleUrl, fromName = 'BillHive',
   } = opts;
 
   // Slightly lighten accent for subtle backgrounds
@@ -116,7 +116,7 @@ function buildEmailHtml(opts) {
             <span style="font-size:16px;line-height:36px;">🏠</span>
           </td>
           <td style="padding-left:10px;">
-            <span style="font-family:Arial,sans-serif;font-weight:900;font-size:20px;color:#f9fafb;">Bill</span><span style="font-family:Arial,sans-serif;font-weight:900;font-size:20px;color:${accentColor};">Flow</span>
+            <span style="font-family:Arial,sans-serif;font-weight:900;font-size:20px;color:#f9fafb;">Bill</span><span style="font-family:Arial,sans-serif;font-weight:900;font-size:20px;color:${accentColor};">Hive</span>
             <div style="font-size:10px;color:#6b7280;letter-spacing:.12em;text-transform:uppercase;margin-top:1px;">household manager</div>
           </td>
         </tr>
@@ -191,7 +191,7 @@ function buildEmailHtml(opts) {
         <tr>
           <td colspan="2" style="padding:24px 28px;border-top:1px solid #2a2d31;">
             <div style="font-size:12px;color:#6b7280;font-family:Arial,sans-serif;">
-              Sent by ${fromName} via BillFlow &nbsp;·&nbsp;
+              Sent by ${fromName} via BillHive &nbsp;·&nbsp;
               <span style="color:#4b5563;">Reply to this email if you have any questions.</span>
             </div>
           </td>
@@ -205,7 +205,7 @@ function buildEmailHtml(opts) {
   <tr>
     <td style="padding:20px 0 0;text-align:center;">
       <span style="font-size:11px;color:#374151;font-family:Arial,sans-serif;">
-        BillFlow · Household Bill Manager
+        BillHive · Household Bill Manager
       </span>
     </td>
   </tr>

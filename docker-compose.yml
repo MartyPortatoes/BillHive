@@ -1,25 +1,25 @@
 services:
 
-  billflow:
-    image: ghcr.io/martyportatoes/billflow:latest
+  billhive:
+    image: ghcr.io/martyportatoes/billhive:latest
     # To build locally instead, comment the line above and uncomment below:
     # build: .
-    container_name: billflow
+    container_name: billhive
     restart: unless-stopped
     ports:
-      - "${BILLFLOW_PORT:-8080}:8080"
+      - "${BILLHIVE_PORT:-8080}:8080"
     environment:
       PORT: 8080
-      DB_PATH: /data/billflow.db
+      DB_PATH: /data/billhive.db
     volumes:
-      - billflow-data:/data
+      - billhive-data:/data
 
 volumes:
-  billflow-data:
-    name: billflow-data
+  billhive-data:
+    name: billhive-data
     # To use a host-mounted path instead of a named volume:
     # driver: local
     # driver_opts:
     #   type: none
     #   o: bind
-    #   device: /your/host/path/billflow-data
+    #   device: /your/host/path/billhive-data

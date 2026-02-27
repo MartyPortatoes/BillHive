@@ -7,7 +7,7 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const DB_PATH = process.env.DB_PATH || '/data/billflow.db';
+const DB_PATH = process.env.DB_PATH || '/data/billhive.db';
 
 // ── Ensure data directory exists ──────────────────────────────────────────────
 const dataDir = path.dirname(DB_PATH);
@@ -147,7 +147,7 @@ app.get('/api/export', (req, res) => {
   stmts.getAllState.all(req.userId).forEach(r => { try { state[r.key] = JSON.parse(r.value); } catch {} });
   const monthly = {};
   stmts.getAllMonths.all(req.userId).forEach(r => { try { monthly[r.month_key] = JSON.parse(r.data); } catch {} });
-  res.setHeader('Content-Disposition', `attachment; filename="billflow-backup-${req.userId}-${Date.now()}.json"`);
+  res.setHeader('Content-Disposition', `attachment; filename="billhive-backup-${req.userId}-${Date.now()}.json"`);
   res.json({ user: req.userId, exportedAt: new Date().toISOString(), state, monthly });
 });
 
@@ -202,15 +202,15 @@ app.post('/api/email/test', async (req, res) => {
   const { html, text } = buildEmailHtml({
     greeting: 'Hey there,',
     personName: 'You',
-    accentColor: '#a8e063',
+    accentColor: '#F5A800',
     monthLabel: 'Test Email',
     bills: [{ name: 'Electric', amount: 85.00 }, { name: 'Internet', amount: 59.99 }],
     total: 144.99,
     payMethod: 'none',
-    fromName: cfg.fromName || 'BillFlow',
+    fromName: cfg.fromName || 'BillHive',
   });
   try {
-    await sendEmail(cfg, cfg.fromEmail, 'BillFlow — Test Email', html, text);
+    await sendEmail(cfg, cfg.fromEmail, 'BillHive — Test Email', html, text);
     res.json({ ok: true, message: `Test email sent to ${cfg.fromEmail}` });
   } catch(e) {
     res.status(500).json({ error: e.message });
@@ -230,7 +230,7 @@ app.post('/api/email/send', async (req, res) => {
   const { html, text } = buildEmailHtml({
     greeting, personName, accentColor,
     monthLabel, bills, total, payMethod, payId, zelleUrl,
-    fromName: cfg.fromName || 'BillFlow',
+    fromName: cfg.fromName || 'BillHive',
   });
 
   const subject = `Bills for ${monthLabel}`;
@@ -250,7 +250,7 @@ app.get('*', (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`BillFlow running on :${PORT}`);
+  console.log(`BillHive running on :${PORT}`);
   console.log(`DB: ${DB_PATH}`);
   console.log(`Auth: Remote-User / X-Authentik-Username / X-Forwarded-User (fallback: "local")`);
 });

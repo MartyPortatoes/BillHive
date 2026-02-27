@@ -1,7 +1,7 @@
 {
-  "name": "billflow",
+  "name": "billhive",
   "version": "1.0.0",
-  "description": "BillFlow household bill manager",
+  "description": "BillHive household bill manager",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

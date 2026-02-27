@@ -1,4 +1,4 @@
-# BillFlow 🏠
+# BillHive 🏠
 
 Household bill management app — per-bill splitting, Verizon line tracking,
 Zelle/Venmo deep links, trend charts, and server-side SQLite persistence.
@@ -24,7 +24,7 @@ Open **http://localhost:8080**
 ## Project Structure
 
 ```
-billflow/
+billhive/
 ├── server.js          # Express — serves frontend + REST API
 ├── package.json
 ├── Dockerfile
@@ -42,27 +42,27 @@ billflow/
 
 ```yaml
 services:
-  billflow:
-    image: ghcr.io/martyportatoes/billflow:latest
-    container_name: billflow
+  billhive:
+    image: ghcr.io/martyportatoes/billhive:latest
+    container_name: billhive
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
-      - billflow-data:/data
+      - billhive-data:/data
 
 volumes:
-  billflow-data:
+  billhive-data:
 ```
 
 ---
 
 ## Reverse Proxy Setup
 
-Point your proxy at port `8080` (or whatever `BILLFLOW_PORT` is set to).
+Point your proxy at port `8080` (or whatever `BILLHIVE_PORT` is set to).
 
 ### Authelia
-Automatically injects `Remote-User` header — no BillFlow config needed.
+Automatically injects `Remote-User` header — no BillHive config needed.
 
 ```yaml
 # Authelia access_control example
@@ -75,16 +75,16 @@ rules:
 Automatically injects `X-Authentik-Username` — ensure "Pass User Headers" is
 enabled in your proxy provider (it is by default).
 
-### Traefik labels (add to the billflow service)
+### Traefik labels (add to the billhive service)
 
 ```yaml
 labels:
   - "traefik.enable=true"
-  - "traefik.http.routers.billflow.rule=Host(`bills.yourdomain.com`)"
-  - "traefik.http.routers.billflow.entrypoints=websecure"
-  - "traefik.http.routers.billflow.tls.certresolver=letsencrypt"
-  - "traefik.http.routers.billflow.middlewares=authelia@docker"
-  - "traefik.http.services.billflow.loadbalancer.server.port=8080"
+  - "traefik.http.routers.billhive.rule=Host(`bills.yourdomain.com`)"
+  - "traefik.http.routers.billhive.entrypoints=websecure"
+  - "traefik.http.routers.billhive.tls.certresolver=letsencrypt"
+  - "traefik.http.routers.billhive.middlewares=authelia@docker"
+  - "traefik.http.services.billhive.loadbalancer.server.port=8080"
 ```
 
 Without a proxy, all data is stored under the user ID `local` (single-user mode).
@@ -93,24 +93,24 @@ Without a proxy, all data is stored under the user ID `local` (single-user mode)
 
 ## Data Persistence
 
-SQLite lives in a named Docker volume at `/data/billflow.db`.
+SQLite lives in a named Docker volume at `/data/billhive.db`.
 
 **Host-mounted path** (easier backups):
 ```yaml
 volumes:
-  billflow-data:
+  billhive-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /your/host/path/billflow-data
+      device: /your/host/path/billhive-data
 ```
 
 **Backup via UI:** Settings → Export Backup → downloads full JSON
 
 **Backup via CLI:**
 ```bash
-docker exec billflow sqlite3 /data/billflow.db .dump > backup.sql
+docker exec billhive sqlite3 /data/billhive.db .dump > backup.sql
 ```
 
 **Restore:** Settings → Import Backup → select `.json` file
@@ -122,7 +122,7 @@ docker exec billflow sqlite3 /data/billflow.db .dump > backup.sql
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | Port the server listens on |
-| `DB_PATH` | `/data/billflow.db` | SQLite database path |
+| `DB_PATH` | `/data/billhive.db` | SQLite database path |
 
 ---
 
