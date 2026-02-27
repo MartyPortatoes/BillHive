@@ -1316,6 +1316,8 @@ function renderReceiveCards() {
       ? 'Zelle · ' + (person.payId || 'set ID in Settings')
       : person.payMethod === 'venmo'
       ? 'Venmo · ' + (person.payId || 'set handle in Settings')
+      : person.payMethod === 'cashapp'
+      ? 'Cash App · ' + (person.payId || 'set $cashtag in Settings')
       : 'Manual';
     const emailDesc = person.email ? person.email : '(no email — add in Settings)';
 
@@ -1324,6 +1326,8 @@ function renderReceiveCards() {
       payBtn = `<button class="btn btn-blue btn-sm" onclick="openZelle('${person.id}');markCheck('zelle_${person.id}')">💰 Zelle</button>`;
     } else if (person.payMethod === 'venmo') {
       payBtn = `<button class="btn btn-orange btn-sm" onclick="openVenmo('${person.id}');markCheck('venmo_${person.id}')">💸 Venmo</button>`;
+    } else if (person.payMethod === 'cashapp') {
+      payBtn = `<button class="btn btn-green btn-sm" onclick="openCashApp('${person.id}');markCheck('cashapp_${person.id}')">💵 Cash App</button>`;
     }
 
     const emailBtn = person.email
@@ -1383,6 +1387,7 @@ function buildPersonEmail(personId) {
   let payHint = '';
   if (person.payMethod === 'zelle') payHint = "I'll send you a Zelle request for this amount.";
   else if (person.payMethod === 'venmo') payHint = "I'll send you a Venmo request for this amount.";
+  else if (person.payMethod === 'cashapp') payHint = "I'll send you a Cash App request for this amount.";
   else payHint = "Please send your share when you get a chance.";
 
   let lines = [
@@ -1492,6 +1497,16 @@ function openVenmo(personId) {
   toast('Venmo opened — request $' + amt + ' from ' + person.name);
 }
 
+function openCashApp(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const amt = (owes[personId]?.total || 0).toFixed(2);
+  const tag = (person.payId||'').replace('$','');
+  const url = tag ? 'https://cash.app/$' + tag : 'https://cash.app/';
+  window.open(url, '_blank');
+  toast('Cash App opened — request $' + amt + ' from ' + person.name);
+}
+
 // ── SEND section ────────────────────────────────
 function renderSendCards() {
   const container = document.getElementById('sendCards');
@@ -1580,6 +1595,8 @@ function buildChecklistDefs() {
       defs.push({ id:'zelle_'+person.id, label:'Send Zelle request to '+person.name, meta:'Receive ↑' });
     } else if (person.payMethod === 'venmo') {
       defs.push({ id:'venmo_'+person.id, label:'Send Venmo request to '+person.name, meta:'Receive ↑' });
+    } else if (person.payMethod === 'cashapp') {
+      defs.push({ id:'cashapp_'+person.id, label:'Send Cash App request to '+person.name, meta:'Receive ↑' });
     }
     defs.push({ id:'email_'+person.id, label:'Email bill summary to '+person.name, meta:'Receive ↑' });
   });
@@ -1991,13 +2008,17 @@ function renderPeopleConfig() {
       <div class="person-color-dot" style="background:${p.color}" title="Click to change color" onclick="cyclePeopleColor(${idx})"></div>
       <input type="text" value="${p.name}" oninput="S.people[${idx}].name=this.value" placeholder="Name" style="font-size:12px;">
       <select onchange="S.people[${idx}].payMethod=this.value;renderPeopleConfig();" style="font-size:11px;">
-        <option value="none"  ${p.payMethod==='none' ?'selected':''}>No payment</option>
-        <option value="zelle" ${p.payMethod==='zelle'?'selected':''}>Zelle</option>
-        <option value="venmo" ${p.payMethod==='venmo'?'selected':''}>Venmo</option>
-        <option value="manual"${p.payMethod==='manual'?'selected':''}>Manual</option>
+        <option value="none"   ${p.payMethod==='none'   ?'selected':''}>No payment</option>
+        <option value="zelle"  ${p.payMethod==='zelle'  ?'selected':''}>Zelle</option>
+        <option value="venmo"  ${p.payMethod==='venmo'  ?'selected':''}>Venmo</option>
+        <option value="cashapp"${p.payMethod==='cashapp'?'selected':''}>Cash App</option>
+        <option value="manual" ${p.payMethod==='manual' ?'selected':''}>Manual</option>
       </select>
       ${p.payMethod==='venmo'
         ? `<input type="text" value="${p.payId||''}" placeholder="@handle"
+               oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
+        : p.payMethod==='cashapp'
+        ? `<input type="text" value="${p.payId||''}" placeholder="$cashtag"
                oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
         : p.payMethod==='zelle'
         ? `<div style="display:flex;flex-direction:column;gap:3px;">

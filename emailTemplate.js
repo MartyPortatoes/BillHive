@@ -75,6 +75,23 @@ function buildEmailHtml(opts) {
           Venmo @${handle}
         </span>
       </td></tr>`;
+  } else if (payMethod === 'cashapp' && payId) {
+    const tag = payId.replace('$', '');
+    const cashAppUrl = `https://cash.app/$${tag}`;
+    payButtonHtml = `
+      <tr><td align="center" style="padding:28px 0 8px;">
+        <a href="${cashAppUrl}"
+           style="display:inline-block;background:${accentColor};color:#0c0d0f;text-decoration:none;
+                  font-family:Arial,sans-serif;font-weight:700;font-size:15px;
+                  padding:14px 36px;border-radius:8px;letter-spacing:.02em;">
+          Pay via Cash App — $${total.toFixed(2)}
+        </a>
+      </td></tr>
+      <tr><td align="center" style="padding:0 0 8px;">
+        <span style="font-size:11px;color:#6b7280;font-family:Arial,sans-serif;">
+          Cash App $${tag}
+        </span>
+      </td></tr>`;
   } else {
     payButtonHtml = `
       <tr><td align="center" style="padding:28px 0 8px;">
@@ -229,6 +246,7 @@ function buildEmailHtml(opts) {
     '',
     payMethod === 'zelle' && payId ? `Please pay via Zelle to ${payId}.` :
     payMethod === 'venmo' && payId ? `Please pay via Venmo @${payId.replace('@','')}.` :
+    payMethod === 'cashapp' && payId ? `Please pay via Cash App $${payId.replace('$','')}.` :
     'Please send your share when you get a chance.',
     '',
     `Thanks, ${fromName}`,
