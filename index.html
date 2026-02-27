@@ -167,7 +167,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .sum-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
 .sum-row:last-child{border-bottom:none;}
 .sum-label{color:var(--muted);font-size:12px;}
-.sum-val{font-family:'Syncopate',sans-serif;font-weight:700;font-size:16px;color:var(--green);}
+.sum-val{font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);}
 .sum-val.big{font-size:22px;}
 .sum-val.orange{color:var(--orange);}
 .sum-val.blue{color:var(--blue);}
@@ -179,8 +179,8 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .pscard-wife::before{background:var(--green);}
 .pscard-dad::before{background:var(--orange);}
 .pscard-other::before{background:var(--purple);}
-.ps-name{font-family:'Syncopate',sans-serif;font-weight:700;font-size:16px;margin-bottom:2px;}
-.ps-amount{font-family:'Syncopate',sans-serif;font-weight:700;font-size:28px;line-height:1;margin:8px 0;}
+.ps-name{font-family:'DM Mono',monospace;font-weight:700;font-size:16px;margin-bottom:2px;}
+.ps-amount{font-family:'DM Mono',monospace;font-weight:700;font-size:28px;line-height:1;margin:8px 0;}
 .ps-bills{font-size:10px;color:var(--muted);}
 
 /* ── CHECKLIST ── */
@@ -224,7 +224,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── MODAL ── */
 #modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:none;align-items:center;justify-content:center;}
 #modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:28px 24px 20px;width:340px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.5);}
-#modal-title{font-family:'Syncopate',sans-serif;font-weight:700;font-size:17px;color:var(--text);margin-bottom:16px;line-height:1.4;}
+#modal-title{font-family:'DM Mono',monospace;font-weight:700;font-size:17px;color:var(--text);margin-bottom:16px;line-height:1.4;}
 #modal-input{width:100%;margin-bottom:16px;display:none;}
 #modal-footer{display:flex;justify-content:flex-end;gap:8px;padding-top:4px;}
 
@@ -233,7 +233,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .sr-section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
 .sr-section-icon.receive{background:rgba(91,196,245,.15);color:var(--blue);border:1px solid rgba(91,196,245,.25);}
 .sr-section-icon.send{background:rgba(245,168,0,.15);color:var(--green);border:1px solid rgba(245,168,0,.25);}
-.sr-section-title{font-family:'Syncopate',sans-serif;font-weight:700;font-size:16px;}
+.sr-section-title{font-family:'DM Mono',monospace;font-weight:700;font-size:16px;}
 .sr-section-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 
 /* person receive card */
@@ -242,9 +242,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .receive-card-head:hover{background:rgba(255,255,255,.02);}
 .receive-person{display:flex;align-items:center;gap:10px;}
 .receive-person-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.receive-person-name{font-family:'Syncopate',sans-serif;font-weight:700;font-size:15px;}
+.receive-person-name{font-family:'DM Mono',monospace;font-weight:700;font-size:15px;}
 .receive-person-method{font-size:10px;color:var(--muted);margin-top:1px;}
-.receive-amount{font-family:'Syncopate',sans-serif;font-weight:700;font-size:22px;}
+.receive-amount{font-family:'DM Mono',monospace;font-weight:700;font-size:22px;}
 .receive-actions{display:flex;align-items:center;gap:8px;}
 .receive-body{display:none;border-top:1px solid var(--border);padding:16px 18px;background:var(--surface2);}
 .receive-card.open .receive-body{display:block;}
@@ -257,7 +257,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .send-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px;}
 .send-card-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
 .send-bill-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.send-bill-name{font-family:'Syncopate',sans-serif;font-weight:700;font-size:14px;}
+.send-bill-name{font-family:'DM Mono',monospace;font-weight:700;font-size:14px;}
 .send-bill-amount{font-size:12px;color:var(--muted);margin-top:1px;}
 .send-card-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .send-url-input{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 8px;font-family:'DM Mono',monospace;font-size:10px;border-radius:5px;width:180px;outline:none;transition:border-color .15s,color .15s;}
@@ -1273,7 +1273,7 @@ function renderSummary() {
         : getBillTotal(bill.id);
       if (billTotal === 0) return;
       html += `<div style="margin-bottom:16px;">
-        <div style="font-family:'Syncopate',sans-serif;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${bill.icon} ${bill.name} — $${billTotal.toFixed(2)} total</div>`;
+        <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${bill.icon} ${bill.name} — $${billTotal.toFixed(2)} total</div>`;
       S.people.forEach(p => {
         const amt = split[p.id] || 0;
         if (!amt) return;
@@ -1731,7 +1731,7 @@ function renderTrendsPersonView() {
           <div style="font-size:12px;">${monthLabel(k)}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px;">${owesStr||'—'}</div>
         </div>
-        <div style="font-family:'Syncopate',sans-serif;font-weight:700;color:var(--green)">$${(d._myTotal||0).toFixed(2)}</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:700;color:var(--green)">$${(d._myTotal||0).toFixed(2)}</div>
       </div>`;
     }).join('');
   }
@@ -1824,12 +1824,12 @@ function renderTrendsBillView() {
           <div style="width:8px;height:8px;border-radius:50%;background:${bill.color};flex-shrink:0;"></div>
           <div style="font-size:12px;">${bill.name}</div>
         </div>
-        <div style="font-family:'Syncopate',sans-serif;font-weight:700;color:${bill.color};">$${total.toFixed(2)}</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:700;color:${bill.color};">$${total.toFixed(2)}</div>
       </div>`;
     }).filter(Boolean).join('') +
     `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Grand Total</div>
-      <div style="font-family:'Syncopate',sans-serif;font-weight:700;font-size:16px;color:var(--green);">$${grandTotal.toFixed(2)}</div>
+      <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);">$${grandTotal.toFixed(2)}</div>
     </div>`;
   }
 }
