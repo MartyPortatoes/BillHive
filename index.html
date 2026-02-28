@@ -470,6 +470,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   <div class="card">
     <div class="setting-group">
       <div class="setting-group-title">People</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+        The <span style="color:var(--green)">★ Primary</span> person is <strong>you</strong> — the one who fronts all bills and collects from everyone else. This person cannot be removed.
+      </div>
       <div id="peopleConfig"></div>
       <div class="action-row">
         <button class="btn btn-ghost btn-sm" onclick="addPerson()">＋ Add Person</button>
@@ -649,6 +652,28 @@ async function saveMonthNow(key, data) {
       body: JSON.stringify(data)
     });
   } catch(e) { console.warn('Month save failed:', e); }
+}
+
+function normalizeState() {
+  // Guarantee exactly one person with id 'me' exists.
+  // All split/summary logic keys off this id — it is the primary bill payer.
+  if (!S.people || S.people.length === 0) {
+    S.people = [{ id:'me', name:'Me', color:'#F5A800', payMethod:'none', payId:'', email:'', greeting:'' }];
+    save();
+    return;
+  }
+  if (!S.people.find(p => p.id === 'me')) {
+    // Promote first person to 'me' and remap all bill line references
+    const oldId = S.people[0].id;
+    S.people[0].id = 'me';
+    S.bills.forEach(bill => {
+      bill.lines.forEach(line => {
+        if (line.personId === oldId) line.personId = 'me';
+        if (line.coveredById === oldId) line.coveredById = 'me';
+      });
+    });
+    save();
+  }
 }
 
 async function load() {
@@ -2047,7 +2072,7 @@ function renderPeopleConfig() {
       <input type="email" value="${p.email||''}" placeholder="email for notifications"
              oninput="S.people[${idx}].email=this.value" style="font-size:11px;">
       ${p.id==='me'
-        ? `<div style="text-align:center;font-size:10px;color:var(--muted2)">you</div>`
+        ? `<div style="text-align:center;font-size:10px;color:var(--green);font-weight:600;">★</div>`
         : `<button class="btn btn-danger btn-xs" style="padding:4px 6px;" onclick="removePerson(${idx})">✕</button>`}
     </div>
   `).join('');
@@ -2206,6 +2231,7 @@ async function init() {
   document.getElementById('yearSel').value = now.getFullYear();
   showBanner('Loading...', 'info');
   await load();
+  normalizeState();
   hideBanner();
   renderBills();
   recalcAll();
