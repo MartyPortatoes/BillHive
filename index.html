@@ -74,13 +74,18 @@ main{overflow-y:auto;padding:24px 28px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
 
 /* ── INPUTS ── */
-input[type=text],input[type=number],input[type=email],input[type=url],select,textarea{
+input[type=text],input[type=number],input[type=email],input[type=url],input[type=password],select,textarea{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
   padding:8px 10px;font-family:'DM Mono',monospace;font-size:12px;border-radius:6px;
   outline:none;width:100%;transition:border-color .15s;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--green);}
 input::placeholder{color:var(--muted2);}
+input:-webkit-autofill,input:-webkit-autofill:focus{
+  -webkit-box-shadow:0 0 0 1000px var(--surface2) inset;
+  -webkit-text-fill-color:var(--text);
+  caret-color:var(--text);
+}
 select option{background:var(--surface2);}
 input[type=range]{accent-color:var(--green);width:100%;margin:0;}
 
