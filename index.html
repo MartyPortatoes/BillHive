@@ -828,8 +828,8 @@ function renderBills() {
     const pillsHtml = allShown.map(pid => {
       const p = getPerson(pid);
       const isCoverer = payers.includes(pid) && !participants.includes(pid);
-      const colorClass = pid==='me'?'pill-green':pid==='wife'?'pill-blue':pid==='dad'?'pill-orange':'pill-purple';
-      return `<span class="pill ${colorClass}">${isCoverer ? '↑ ' : ''}${p.name}</span>`;
+      const c = p.color || '#767880';
+      return `<span class="pill" style="background:${c}26;color:${c};border-color:${c}40">${isCoverer ? '↑ ' : ''}${p.name}</span>`;
     }).join(' ');
 
     card.innerHTML = `
@@ -2008,6 +2008,13 @@ function renderGreetingConfig() {
 }
 
 function renderPeopleConfig() {
+  // Pin 'me' to the top of the list regardless of saved order
+  const meIdx = S.people.findIndex(p => p.id === 'me');
+  if (meIdx > 0) {
+    const [me] = S.people.splice(meIdx, 1);
+    S.people.unshift(me);
+    save();
+  }
   const el = document.getElementById('peopleConfig');
   if (!el) return;
   el.innerHTML = S.people.map((p,idx) => `
@@ -2133,6 +2140,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     const page = tab.dataset.page;
     document.getElementById(`page-${page}`).classList.add('active');
+    if (page==='bills') renderBills();
     if (page==='summary') renderSummary();
     if (page==='sendpay') renderSendPay();
     if (page==='trends') renderTrends();
