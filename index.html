@@ -906,9 +906,7 @@ function renderBillBody(bill) {
         <label>Total Bill ($)</label>
         <input type="number" placeholder="0.00" step="0.01" value="${total||''}"
                oninput="onTotalInput('${bill.id}', this.value)" style="max-width:140px;">
-        <div class="total-breakdown">
-          ${pctOk ? '' : `<span style="color:var(--orange)">⚠ percentages sum to ${pctSum}%</span>`}
-        </div>
+        <div class="total-breakdown"></div>
       </div>
       <div class="line-items-head" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;">
         <div>Description</div><div>Responsible</div><div style="text-align:right">%</div><div style="text-align:right">Amount</div><div>Covered By</div><div></div>
@@ -1089,10 +1087,6 @@ function updateBillComputedDisplays(billId) {
         owedEls[i].textContent = total ? '$'+amt.toFixed(2) : '—';
       }
     });
-    // Update pct warning
-    const pctSum = bill.lines.reduce((s,l)=>s+l.value,0);
-    const warnEl = card.querySelector('.total-breakdown');
-    if (warnEl) warnEl.innerHTML = Math.abs(pctSum-100)<0.01 ? '' : '<span style="color:var(--orange)">⚠ percentages sum to '+pctSum+'%</span>';
   }
 
   // Fixed bills: update remainder display div and hint text (no inputs touched)
@@ -1126,7 +1120,27 @@ function updateLinePersonId(billId, lineId, val) {
 function updateLinePct(billId, lineId, val) {
   const bill = S.bills.find(b=>b.id===billId);
   const line = bill?.lines.find(l=>l.id===lineId);
-  if (line) { line.value = parseFloat(val)||0; updateBillComputedDisplays(billId); recalcAll(); save(); }
+  if (!line) return;
+  line.value = parseFloat(val)||0;
+  // Auto-fill: when all lines are non-zero and their sum is > 100 (i.e. dollar
+  // amounts were entered, not percentages), normalise to true percentages and
+  // set the bill total to their sum so the Amount column stays correct.
+  const allFilled = bill.lines.length > 0 && bill.lines.every(l => l.value > 0);
+  if (allFilled) {
+    const rawSum = bill.lines.reduce((s,l) => s+l.value, 0);
+    if (rawSum > 100) {
+      bill.lines.forEach(l => { l.value = parseFloat(((l.value/rawSum)*100).toFixed(4)); });
+      setBillTotal(billId, parseFloat(rawSum.toFixed(2)));
+      saveMonthSnapshot();
+      refreshBillBody(billId);
+      recalcAll();
+      save();
+      return;
+    }
+  }
+  updateBillComputedDisplays(billId);
+  recalcAll();
+  save();
 }
 function updateLineCoveredBy(billId, lineId, val) {
   const bill = S.bills.find(b=>b.id===billId);
