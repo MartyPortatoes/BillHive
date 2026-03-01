@@ -37,9 +37,7 @@ body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg 
 #app{display:grid;grid-template-rows:56px 44px 1fr;height:100vh;overflow:hidden;}
 header{display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-mark{width:32px;height:32px;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden;}
-.logo-mark svg{display:block;}
-.logo-mark::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18) 0%,transparent 60%);}
+.logo-mark{flex-shrink:0;display:block;}
 .logo-wordmark{display:flex;flex-direction:column;gap:0px;}
 .logo-name{font-family:'Syncopate',sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.5px;line-height:1;color:var(--text);}
 .logo-name span{color:var(--green);}
@@ -296,15 +294,14 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
 <header>
   <div class="logo">
-    <div class="logo-mark">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <rect x="2" y="3" width="10" height="2" rx="1" fill="#0c0d0f"/>
-        <rect x="2" y="7" width="14" height="2" rx="1" fill="#0c0d0f"/>
-        <rect x="2" y="11" width="8" height="2" rx="1" fill="#0c0d0f"/>
-        <circle cx="14" cy="13" r="3" fill="#0c0d0f" opacity="0.25"/>
-        <path d="M13 13l1 1 2-2" stroke="#0c0d0f" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
+    <svg class="logo-mark" width="32" height="28" viewBox="0 0 32 27.713" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="hxShine" x1="0%" y1="0%" x2="65%" y2="100%"><stop offset="0%" stop-color="white" stop-opacity="0.2"/><stop offset="100%" stop-color="white" stop-opacity="0"/></linearGradient></defs>
+      <polygon points="8,0 24,0 32,13.856 24,27.713 8,27.713 0,13.856" fill="var(--green)"/>
+      <polygon points="8,0 24,0 32,13.856 24,27.713 8,27.713 0,13.856" fill="url(#hxShine)"/>
+      <rect x="10.5" y="9.6" width="8" height="1.9" rx="0.95" fill="#0c0d0f"/>
+      <rect x="10.5" y="13" width="11" height="1.9" rx="0.95" fill="#0c0d0f"/>
+      <rect x="10.5" y="16.4" width="6.5" height="1.9" rx="0.95" fill="#0c0d0f"/>
+    </svg>
     <div class="logo-wordmark">
       <div class="logo-name">Bill<span>Hive</span></div>
       <div class="logo-sub">household manager</div>
@@ -330,11 +327,11 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 </header>
 
 <nav>
-  <div class="tab active" data-page="bills">📋 Bills <span class="badge" id="tab-badge-bills">0</span></div>
-  <div class="tab" data-page="summary">💰 Summary</div>
-  <div class="tab" data-page="sendpay">📤 Send &amp; Receive</div>
-  <div class="tab" data-page="trends">📈 Trends</div>
-  <div class="tab" data-page="settings">⚙️ Settings</div>
+  <div class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></div>
+  <div class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="8" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="4.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="6.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="15.3" x2="15" y2="15.3"/></svg> Summary</div>
+  <div class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Send &amp; Receive</div>
+  <div class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</div>
+  <div class="tab" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="14.5" y2="4"/><line x1="1.5" y1="8" x2="14.5" y2="8"/><line x1="1.5" y1="12" x2="14.5" y2="12"/><circle cx="10" cy="4" r="1.75"/><circle cx="5" cy="8" r="1.75"/><circle cx="11" cy="12" r="1.75"/></svg> Settings</div>
 </nav>
 
 <main>
