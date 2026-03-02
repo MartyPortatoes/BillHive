@@ -434,9 +434,16 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <div class="page-title">Trends</div>
       <div class="page-sub" style="margin-bottom:0;">Month-over-month spend tracking.</div>
     </div>
-    <div class="trend-toggle" style="margin-top:4px;">
-      <button class="trend-toggle-btn active" id="toggle-person" onclick="setTrendsView('person')">Per Person</button>
-      <button class="trend-toggle-btn" id="toggle-bill" onclick="setTrendsView('bill')">By Bill</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px;">
+      <div class="trend-toggle">
+        <button class="trend-toggle-btn active" id="toggle-person" onclick="setTrendsView('person')">Per Person</button>
+        <button class="trend-toggle-btn" id="toggle-bill" onclick="setTrendsView('bill')">By Bill</button>
+      </div>
+      <div class="trend-toggle">
+        <button class="trend-toggle-btn active" id="toggle-months-12" onclick="setTrendsMonthLimit(12)">12M</button>
+        <button class="trend-toggle-btn" id="toggle-months-24" onclick="setTrendsMonthLimit(24)">24M</button>
+        <button class="trend-toggle-btn" id="toggle-months-0" onclick="setTrendsMonthLimit(0)">All</button>
+      </div>
     </div>
   </div>
 
@@ -630,6 +637,7 @@ let S = {
 let trendChartInst = null, pieChartInst = null;
 let billTrendChartInst = null, billBarChartInst = null;
 let trendsView = 'person';
+let trendsMonthLimit = 12;
 
 // ═══════════════════════════════════════════════
 //  API PERSISTENCE
@@ -1777,8 +1785,17 @@ function setTrendsView(view) {
   renderTrends();
 }
 
+function setTrendsMonthLimit(n) {
+  trendsMonthLimit = n;
+  document.getElementById('toggle-months-12').classList.toggle('active', n === 12);
+  document.getElementById('toggle-months-24').classList.toggle('active', n === 24);
+  document.getElementById('toggle-months-0').classList.toggle('active', n === 0);
+  renderTrends();
+}
+
 function renderTrendsPersonView() {
-  const keys = Object.keys(S.monthly).filter(k=>S.monthly[k]._myTotal!==undefined).sort();
+  const allKeys = Object.keys(S.monthly).filter(k=>S.monthly[k]._myTotal!==undefined).sort();
+  const keys = trendsMonthLimit > 0 ? allKeys.slice(-trendsMonthLimit) : allKeys;
   const labels = keys.map(monthLabel);
   const myData = keys.map(k=>S.monthly[k]._myTotal||0);
 
@@ -1854,10 +1871,11 @@ function getBillTotalForMonth(monthData, bill) {
 }
 
 function renderTrendsBillView() {
-  const keys = Object.keys(S.monthly).filter(k => {
+  const allKeys = Object.keys(S.monthly).filter(k => {
     const d = S.monthly[k];
     return d && (d._myTotal !== undefined || Object.keys(d.totals || {}).length || Object.keys(d.amounts || {}).length);
   }).sort();
+  const keys = trendsMonthLimit > 0 ? allKeys.slice(-trendsMonthLimit) : allKeys;
   const labels = keys.map(monthLabel);
 
   const chartDefaults = {
