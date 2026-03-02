@@ -762,17 +762,8 @@ async function _reloadFromServer() {
   _reloading = true;
   try {
     await load();
-    // Recompute cached fields in memory WITHOUT writing back to the server.
-    // Calling saveMonthNow() here would trigger broadcastChange → SSE loop.
-    const k = monthKey();
-    if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
-    S.monthly[k]._myTotal = computeMyTotal();
-    const owes = computePersonOwes();
-    S.monthly[k]._owes = {};
-    Object.entries(owes).forEach(([pid, d]) => { S.monthly[k]._owes[pid] = d.total; });
-    renderSummary();
-    renderSendPay();
-    updateTabBadge();
+    // renderBills() → recalcAll() → saveMonthSnapshot() but saveMonthSnapshot
+    // checks _reloading and skips writes, so no broadcast → no loop.
     renderBills();
     renderSettings();
   } finally {
@@ -1323,6 +1314,9 @@ function saveMonthSnapshot() {
   Object.entries(owes).forEach(([pid, d]) => {
     S.monthly[k]._owes[pid] = d.total;
   });
+  // Skip writes during a server reload — saves would trigger broadcastChange
+  // → SSE data-changed → _reloadFromServer() → infinite loop.
+  if (_reloading) return;
   // Persist month data to API (fire and forget)
   saveMonthNow(k, S.monthly[k]);
   // Also persist config state
