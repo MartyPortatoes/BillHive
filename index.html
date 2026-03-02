@@ -135,6 +135,24 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .bill-card.expanded .bill-body{display:block;}
 .bill-card.expanded .bill-expand-btn{background:var(--surface2);color:var(--text);}
 
+/* ── PERSON CARDS (Settings) ── */
+.person-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
+.person-card:hover{border-color:var(--border2);}
+.person-card.expanded{border-color:var(--border2);}
+.person-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;}
+.person-header:hover{background:rgba(255,255,255,.025);}
+.person-header-name{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.04em;}
+.person-header-meta{font-size:10px;color:var(--muted);margin-left:auto;}
+.person-expand-btn{width:24px;height:24px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s;flex-shrink:0;}
+.person-expand-btn:hover{border-color:var(--border2);color:var(--text);}
+.person-card.expanded .person-expand-btn{background:var(--surface3);color:var(--text);}
+.person-body{display:none;padding:14px;border-top:1px solid var(--border);}
+.person-card.expanded .person-body{display:block;}
+.person-field{margin-bottom:10px;}
+.person-field:last-child{margin-bottom:0;}
+.person-field-label{font-size:9px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.person-body input,.person-body select{background:var(--surface3);}
+
 /* ── LINE ITEMS ── */
 .line-items-head{display:grid;grid-template-columns:180px 1fr 130px 130px 28px;gap:8px;padding:10px 0 6px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
 .line-item{display:grid;grid-template-columns:180px 1fr 130px 130px 28px;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border);}
@@ -1065,6 +1083,11 @@ function renderBillBody(bill) {
 
 function toggleBill(id) {
   const card = document.getElementById(`bill-card-${id}`);
+  card.classList.toggle('expanded');
+}
+
+function togglePerson(id) {
+  const card = document.getElementById(`person-card-${id}`);
   card.classList.toggle('expanded');
 }
 
@@ -2097,40 +2120,97 @@ function renderPeopleConfig() {
   }
   const el = document.getElementById('peopleConfig');
   if (!el) return;
-  el.innerHTML = S.people.map((p,idx) => `
-    <div class="person-row" style="grid-template-columns:36px 1fr 110px 130px 130px 36px;">
-      <input type="color" class="person-color-dot" value="${p.color}" title="Pick color"
-             oninput="S.people[${idx}].color=this.value"
-             onchange="S.people[${idx}].color=this.value;save()">
-      <input type="text" value="${p.name}" oninput="S.people[${idx}].name=this.value" placeholder="Name" style="font-size:12px;">
-      <select onchange="S.people[${idx}].payMethod=this.value;renderPeopleConfig();" style="font-size:11px;">
-        <option value="none"   ${p.payMethod==='none'   ?'selected':''}>No payment</option>
-        <option value="zelle"  ${p.payMethod==='zelle'  ?'selected':''}>Zelle</option>
-        <option value="venmo"  ${p.payMethod==='venmo'  ?'selected':''}>Venmo</option>
-        <option value="cashapp"${p.payMethod==='cashapp'?'selected':''}>Cash App</option>
-        <option value="manual" ${p.payMethod==='manual' ?'selected':''}>Manual</option>
-      </select>
-      ${p.payMethod==='venmo'
-        ? `<input type="text" value="${p.payId||''}" placeholder="@handle"
-               oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
-        : p.payMethod==='cashapp'
-        ? `<input type="text" value="${p.payId||''}" placeholder="$cashtag"
-               oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">`
-        : p.payMethod==='zelle'
-        ? `<div style="display:flex;flex-direction:column;gap:3px;">
-             <input type="text" value="${p.payId||''}" placeholder="phone / email"
-                    oninput="S.people[${idx}].payId=this.value" style="font-size:11px;">
-             <input type="url" value="${p.zelleUrl||''}" placeholder="Custom Zelle URL (optional)"
-                    oninput="S.people[${idx}].zelleUrl=this.value" style="font-size:10px;">
-           </div>`
-        : `<div></div>`}
-      <input type="email" value="${p.email||''}" placeholder="email for notifications"
-             oninput="S.people[${idx}].email=this.value" style="font-size:11px;">
-      ${p.id==='me'
-        ? `<div style="text-align:center;font-size:10px;color:var(--green);font-weight:600;">★</div>`
-        : `<button class="btn btn-danger btn-xs" style="padding:4px 6px;" onclick="removePerson(${idx})">✕</button>`}
-    </div>
-  `).join('');
+
+  // Preserve expanded state across re-renders (e.g. payment method change)
+  const wasExpanded = new Set(
+    [...document.querySelectorAll('.person-card.expanded')].map(c => c.id)
+  );
+
+  el.innerHTML = S.people.map((p, idx) => {
+    const isMe = p.id === 'me';
+    const payLabel = {none:'None',zelle:'Zelle',venmo:'Venmo',cashapp:'Cash App',manual:'Manual'}[p.payMethod] ?? 'None';
+
+    // Conditional pay ID field(s)
+    let payIdFields = '';
+    if (p.payMethod === 'zelle') {
+      payIdFields = `
+        <div class="person-field">
+          <div class="person-field-label">Phone / Email</div>
+          <input type="text" value="${p.payId||''}" placeholder="phone or email"
+                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+        </div>
+        <div class="person-field">
+          <div class="person-field-label">Zelle URL</div>
+          <input type="url" value="${p.zelleUrl||''}" placeholder="Custom URL (optional)"
+                 oninput="S.people[${idx}].zelleUrl=this.value" onchange="save()">
+        </div>`;
+    } else if (p.payMethod === 'venmo') {
+      payIdFields = `
+        <div class="person-field">
+          <div class="person-field-label">Venmo Handle</div>
+          <input type="text" value="${p.payId||''}" placeholder="@handle"
+                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+        </div>`;
+    } else if (p.payMethod === 'cashapp') {
+      payIdFields = `
+        <div class="person-field">
+          <div class="person-field-label">Cash Tag</div>
+          <input type="text" value="${p.payId||''}" placeholder="$cashtag"
+                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+        </div>`;
+    }
+
+    return `
+      <div class="person-card" id="person-card-${p.id}">
+        <div class="person-header" onclick="togglePerson('${p.id}')">
+          <span style="width:12px;height:12px;border-radius:50%;background:${p.color};display:inline-block;flex-shrink:0;"></span>
+          <span class="person-header-name">${p.name||'New Person'}</span>
+          ${isMe
+            ? `<span style="margin-left:auto;font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);background:var(--surface3);padding:3px 7px;border-radius:4px;">you</span>`
+            : `<span class="person-header-meta">${payLabel}</span>`}
+          <button class="person-expand-btn" onclick="event.stopPropagation();togglePerson('${p.id}')">▾</button>
+        </div>
+        <div class="person-body">
+          <div class="person-field">
+            <div class="person-field-label">Name</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="color" value="${p.color}" title="Pick color"
+                     style="width:34px;height:34px;padding:2px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;flex-shrink:0;"
+                     oninput="S.people[${idx}].color=this.value"
+                     onchange="S.people[${idx}].color=this.value;save()">
+              <input type="text" value="${p.name||''}" placeholder="Name"
+                     oninput="S.people[${idx}].name=this.value" onchange="save()">
+            </div>
+          </div>
+          <div class="person-field">
+            <div class="person-field-label">Payment</div>
+            <select onchange="S.people[${idx}].payMethod=this.value;renderPeopleConfig();">
+              <option value="none"    ${p.payMethod==='none'    ?'selected':''}>None</option>
+              <option value="zelle"   ${p.payMethod==='zelle'   ?'selected':''}>Zelle</option>
+              <option value="venmo"   ${p.payMethod==='venmo'   ?'selected':''}>Venmo</option>
+              <option value="cashapp" ${p.payMethod==='cashapp' ?'selected':''}>Cash App</option>
+              <option value="manual"  ${p.payMethod==='manual'  ?'selected':''}>Manual</option>
+            </select>
+          </div>
+          ${payIdFields}
+          <div class="person-field">
+            <div class="person-field-label">Email</div>
+            <input type="email" value="${p.email||''}" placeholder="Notifications email"
+                   oninput="S.people[${idx}].email=this.value" onchange="save()">
+          </div>
+          ${!isMe ? `
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+            <button class="btn btn-danger btn-sm" style="width:100%;" onclick="removePerson(${idx})">✕ Remove ${p.name||'Person'}</button>
+          </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Restore expanded state
+  wasExpanded.forEach(id => {
+    const card = document.getElementById(id);
+    if (card) card.classList.add('expanded');
+  });
 }
 
 function cyclePeopleColor(idx) {
@@ -2140,8 +2220,12 @@ function cyclePeopleColor(idx) {
 }
 
 function addPerson() {
-  S.people.push({ id:'p'+Date.now(), name:'New Person', color:PERSON_COLORS[S.people.length%PERSON_COLORS.length], payMethod:'manual', payId:'', email:'' });
+  const newPerson = { id:'p'+Date.now(), name:'New Person', color:PERSON_COLORS[S.people.length%PERSON_COLORS.length], payMethod:'manual', payId:'', email:'' };
+  S.people.push(newPerson);
   renderPeopleConfig();
+  // Auto-expand the new card
+  const card = document.getElementById(`person-card-${newPerson.id}`);
+  if (card) card.classList.add('expanded');
 }
 
 function removePerson(idx) {
