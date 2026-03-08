@@ -8,6 +8,12 @@
 
 <p align="center">Runs as a <strong>single Docker container</strong> with a SQLite database. No cloud, no subscription, no external services required.</p>
 
+<p align="center">
+  <a href="https://www.buymeacoffee.com/mportelos">
+    <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" />
+  </a>
+</p>
+
 ---
 
 ## Screenshots
