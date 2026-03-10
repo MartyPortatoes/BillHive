@@ -86,7 +86,8 @@ function rateLimiter(maxReqs, windowMs) {
   };
 }
 // 300 requests per 15 minutes per IP — generous for a self-hosted personal app
-app.use(rateLimiter(300, 15 * 60 * 1000));
+const limiter = rateLimiter(300, 15 * 60 * 1000);
+app.use(limiter);
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '2mb' }));
@@ -298,7 +299,7 @@ app.get('/api/events', (req, res) => {
 });
 
 // ── SPA fallback — serve index.html for any non-API route ────────────────────
-app.get('*', (req, res) => {
+app.get('*', limiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

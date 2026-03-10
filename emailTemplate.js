@@ -40,9 +40,12 @@ const HEX_LOGO = `<svg width="40" height="36" viewBox="0 0 40 36" xmlns="http://
 
 function buildEmailHtml(opts) {
   const {
-    greeting, personName, accentColor = '#F5A800',
+    greeting, personName, accentColor: rawAccent = '#F5A800',
     monthLabel, bills, total, payMethod, payId, zelleUrl: customZelleUrl, fromName = 'BillHive',
   } = opts;
+
+  // Validate accentColor is a safe hex value before embedding in HTML/CSS
+  const accentColor = /^#[0-9A-Fa-f]{3,8}$/.test(rawAccent) ? rawAccent : '#F5A800';
 
   const accentBg     = accentColor + '22';
   const accentBorder = accentColor + '55';
