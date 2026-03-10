@@ -26,7 +26,11 @@ function escapeHtml(str) {
 function safeUrl(url) {
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:' ? url : '';
+    if (parsed.protocol !== 'https:') return '';
+    // Rebuild from parsed components — never return the raw input string
+    const normalized = (parsed.origin + parsed.pathname + parsed.search + parsed.hash)
+      .replace(/[\u0000-\u001F\u007F]+/g, '');
+    return normalized;
   } catch { return ''; }
 }
 
