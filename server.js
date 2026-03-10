@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
@@ -66,27 +67,8 @@ function broadcastChange(userId) {
   }
 }
 
-// ── Rate limiting (no external dep — simple in-memory per-IP sliding window) ──
-const _rlStore = new Map();
-function rateLimiter(maxReqs, windowMs) {
-  return (req, res, next) => {
-    const key = req.ip || req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-    let e = _rlStore.get(key);
-    if (!e || now > e.reset) {
-      e = { count: 1, reset: now + windowMs };
-    } else {
-      e.count++;
-    }
-    _rlStore.set(key, e);
-    if (e.count > maxReqs) {
-      return res.status(429).set('Retry-After', Math.ceil((e.reset - now) / 1000)).json({ error: 'Too many requests' });
-    }
-    next();
-  };
-}
-// 300 requests per 15 minutes per IP — generous for a self-hosted personal app
-const limiter = rateLimiter(300, 15 * 60 * 1000);
+// ── Rate limiting — 300 requests per 15 min per IP (generous for self-hosted) ─
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
 app.use(limiter);
 
 // ── Middleware ────────────────────────────────────────────────────────────────

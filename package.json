@@ -10,6 +10,7 @@
   "dependencies": {
     "better-sqlite3": "^9.4.3",
     "express": "^4.18.2",
-    "nodemailer": "^7.0.11"
+    "nodemailer": "^7.0.11",
+    "express-rate-limit": "^8.3.1"
   }
 }
