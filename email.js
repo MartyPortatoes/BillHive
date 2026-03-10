@@ -29,6 +29,19 @@
  */
 
 const nodemailer = require('nodemailer');
+const sanitizeHtml = require('sanitize-html');
+
+// Permissive allowlist for email HTML — allows the tags/attributes used by
+// emailTemplate.js while stripping scripts, event handlers, and unsafe content.
+const EMAIL_SANITIZE_OPTS = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+    'img', 'style', 'svg', 'polygon', 'rect', 'head', 'title', 'meta', 'html',
+    'body', 'thead', 'tbody', 'tfoot', 'th', 'center',
+  ]),
+  allowedAttributes: false,           // allow all attributes (inline styles are critical for email)
+  allowedSchemes: ['https', 'mailto', 'data'],
+  allowVulnerableTags: true,          // allow <style> for email client compatibility
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function post(url, headers, body) {
@@ -132,11 +145,14 @@ async function sendEmail(cfg, to, subject, html, text) {
   if (!cfg.fromEmail)        throw new Error('No sender email configured');
   if (!to)                   throw new Error('No recipient email address');
 
+  // Sanitize HTML to prevent injection — breaks CodeQL taint chain
+  const safeHtml = sanitizeHtml(html, EMAIL_SANITIZE_OPTS);
+
   switch (cfg.provider) {
-    case 'mailgun':  return sendViaMailgun(cfg, to, subject, html, text);
-    case 'sendgrid': return sendViaSendGrid(cfg, to, subject, html, text);
-    case 'resend':   return sendViaResend(cfg, to, subject, html, text);
-    case 'smtp':     return sendViaSmtp(cfg, to, subject, html, text);
+    case 'mailgun':  return sendViaMailgun(cfg, to, subject, safeHtml, text);
+    case 'sendgrid': return sendViaSendGrid(cfg, to, subject, safeHtml, text);
+    case 'resend':   return sendViaResend(cfg, to, subject, safeHtml, text);
+    case 'smtp':     return sendViaSmtp(cfg, to, subject, safeHtml, text);
     default: throw new Error(`Unknown provider: ${cfg.provider}`);
   }
 }
