@@ -313,12 +313,17 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 <header>
   <div class="logo">
     <svg class="logo-mark" width="32" height="28" viewBox="0 0 32 27.713" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="hxShine" x1="0%" y1="0%" x2="65%" y2="100%"><stop offset="0%" stop-color="white" stop-opacity="0.2"/><stop offset="100%" stop-color="white" stop-opacity="0"/></linearGradient></defs>
-      <polygon points="8,0 24,0 32,13.856 24,27.713 8,27.713 0,13.856" fill="var(--green)"/>
-      <polygon points="8,0 24,0 32,13.856 24,27.713 8,27.713 0,13.856" fill="url(#hxShine)"/>
-      <rect x="10.5" y="9.6" width="8" height="1.9" rx="0.95" fill="#0c0d0f"/>
-      <rect x="10.5" y="13" width="11" height="1.9" rx="0.95" fill="#0c0d0f"/>
-      <rect x="10.5" y="16.4" width="6.5" height="1.9" rx="0.95" fill="#0c0d0f"/>
+      <defs>
+        <linearGradient id="hxAmber" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFD000"/><stop offset="100%" stop-color="#D4890A"/></linearGradient>
+      </defs>
+      <!-- Outer amber hex ring -->
+      <polygon points="8,0 24,0 32,13.856 24,27.713 8,27.713 0,13.856" fill="url(#hxAmber)"/>
+      <!-- Dark inner hex cutout -->
+      <polygon points="10.4,4.2 21.6,4.2 27.2,13.856 21.6,23.5 10.4,23.5 4.8,13.856" fill="#0e0e0e"/>
+      <!-- Centered amber bars -->
+      <rect x="11" y="9.43" width="10" height="2" rx="1" fill="url(#hxAmber)"/>
+      <rect x="9.5" y="12.86" width="13" height="2" rx="1" fill="url(#hxAmber)"/>
+      <rect x="10.5" y="16.29" width="11" height="2" rx="1" fill="url(#hxAmber)"/>
     </svg>
     <div class="logo-wordmark">
       <div class="logo-name">Bill<span>Hive</span></div>
