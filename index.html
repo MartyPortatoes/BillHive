@@ -1179,6 +1179,13 @@ function renderBillBody(bill) {
       </label>
       <label class="preserve-row-label" for="preserve-${bill.id}">Carry amounts forward each month</label>
     </div>
+    <div class="preserve-row">
+      <label class="tog">
+        <input type="checkbox" id="autopay-${bill.id}" ${bill.autoPay ? 'checked' : ''} onchange="toggleAutoPay('${bill.id}', this.checked)">
+        <span class="tog-slider"></span>
+      </label>
+      <label class="preserve-row-label" for="autopay-${bill.id}">Auto-pay — skip &ldquo;paid&rdquo; task in checklist</label>
+    </div>
   `;
 
   return identityRow + splitTypeToggle + bodyContent + preserveToggle;
@@ -1198,6 +1205,13 @@ function togglePreserve(billId, val) {
   const bill = S.bills.find(b => b.id === billId);
   if (!bill) return;
   bill.preserve = !!val;
+  save();
+}
+
+function toggleAutoPay(billId, val) {
+  const bill = S.bills.find(b => b.id === billId);
+  if (!bill) return;
+  bill.autoPay = !!val;
   save();
 }
 
@@ -1836,8 +1850,9 @@ function buildChecklistDefs() {
     }
     defs.push({ id:'email_'+person.id, label:'Email bill summary to '+person.name, meta:'Receive ↑' });
   });
-  // Dynamic per-bill pay items
+  // Dynamic per-bill pay items (skip auto-pay bills)
   S.bills.forEach(bill => {
+    if (bill.autoPay) return;
     if (bill.payUrl) {
       defs.push({ id:'pay_'+bill.id, label:'Pay '+bill.name, meta:'Send ↑' });
     }
