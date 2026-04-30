@@ -603,6 +603,22 @@ function esc(str) {
     .replace(/'/g, '&#039;');
 }
 
+// Returns the raw URL only if it parses cleanly and uses the https scheme.
+// User-entered or imported URLs may otherwise contain javascript:, data:,
+// file:, or arbitrary schemes — opening them via window.open could trigger
+// XSS, native handler hijacking, or download prompts. Mirrors the iOS
+// app's bhSafeWebURL helper so the two clients have the same posture.
+function safeWebUrl(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:') return null;
+    return u.toString();
+  } catch { return null; }
+}
+
 // Global state object — the single source of truth. Loaded from the API on init,
 // mutated by UI interactions, and persisted back via debounced save().
 // These defaults are used only on first launch before any server data exists.
@@ -1714,14 +1730,17 @@ function openZelle(personId) {
   const owes = computePersonOwes();
   const amt = (owes[personId]?.total || 0).toFixed(2);
   let url;
-  if (person.zelleUrl) {
-    url = person.zelleUrl;
+  // Custom Zelle URL must be an https:// URL — protects against javascript:,
+  // data:, file:, or arbitrary scheme handlers being planted via imported data.
+  const safeCustom = safeWebUrl(person.zelleUrl);
+  if (safeCustom) {
+    url = safeCustom;
   } else if (person.payId) {
     url = 'https://enroll.zellepay.com/qr-codes?data=' + encodeURIComponent(JSON.stringify({name:person.name,token:person.payId,amount:amt}));
   } else {
     url = 'https://www.zellepay.com/';
   }
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noopener');
   toast('Zelle opened — request $' + amt + ' from ' + person.name);
 }
 
@@ -1729,12 +1748,14 @@ function openVenmo(personId) {
   const person = getPerson(personId);
   const owes = computePersonOwes();
   const amt = (owes[personId]?.total || 0).toFixed(2);
-  const handle = (person.payId||'').replace('@','');
+  // Percent-encode the handle so '&', '?', '#' in a corrupted payId can't
+  // inject extra query parameters into the deep link.
+  const handle = encodeURIComponent((person.payId||'').replace('@',''));
   const note = encodeURIComponent('Bills ' + monthLabel(monthKey()));
   const url = handle
     ? 'https://venmo.com/' + handle + '?txn=charge&amount=' + amt + '&note=' + note
     : 'https://venmo.com/';
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noopener');
   toast('Venmo opened — request $' + amt + ' from ' + person.name);
 }
 
@@ -1742,9 +1763,10 @@ function openCashApp(personId) {
   const person = getPerson(personId);
   const owes = computePersonOwes();
   const amt = (owes[personId]?.total || 0).toFixed(2);
-  const tag = (person.payId||'').replace('$','');
+  // Percent-encode the cashtag so it can't inject path/query syntax.
+  const tag = encodeURIComponent((person.payId||'').replace('$',''));
   const url = tag ? 'https://cash.app/$' + tag : 'https://cash.app/';
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noopener');
   toast('Cash App opened — request $' + amt + ' from ' + person.name);
 }
 
@@ -1806,11 +1828,11 @@ function updateBillPayUrl(billId, url) {
     // Replace everything after the input
     const existingBtn = right.querySelector('a.btn, span');
     if (existingBtn) existingBtn.remove();
-    const isSafe = hasUrl && /^https?:\/\//i.test(bill.payUrl);
-    if (isSafe) {
+    const safePayUrl = safeWebUrl(bill.payUrl);
+    if (safePayUrl) {
       const a = document.createElement('a');
       a.className = 'btn btn-green btn-sm';
-      a.href = bill.payUrl;
+      a.href = safePayUrl;
       a.target = '_blank';
       a.rel = 'noopener';
       a.textContent = 'Pay ↗';
@@ -1819,7 +1841,7 @@ function updateBillPayUrl(billId, url) {
     } else if (hasUrl) {
       const span = document.createElement('span');
       span.style.cssText = 'font-size:10px;color:var(--red)';
-      span.textContent = 'Invalid URL (must start with http)';
+      span.textContent = 'Invalid URL (must start with https://)';
       right.appendChild(span);
     } else {
       const span = document.createElement('span');
