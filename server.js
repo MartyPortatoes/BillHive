@@ -24,6 +24,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const Database = require('better-sqlite3');   // Sync SQLite — never use async/await for DB calls
 const path = require('path');
 const fs = require('fs');
@@ -33,6 +34,14 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const DB_PATH = process.env.DB_PATH || '/data/billhive.db';  // Docker volume mount point
+
+// TRUST_PROXY tells Express how many reverse-proxy hops to trust for X-Forwarded-*.
+// Default 1 = trust the immediate proxy (Authelia/Authentik/Traefik). Set to 0 to
+// disable, or a higher number if you have multiple proxies in front. Required for
+// express-rate-limit to key off the real client IP.
+const TRUST_PROXY = process.env.TRUST_PROXY ?? '1';
+app.set('trust proxy', isNaN(Number(TRUST_PROXY)) ? TRUST_PROXY : Number(TRUST_PROXY));
+app.disable('x-powered-by');
 
 // ── Ensure data directory exists ──────────────────────────────────────────────
 const dataDir = path.dirname(DB_PATH);
@@ -116,8 +125,57 @@ function broadcastChange(userId) {
   }
 }
 
-// ── Rate limiting — 300 requests per 15 min per IP (generous for self-hosted) ─
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
+// ── Security headers (helmet) ────────────────────────────────────────────────
+// CSP is tuned to what index.html actually loads:
+//   - Google Fonts (CSS at fonts.googleapis.com, font files at fonts.gstatic.com)
+//   - Chart.js from cdnjs.cloudflare.com (loaded with SRI integrity)
+//   - Inline <script> and inline style="..." (the entire SPA is one inline script,
+//     and email-style inline CSS is everywhere). 'unsafe-inline' is required.
+//   - data: URIs for SVG background patterns in CSS
+// connect-src includes 'self' for fetch + EventSource (SSE).
+// frame-ancestors 'none' replaces X-Frame-Options to prevent clickjacking.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src':     ["'self'"],
+      'script-src':      ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+      'style-src':       ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'font-src':        ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      'img-src':         ["'self'", 'data:'],
+      'connect-src':     ["'self'"],
+      'frame-ancestors': ["'none'"],
+      'base-uri':        ["'self'"],
+      'form-action':     ["'self'"],
+      'object-src':      ["'none'"],
+      'upgrade-insecure-requests': null,   // self-hosted users may run on http://
+    },
+  },
+  // HSTS only meaningful over HTTPS; harmless otherwise. 1 year.
+  strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
+  referrerPolicy: { policy: 'no-referrer' },
+  crossOriginEmbedderPolicy: false,        // Google Fonts doesn't send CORP headers
+  crossOriginResourcePolicy: { policy: 'same-site' },
+}));
+
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// Global limiter: 300 req / 15 min per IP. Generous enough for SSE reconnects
+// and aggressive saves while still capping a single bad actor.
+// Email limiter: tighter, applied only to /api/email/test and /api/email/send to
+// prevent outbound mail abuse (quota burn, spam reputation damage).
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+});
+const emailLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Email rate limit exceeded. Try again in a minute.' },
+});
 app.use(limiter);
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -130,13 +188,34 @@ app.use(express.json({ limit: '2mb' }));
 // and generic forward-auth setups (X-Forwarded-User, X-Remote-User).
 // When no proxy is present (e.g. local Docker Compose), defaults to "local"
 // so the app works seamlessly in single-user mode.
+//
+// Security boundary: these headers are TRUSTED. The reverse proxy MUST strip
+// them from incoming client requests before forwarding. If you expose this
+// container directly without a proxy, anyone can spoof Remote-User and
+// impersonate any user. Set TRUSTED_AUTH_HEADERS to restrict which header(s)
+// are honored — e.g. TRUSTED_AUTH_HEADERS=remote-user for Authelia-only.
+const TRUSTED_AUTH_HEADERS = (process.env.TRUSTED_AUTH_HEADERS ||
+  'remote-user,x-authentik-username,x-forwarded-user,x-remote-user'
+).toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+
+function pickAuthHeader(headers) {
+  for (const name of TRUSTED_AUTH_HEADERS) {
+    let v = headers[name];
+    // Node represents repeat headers as arrays — take the first to avoid
+    // arrays leaking into SQL bind parameters.
+    if (Array.isArray(v)) v = v[0];
+    if (typeof v !== 'string') continue;
+    v = v.trim();
+    // Whitelist: alphanum, dot, dash, underscore, @ — covers usernames and emails.
+    // Rejects newlines, control chars, spaces, NULs, quotes — anything that
+    // could break log lines or SQL.
+    if (v && /^[A-Za-z0-9._@-]{1,128}$/.test(v)) return v;
+  }
+  return 'local';
+}
+
 app.use((req, res, next) => {
-  req.userId =
-    req.headers['remote-user']          ||   // Authelia
-    req.headers['x-authentik-username'] ||   // Authentik
-    req.headers['x-forwarded-user']     ||   // Generic
-    req.headers['x-remote-user']        ||
-    'local';
+  req.userId = pickAuthHeader(req.headers);
   next();
 });
 
@@ -248,10 +327,23 @@ app.get('/api/export', (req, res) => {
 });
 
 app.post('/api/import', (req, res) => {
-  const { state, monthly } = req.body;
+  const { state, monthly } = req.body || {};
+  // Whitelist state keys we manage; reject anything else so a crafted backup
+  // can't pollute user_state with arbitrary rows.
+  const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist']);
   const importAll = db.transaction((userId, s, m) => {
-    if (s) for (const [k, v] of Object.entries(s)) stmts.setState.run(userId, k, JSON.stringify(v));
-    if (m) for (const [k, v] of Object.entries(m)) stmts.setMonth.run(userId, k, JSON.stringify(v));
+    if (s && typeof s === 'object') {
+      for (const [k, v] of Object.entries(s)) {
+        if (!ALLOWED_STATE_KEYS.has(k)) continue;
+        stmts.setState.run(userId, k, JSON.stringify(v));
+      }
+    }
+    if (m && typeof m === 'object') {
+      for (const [k, v] of Object.entries(m)) {
+        if (!/^\d{4}-\d{2}$/.test(k)) continue;
+        stmts.setMonth.run(userId, k, JSON.stringify(v));
+      }
+    }
   });
   importAll(req.userId, state, monthly);
   res.json({ ok: true });
@@ -297,7 +389,7 @@ app.put('/api/email/config', (req, res) => {
 });
 
 // POST /api/email/test — send a test email to the configured from address
-app.post('/api/email/test', async (req, res) => {
+app.post('/api/email/test', emailLimiter, async (req, res) => {
   const row = stmts.getEmailCfg.get(req.userId);
   if (!row) return res.status(400).json({ error: 'No email config saved' });
   let cfg;
@@ -321,7 +413,7 @@ app.post('/api/email/test', async (req, res) => {
 });
 
 // POST /api/email/send — send bill summary to a person
-app.post('/api/email/send', async (req, res) => {
+app.post('/api/email/send', emailLimiter, async (req, res) => {
   const { to, greeting, personName, accentColor, monthLabel, bills, total, payMethod, payId, zelleUrl } = req.body;
   if (!to) return res.status(400).json({ error: 'recipient (to) required' });
 
@@ -381,7 +473,7 @@ app.get('/api/events', (req, res) => {
 // BillHive is a single-page app — all client-side routing happens in the browser.
 // Any path that isn't an /api/* route or a static file gets index.html so that
 // deep links and browser refreshes work correctly.
-app.get('*', limiter, (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
