@@ -178,9 +178,9 @@ Data in the volume is preserved across updates.
 
 ## iOS Companion App
 
-A native iOS app called "SelfHive" is currenty in the works and should be available in the app store within the next few weeks. Source code is available at [github.com/martyportatoes/billhive-ios](https://github.com/martyportatoes/billhive-ios). The SelfHive app connects directly to your self-hosted BillHive server.
+A native iOS app called **SelfHive** is available on the App Store: [SelfHive — Bill Splitting](https://apps.apple.com/us/app/selfhive-bill-splitting/id6760245713). It connects directly to your self-hosted BillHive server. Source code: [github.com/martyportatoes/billhive-ios](https://github.com/martyportatoes/billhive-ios).
 
-A standalone version of the app, simply called "BillHive" will be available as well for anyone not interested in selfhosting.
+A standalone version of the app, simply called "BillHive", will also be available for anyone not interested in self-hosting.
 
 ---
 
