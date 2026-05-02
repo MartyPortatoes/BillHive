@@ -426,7 +426,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   <div class="page-sub">Add your bills and let's figure out who owes what.</div>
   <div id="billsList"></div>
   <div style="margin-top:8px;">
-    <button class="btn btn-ghost btn-sm" onclick="addNewBill()">＋ Add Bill</button>
+    <button class="btn btn-ghost btn-sm" data-click="addNewBill()">＋ Add Bill</button>
   </div>
 </div>
 
@@ -502,13 +502,13 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px;">
       <div class="trend-toggle">
-        <button class="trend-toggle-btn active" id="toggle-person" onclick="setTrendsView('person')">Per Person</button>
-        <button class="trend-toggle-btn" id="toggle-bill" onclick="setTrendsView('bill')">By Bill</button>
+        <button class="trend-toggle-btn active" id="toggle-person" data-click="setTrendsView('person')">Per Person</button>
+        <button class="trend-toggle-btn" id="toggle-bill" data-click="setTrendsView('bill')">By Bill</button>
       </div>
       <div class="trend-toggle">
-        <button class="trend-toggle-btn active" id="toggle-months-12" onclick="setTrendsMonthLimit(12)">12M</button>
-        <button class="trend-toggle-btn" id="toggle-months-24" onclick="setTrendsMonthLimit(24)">24M</button>
-        <button class="trend-toggle-btn" id="toggle-months-0" onclick="setTrendsMonthLimit(0)">All</button>
+        <button class="trend-toggle-btn active" id="toggle-months-12" data-click="setTrendsMonthLimit(12)">12M</button>
+        <button class="trend-toggle-btn" id="toggle-months-24" data-click="setTrendsMonthLimit(24)">24M</button>
+        <button class="trend-toggle-btn" id="toggle-months-0" data-click="setTrendsMonthLimit(0)">All</button>
       </div>
     </div>
   </div>
@@ -563,9 +563,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <div class="appearance-sub">Match your system, or pin to light or dark.</div>
       </div>
       <div class="appearance-seg" id="themeSeg">
-        <button type="button" data-theme-pref="system">System</button>
-        <button type="button" data-theme-pref="light">Light</button>
-        <button type="button" data-theme-pref="dark">Dark</button>
+        <button type="button" data-theme-pref="system" data-click="setThemePref('system')">System</button>
+        <button type="button" data-theme-pref="light"  data-click="setThemePref('light')">Light</button>
+        <button type="button" data-theme-pref="dark"   data-click="setThemePref('dark')">Dark</button>
       </div>
     </div>
   </div>
@@ -584,7 +584,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       </div>
       <div id="peopleConfig"></div>
       <div class="action-row">
-        <button class="btn btn-ghost btn-sm" onclick="addPerson()">＋ Add Person</button>
+        <button class="btn btn-ghost btn-sm" data-click="addPerson()">＋ Add Person</button>
       </div>
     </div>
   </div>
@@ -626,8 +626,8 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <div id="emailProviderFields"></div>
 
       <div class="action-row" style="margin-top:12px;">
-        <button class="btn btn-green btn-sm" onclick="saveEmailConfig()">Save Email Config</button>
-        <button class="btn btn-ghost btn-sm" onclick="testEmailConfig()">Send Test Email</button>
+        <button class="btn btn-green btn-sm" data-click="saveEmailConfig()">Save Email Config</button>
+        <button class="btn btn-ghost btn-sm" data-click="testEmailConfig()">Send Test Email</button>
         <span id="emailConfigStatus" style="font-size:11px;color:var(--muted);"></span>
       </div>
     </div>
@@ -676,7 +676,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <div id="devicesList" style="display:flex;flex-direction:column;gap:6px;"></div>
 
       <div class="action-row" style="margin-top:12px;">
-        <button class="btn btn-green btn-sm" onclick="generateDeviceKey()">+ Generate Device Key</button>
+        <button class="btn btn-green btn-sm" data-click="generateDeviceKey()">+ Generate Device Key</button>
       </div>
     </div>
   </div>
@@ -691,12 +691,12 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         </div>
       </div>
       <div class="action-row">
-        <button class="btn btn-ghost btn-sm" onclick="exportData()">Export Backup</button>
+        <button class="btn btn-ghost btn-sm" data-click="exportData()">Export Backup</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
           Import Backup
           <input type="file" accept=".json" style="display:none" onchange="importData(this.files[0])">
         </label>
-        <button class="btn btn-danger btn-sm" onclick="clearAll()">Reset All</button>
+        <button class="btn btn-danger btn-sm" data-click="clearAll()">Reset All</button>
       </div>
     </div>
   </div>
@@ -839,22 +839,23 @@ function setThemePref(pref) {
   applyTheme();
   save();
 }
-// Event delegation — survives any future re-render and is more robust than
-// inline onclick attributes (which some CSP profiles or browser extensions
-// can interfere with).
+// Universal click delegator — drop-in replacement for inline `onclick=""`
+// attributes, which some browsers (privacy extensions, stricter CSP profiles,
+// or stale half-cached pages) silently neutralize. Every element that used to
+// say `onclick="someFn(args)"` now says `data-click="someFn(args)"` and is
+// dispatched here.
+//
+// Security note: data-click bodies are author-controlled HTML written by this
+// app; never user input. Function constructor runs in the global scope so all
+// top-level `function` declarations (toggleBill, addPerson, …) resolve.
 document.addEventListener('click', (e) => {
-  // Theme picker (Settings → Appearance)
-  const themeBtn = e.target.closest('#themeSeg button[data-theme-pref]');
-  if (themeBtn) { setThemePref(themeBtn.dataset.themePref); return; }
-
-  // Bill card expand — header strip and the trailing chevron button both
-  // toggle the same card. The chevron is inside the header, so a click on it
-  // matches both selectors; closest('.bill-expand-btn') wins via earlier
-  // match. Either way, toggleBill is idempotent so a single call is correct.
-  const billExpandBtn = e.target.closest('.bill-expand-btn[data-bill-id]');
-  if (billExpandBtn) { e.stopPropagation(); toggleBill(billExpandBtn.dataset.billId); return; }
-  const billHeader = e.target.closest('.bill-header[data-bill-id]');
-  if (billHeader) { toggleBill(billHeader.dataset.billId); return; }
+  const el = e.target.closest('[data-click]');
+  if (!el) return;
+  try {
+    new Function('event', el.dataset.click).call(el, e);
+  } catch (err) {
+    console.warn('data-click handler failed:', err, el);
+  }
 });
 
 // Chart.js instances — kept in module scope so they can be destroyed before
@@ -1155,7 +1156,7 @@ function renderBills() {
       <div class="empty-state-icon">📋</div>
       <div class="empty-state-title">No bills yet</div>
       <div class="empty-state-sub">Add your first recurring household bill to start tracking who owes what each month.</div>
-      <button class="btn btn-green btn-sm" onclick="addNewBill()">＋ Add Your First Bill</button>
+      <button class="btn btn-green btn-sm" data-click="addNewBill()">＋ Add Your First Bill</button>
     </div>`;
     updateTabBadge();
     return;
@@ -1200,7 +1201,7 @@ function renderBills() {
     }).join(' ');
 
     card.innerHTML = `
-      <div class="bill-header" data-bill-id="${bill.id}">
+      <div class="bill-header" data-click="toggleBill('${bill.id}')">
         <div class="bill-name-wrap">
           <div class="bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
@@ -1210,7 +1211,7 @@ function renderBills() {
         </div>
         ${totalDisplay}
         ${myShareDisplay}
-        <button type="button" class="bill-expand-btn" data-bill-id="${bill.id}">▾</button>
+        <button type="button" class="bill-expand-btn" data-click="event.stopPropagation();toggleBill('${bill.id}')">▾</button>
       </div>
       <div class="bill-body">
         ${renderBillBody(bill)}
@@ -1255,10 +1256,10 @@ function renderBillBody(bill) {
     <div class="split-config">
       <span class="split-label">Split type:</span>
       <div class="split-type-toggle">
-        <button class="${bill.splitType==='pct'?'active':''}" onclick="setSplitType('${bill.id}','pct')">% Percent</button>
-        <button class="${bill.splitType==='fixed'?'active':''}" onclick="setSplitType('${bill.id}','fixed')">$ Fixed</button>
+        <button class="${bill.splitType==='pct'?'active':''}" data-click="setSplitType('${bill.id}','pct')">% Percent</button>
+        <button class="${bill.splitType==='fixed'?'active':''}" data-click="setSplitType('${bill.id}','fixed')">$ Fixed</button>
       </div>
-      <button class="btn btn-danger btn-xs" style="margin-left:auto" onclick="removeBill('${bill.id}')">Remove Bill</button>
+      <button class="btn btn-danger btn-xs" style="margin-left:auto" data-click="removeBill('${bill.id}')">Remove Bill</button>
     </div>
   `;
 
@@ -1303,11 +1304,11 @@ function renderBillBody(bill) {
               <option value="">— none —</option>
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
             </select>
-            <button class="remove-line" onclick="removeLine('${bill.id}','${line.id}')">✕</button>
+            <button class="remove-line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
           </div>`;
       }).join('')}
       <div class="add-line-row">
-        <button class="btn btn-ghost btn-xs" onclick="addLine('${bill.id}')">＋ Add Person</button>
+        <button class="btn btn-ghost btn-xs" data-click="addLine('${bill.id}')">＋ Add Person</button>
       </div>
     `;
   } else {
@@ -1345,7 +1346,7 @@ function renderBillBody(bill) {
           <div class="line-item" style="grid-template-columns:24px 150px 1fr 120px 130px 28px;${isCovered?'background:rgba(245,168,0,.04);':''}">
             <div style="display:flex;align-items:center;justify-content:center;">
               <button title="${isRemainder ? 'Remainder absorber — click to move' : 'Make this line absorb the remainder'}"
-                onclick="setRemainderLine('${bill.id}','${line.id}')"
+                data-click="setRemainderLine('${bill.id}','${line.id}')"
                 style="width:20px;height:20px;border-radius:50%;border:2px solid ${rColor};background:${rBg};
                        cursor:pointer;font-size:9px;color:${rTxt};font-family:DM Mono,monospace;font-weight:500;">R</button>
             </div>
@@ -1368,11 +1369,11 @@ function renderBillBody(bill) {
               <option value="">— none —</option>
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
             </select>
-            <button class="remove-line" onclick="removeLine('${bill.id}','${line.id}')">✕</button>
+            <button class="remove-line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
           </div>`;
       }).join('')}
       <div class="add-line-row" style="display:flex;align-items:center;gap:12px;">
-        <button class="btn btn-ghost btn-xs" onclick="addLine('${bill.id}')">+ Add Person</button>
+        <button class="btn btn-ghost btn-xs" data-click="addLine('${bill.id}')">+ Add Person</button>
         <span style="font-size:10px;color:var(--muted2)">R = remainder absorber &nbsp;·&nbsp; Covered By = who actually pays you</span>
       </div>
     `;
@@ -1778,15 +1779,15 @@ function renderReceiveCards() {
 
     let payBtn = '';
     if (person.payMethod === 'zelle') {
-      payBtn = `<button class="btn btn-blue btn-sm" onclick="openZelle('${person.id}');markCheck('zelle_${person.id}')">💰 Zelle</button>`;
+      payBtn = `<button class="btn btn-blue btn-sm" data-click="openZelle('${person.id}');markCheck('zelle_${person.id}')">💰 Zelle</button>`;
     } else if (person.payMethod === 'venmo') {
-      payBtn = `<button class="btn btn-orange btn-sm" onclick="openVenmo('${person.id}');markCheck('venmo_${person.id}')">💸 Venmo</button>`;
+      payBtn = `<button class="btn btn-orange btn-sm" data-click="openVenmo('${person.id}');markCheck('venmo_${person.id}')">💸 Venmo</button>`;
     } else if (person.payMethod === 'cashapp') {
-      payBtn = `<button class="btn btn-green btn-sm" onclick="openCashApp('${person.id}');markCheck('cashapp_${person.id}')">💵 Cash App</button>`;
+      payBtn = `<button class="btn btn-green btn-sm" data-click="openCashApp('${person.id}');markCheck('cashapp_${person.id}')">💵 Cash App</button>`;
     }
 
     const emailBtn = person.email
-      ? `<button class="btn btn-ghost btn-sm" onclick="openPersonEmail('${person.id}')">✉️ Email</button>`
+      ? `<button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Email</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.4;cursor:default" title="Add email in Settings">✉️ Email</button>`;
 
     const greetingLine = person.greeting || ('Hi ' + person.name + ',');
@@ -1796,7 +1797,7 @@ function renderReceiveCards() {
 
     return `
       <div class="receive-card" id="rc-${person.id}">
-        <div class="receive-card-head" onclick="toggleReceiveCard('${person.id}')">
+        <div class="receive-card-head" data-click="toggleReceiveCard('${person.id}')">
           <div class="receive-person">
             <div class="receive-person-dot" style="background:${person.color}"></div>
             <div>
@@ -1808,7 +1809,7 @@ function renderReceiveCards() {
             <div class="receive-amount" style="color:${person.color}">$${d.total.toFixed(2)}</div>
             ${emailBtn}
             ${payBtn}
-            <button class="receive-expand" onclick="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
+            <button class="receive-expand" data-click="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
           </div>
         </div>
         <div class="receive-body">
@@ -1818,8 +1819,8 @@ function renderReceiveCards() {
             <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Email preview</div>
             <div class="email-box" style="font-size:11px;max-height:160px;white-space:pre-wrap;">${buildPersonEmail(person.id)}</div>
             <div class="action-row">
-              <button class="btn btn-ghost btn-sm" onclick="openPersonEmail('${person.id}')">✉️ Open in Mail</button>
-              <button class="btn btn-ghost btn-sm" onclick="copyPersonEmail('${person.id}')">📋 Copy</button>
+              <button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Open in Mail</button>
+              <button class="btn btn-ghost btn-sm" data-click="copyPersonEmail('${person.id}')">📋 Copy</button>
             </div>
           </div>
         </div>
@@ -1992,7 +1993,7 @@ function renderSendCards() {
     // Only allow http(s) URLs — block javascript: and other dangerous protocols
     const safePayUrl = hasUrl && /^https?:\/\//i.test(url) ? esc(url) : '';
     const payBtn = safePayUrl
-      ? `<a class="btn btn-green btn-sm" href="${safePayUrl}" target="_blank" rel="noopener" onclick="markCheck('pay_${bill.id}')">Pay ↗</a>`
+      ? `<a class="btn btn-green btn-sm" href="${safePayUrl}" target="_blank" rel="noopener" data-click="markCheck('pay_${bill.id}')">Pay ↗</a>`
       : `<span style="font-size:10px;color:var(--muted2)">${hasUrl ? 'Invalid URL (must start with http)' : 'Add URL to get Pay button'}</span>`;
 
     return `
@@ -2099,7 +2100,7 @@ function renderChecklist() {
     return;
   }
   el.innerHTML = defs.map(item => `
-    <div class="check-item ${done[item.id]?'done':''}" onclick="toggleCheck('${item.id}')">
+    <div class="check-item ${done[item.id]?'done':''}" data-click="toggleCheck('${item.id}')">
       <div class="check-box">${done[item.id]?'✓':''}</div>
       <div class="check-label">${item.label}</div>
       <div class="check-meta">${item.meta}</div>
@@ -2369,7 +2370,7 @@ function renderDevicesList(keys) {
           <div class="device-row-name">${esc(k.name)}</div>
           <div class="device-row-meta">${esc(k.keyPrefix)}…  ·  created ${esc(created)}  ·  ${esc(lastUsed)}</div>
         </div>
-        <button class="btn btn-danger btn-sm" data-key-id="${esc(k.id)}" data-key-name="${esc(k.name)}" onclick="revokeDeviceKey(this.dataset.keyId, this.dataset.keyName)">Revoke</button>
+        <button class="btn btn-danger btn-sm" data-key-id="${esc(k.id)}" data-key-name="${esc(k.name)}" data-click="revokeDeviceKey(this.dataset.keyId, this.dataset.keyName)">Revoke</button>
       </div>
     `;
   }).join('');
@@ -2416,8 +2417,8 @@ function showKeyRevealModal(data) {
       ${esc(data.name)}  ·  ${esc(data.id)}
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="copyDeviceKey()">📋 Copy</button>
-      <button class="btn btn-green btn-sm" onclick="closeBhModal()">I saved it</button>
+      <button class="btn btn-ghost btn-sm" data-click="copyDeviceKey()">📋 Copy</button>
+      <button class="btn btn-green btn-sm" data-click="closeBhModal()">I saved it</button>
     </div>
   `);
 }
@@ -2713,13 +2714,13 @@ function renderPeopleConfig() {
 
     return `
       <div class="person-card" id="person-card-${p.id}">
-        <div class="person-header" onclick="togglePerson('${p.id}')">
+        <div class="person-header" data-click="togglePerson('${p.id}')">
           <span style="width:12px;height:12px;border-radius:50%;background:${p.color};display:inline-block;flex-shrink:0;"></span>
           <span class="person-header-name">${esc(p.name||'New Person')}</span>
           ${isMe
             ? `<span style="margin-left:auto;font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);background:var(--surface3);padding:3px 7px;border-radius:4px;">you</span>`
             : `<span class="person-header-meta">${payLabel}</span>`}
-          <button class="person-expand-btn" onclick="event.stopPropagation();togglePerson('${p.id}')">▾</button>
+          <button class="person-expand-btn" data-click="event.stopPropagation();togglePerson('${p.id}')">▾</button>
         </div>
         <div class="person-body">
           <div class="person-field">
@@ -2751,7 +2752,7 @@ function renderPeopleConfig() {
           </div>
           ${!isMe ? `
           <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-            <button class="btn btn-danger btn-sm" style="width:100%;" onclick="removePerson(${idx})">✕ Remove ${esc(p.name||'Person')}</button>
+            <button class="btn btn-danger btn-sm" style="width:100%;" data-click="removePerson(${idx})">✕ Remove ${esc(p.name||'Person')}</button>
           </div>` : ''}
         </div>
       </div>`;
@@ -3002,13 +3003,13 @@ init();
 </script>
 
 <!-- ════════════════ MODAL ════════════════ -->
-<div id="modal-overlay" onclick="_modalCancel()">
-  <div id="modal-box" onclick="event.stopPropagation()">
+<div id="modal-overlay" data-click="_modalCancel()">
+  <div id="modal-box" data-click="event.stopPropagation()">
     <div id="modal-title"></div>
     <input id="modal-input" type="text" onkeydown="if(event.key==='Enter')_modalOk()">
     <div id="modal-footer">
-      <button class="btn btn-ghost btn-sm" id="modal-cancel-btn" onclick="_modalCancel()">Cancel</button>
-      <button class="btn btn-green btn-sm" id="modal-ok-btn" onclick="_modalOk()">OK</button>
+      <button class="btn btn-ghost btn-sm" id="modal-cancel-btn" data-click="_modalCancel()">Cancel</button>
+      <button class="btn btn-green btn-sm" id="modal-ok-btn" data-click="_modalOk()">OK</button>
     </div>
   </div>
 </div>
