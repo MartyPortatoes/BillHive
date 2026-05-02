@@ -839,12 +839,22 @@ function setThemePref(pref) {
   applyTheme();
   save();
 }
-// Event delegation — survives any future re-render of #themeSeg and is
-// more robust than inline onclick attributes (which some CSP profiles or
-// browser extensions can interfere with).
+// Event delegation — survives any future re-render and is more robust than
+// inline onclick attributes (which some CSP profiles or browser extensions
+// can interfere with).
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('#themeSeg button[data-theme-pref]');
-  if (btn) setThemePref(btn.dataset.themePref);
+  // Theme picker (Settings → Appearance)
+  const themeBtn = e.target.closest('#themeSeg button[data-theme-pref]');
+  if (themeBtn) { setThemePref(themeBtn.dataset.themePref); return; }
+
+  // Bill card expand — header strip and the trailing chevron button both
+  // toggle the same card. The chevron is inside the header, so a click on it
+  // matches both selectors; closest('.bill-expand-btn') wins via earlier
+  // match. Either way, toggleBill is idempotent so a single call is correct.
+  const billExpandBtn = e.target.closest('.bill-expand-btn[data-bill-id]');
+  if (billExpandBtn) { e.stopPropagation(); toggleBill(billExpandBtn.dataset.billId); return; }
+  const billHeader = e.target.closest('.bill-header[data-bill-id]');
+  if (billHeader) { toggleBill(billHeader.dataset.billId); return; }
 });
 
 // Chart.js instances — kept in module scope so they can be destroyed before
@@ -1190,7 +1200,7 @@ function renderBills() {
     }).join(' ');
 
     card.innerHTML = `
-      <div class="bill-header" onclick="toggleBill('${bill.id}')">
+      <div class="bill-header" data-bill-id="${bill.id}">
         <div class="bill-name-wrap">
           <div class="bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
@@ -1200,7 +1210,7 @@ function renderBills() {
         </div>
         ${totalDisplay}
         ${myShareDisplay}
-        <button class="bill-expand-btn" onclick="event.stopPropagation();toggleBill('${bill.id}')">▾</button>
+        <button type="button" class="bill-expand-btn" data-bill-id="${bill.id}">▾</button>
       </div>
       <div class="bill-body">
         ${renderBillBody(bill)}
