@@ -604,7 +604,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
       <div class="setting-row">
         <div class="setting-label">Provider<div class="setting-hint">How emails are sent</div></div>
-        <select id="em-provider" onchange="renderEmailProviderFields()" style="font-size:12px;">
+        <select id="em-provider" data-change="renderEmailProviderFields()" style="font-size:12px;">
           <option value="">— disabled —</option>
           <option value="smtp">SMTP (Gmail, Outlook, self-hosted…)</option>
           <option value="mailgun">Mailgun</option>
@@ -668,7 +668,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
           <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;">When on, SelfHive can't connect without a valid key. Browser access here is unaffected.</div>
         </div>
         <label class="tog">
-          <input type="checkbox" id="requireDeviceKeysToggle" onchange="onRequireDeviceKeysChange(this)">
+          <input type="checkbox" id="requireDeviceKeysToggle" data-change="onRequireDeviceKeysChange(this)">
           <span class="tog-slider"></span>
         </label>
       </div>
@@ -694,7 +694,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <button class="btn btn-ghost btn-sm" data-click="exportData()">Export Backup</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
           Import Backup
-          <input type="file" accept=".json" style="display:none" onchange="importData(this.files[0])">
+          <input type="file" accept=".json" style="display:none" data-change="onImportFileChange(this)">
         </label>
         <button class="btn btn-danger btn-sm" data-click="clearAll()">Reset All</button>
       </div>
@@ -854,7 +854,7 @@ function setThemePref(pref) {
 //
 // Function names are checked against an allowlist so a stray data-click cannot
 // invoke arbitrary globals.
-function _parseClickArg(raw, el) {
+function _parseArg(raw, el) {
   const s = raw.trim();
   if (!s) return undefined;
   if ((s[0] === "'" || s[0] === '"') && s[s.length-1] === s[0]) return s.slice(1, -1);
@@ -863,6 +863,9 @@ function _parseClickArg(raw, el) {
   if (s === 'false') return false;
   if (s === 'null') return null;
   if (s.startsWith('this.dataset.')) return el.dataset[s.slice('this.dataset.'.length)];
+  if (s === 'this.value') return el.value;
+  if (s === 'this.checked') return el.checked;
+  if (s === 'this') return el;
   return s;
 }
 function _splitTopLevel(text, sep) {
@@ -876,49 +879,122 @@ function _splitTopLevel(text, sep) {
   if (buf) out.push(buf);
   return out;
 }
-function _runClickStmt(stmt, el, ev) {
+// Generic statement runner used by click, input, change, and keydown delegators.
+function _runStmt(stmt, el, ev, fnMap, label) {
   const s = stmt.trim();
   if (!s) return;
   if (s === 'event.stopPropagation()') { ev.stopPropagation(); return; }
-  const m = s.match(/^(\w+)\((.*)\)$/);
-  if (!m) { console.warn('Unparseable data-click:', s); return; }
+  const m = s.match(/^(\w+)\((.*)\)$/s);
+  if (!m) { console.warn('Unparseable ' + label + ':', s); return; }
   const name = m[1], argText = m[2];
-  const fn = _CLICK_FNS[name];
-  if (typeof fn !== 'function') { console.warn('Unknown data-click action:', name); return; }
+  const fn = fnMap[name];
+  if (typeof fn !== 'function') { console.warn('Unknown ' + label + ' action:', name); return; }
   const args = argText.trim()
-    ? _splitTopLevel(argText, ',').map(a => _parseClickArg(a, el))
+    ? _splitTopLevel(argText, ',').map(a => _parseArg(a, el))
     : [];
   fn.apply(null, args);
 }
-// _CLICK_FNS is populated lazily on first click so all the function
-// declarations below this point are already hoisted and visible.
-let _CLICK_FNS = null;
-function _initClickFns() {
-  _CLICK_FNS = {
-    // Bills page
+
+// ─── Named wrapper functions for inline handlers ───────────────────
+// Bill identity fields (replace IIFEs that were inline in oninput)
+function updateBillIcon(billId, value) {
+  const b = S.bills.find(x => x.id === billId);
+  if (!b) return;
+  b.icon = value;
+  const iconEl = document.querySelector('#bill-card-' + billId + ' .bill-icon');
+  if (iconEl) iconEl.replaceChildren(document.createTextNode(value));
+  save();
+}
+function updateBillName(billId, value) {
+  const b = S.bills.find(x => x.id === billId);
+  if (!b) return;
+  b.name = value;
+  const el = document.querySelector('#bill-card-' + billId + ' .bill-name');
+  if (el) el.textContent = value;
+  save();
+}
+function updateBillColor(billId, value) {
+  const b = S.bills.find(x => x.id === billId);
+  if (!b) return;
+  b.color = value;
+  const iconEl = document.querySelector('#bill-card-' + billId + ' .bill-icon');
+  if (iconEl) { iconEl.style.background = value + '22'; iconEl.style.color = value; }
+  save();
+}
+
+// Person field updates (replace inline S.people[idx].field = this.value)
+function updatePersonField(idx, field, value) {
+  if (S.people[idx]) S.people[idx][field] = value;
+}
+function updatePersonFieldAndSave(idx, field, value) {
+  if (S.people[idx]) { S.people[idx][field] = value; save(); }
+}
+function updatePersonPayMethod(idx, value) {
+  if (S.people[idx]) { S.people[idx].payMethod = value; save(); renderPeopleConfig(); }
+}
+
+// File import wrapper (replace inline this.files[0] access)
+function onImportFileChange(el) {
+  if (el.files && el.files[0]) importData(el.files[0]);
+}
+
+// ─── Unified function allowlists ───────────────────────────────────
+// Populated lazily on first event so all function declarations are hoisted.
+let _EVT_FNS = null;
+function _initEvtFns() {
+  _EVT_FNS = {
+    // click actions
     addNewBill, toggleBill, removeBill, addLine, removeLine,
     setSplitType, setRemainderLine,
-    // Settings — people
     addPerson, removePerson, togglePerson,
-    // Settings — email/devices/data
     saveEmailConfig, testEmailConfig, generateDeviceKey, copyDeviceKey,
     revokeDeviceKey, exportData, clearAll,
-    // Pay & Collect
     toggleReceiveCard, openZelle, openVenmo, openCashApp,
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
-    // Trends
     setTrendsView, setTrendsMonthLimit,
-    // Theme
     setThemePref,
-    // Modal
     closeBhModal, _modalCancel, _modalOk,
+    // input actions (bill fields)
+    updateBillIcon, updateBillName, updateBillColor,
+    onTotalInput, updateLineDesc, updateLinePct, onFixedLineInput,
+    updateBillPayUrl,
+    // input actions (person fields)
+    updatePersonField,
+    // change actions
+    updatePersonFieldAndSave, updatePersonPayMethod,
+    updateLinePersonId, updateLineCoveredBy,
+    togglePreserve, toggleAutoPay,
+    renderEmailProviderFields,
+    onRequireDeviceKeysChange,
+    onImportFileChange,
+    save,
   };
 }
+function _fns() { if (!_EVT_FNS) _initEvtFns(); return _EVT_FNS; }
+
+// ─── Delegated event listeners ─────────────────────────────────────
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-click]');
   if (!el) return;
-  if (!_CLICK_FNS) _initClickFns();
-  for (const stmt of _splitTopLevel(el.dataset.click, ';')) _runClickStmt(stmt, el, e);
+  for (const stmt of _splitTopLevel(el.dataset.click, ';')) _runStmt(stmt, el, e, _fns(), 'data-click');
+});
+document.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-input]');
+  if (!el) return;
+  for (const stmt of _splitTopLevel(el.dataset.input, ';')) _runStmt(stmt, el, e, _fns(), 'data-input');
+});
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-change]');
+  if (!el) return;
+  for (const stmt of _splitTopLevel(el.dataset.change, ';')) _runStmt(stmt, el, e, _fns(), 'data-change');
+});
+document.addEventListener('keydown', (e) => {
+  const el = e.target.closest('[data-keydown]');
+  if (!el) return;
+  // Optional key filter: data-keydown-key="Enter" limits when the handler fires
+  const keyFilter = el.dataset.keydownKey;
+  if (keyFilter && e.key !== keyFilter) return;
+  for (const stmt of _splitTopLevel(el.dataset.keydown, ';')) _runStmt(stmt, el, e, _fns(), 'data-keydown');
 });
 
 // Chart.js instances — kept in module scope so they can be destroyed before
@@ -1292,25 +1368,15 @@ function renderBillBody(bill) {
     <div style="display:grid;grid-template-columns:44px 1fr 50px;gap:8px;
          align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
       <input type="text" value="${bill.icon}" maxlength="2"
-             oninput="(function(v){const b=S.bills.find(b=>b.id==='${bill.id}');if(!b)return;
-               b.icon=v;
-               document.querySelector('#bill-${bill.id} .bill-icon')?.replaceChildren(document.createTextNode(v));
-               save();})(this.value)"
+             data-input="updateBillIcon('${bill.id}',this.value)"
              style="text-align:center;font-size:18px;padding:4px;width:44px;height:34px;
                     background:${bill.color}22;border:1px solid var(--border);border-radius:6px;color:var(--text);">
       <input type="text" value="${bill.name}" placeholder="Bill name"
-             oninput="(function(v){const b=S.bills.find(b=>b.id==='${bill.id}');if(!b)return;
-               b.name=v;
-               const el=document.querySelector('#bill-${bill.id} .bill-name');if(el)el.textContent=v;
-               save();})(this.value)"
+             data-input="updateBillName('${bill.id}',this.value)"
              style="font-size:12px;font-family:var(--mono);padding:6px 8px;
                     background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);">
       <input type="color" value="${bill.color}"
-             oninput="(function(v){const b=S.bills.find(b=>b.id==='${bill.id}');if(!b)return;
-               b.color=v;
-               const iconEl=document.querySelector('#bill-${bill.id} .bill-icon');
-               if(iconEl){iconEl.style.background=v+'22';iconEl.style.color=v;}
-               save();})(this.value)"
+             data-input="updateBillColor('${bill.id}',this.value)"
              style="width:50px;height:34px;border:none;background:transparent;cursor:pointer;padding:0;">
     </div>
   `;
@@ -1338,7 +1404,7 @@ function renderBillBody(bill) {
       <div class="total-input-wrap" style="margin-top:12px;">
         <label>Total Bill ($)</label>
         <input type="number" placeholder="0.00" step="0.01" value="${total||''}"
-               oninput="onTotalInput('${bill.id}', this.value)" style="max-width:140px;">
+               data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown"></div>
       </div>
       <div class="line-items-head" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;">
@@ -1352,17 +1418,17 @@ function renderBillBody(bill) {
         return `
           <div class="line-item" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;${isCovered?'background:rgba(245,168,0,.04);':''}">
             <input type="text" value="${line.desc}" placeholder="Description"
-                   oninput="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
-            <select onchange="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+                   data-input="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
+            <select data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
             </select>
             <input type="number" value="${+line.value.toFixed(2)}" min="0" max="100" step="0.1"
-                   oninput="updateLinePct('${bill.id}','${line.id}',this.value)"
+                   data-input="updateLinePct('${bill.id}','${line.id}',this.value)"
                    style="text-align:right;font-size:12px;">
             <div class="line-item-owed ${line.personId==='me'?'is-mine':''}" style="text-align:right;">
               ${total ? `$${lineAmt.toFixed(2)}` : '—'}
             </div>
-            <select onchange="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+            <select data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
                     style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
               <option value="">— none —</option>
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
@@ -1387,7 +1453,7 @@ function renderBillBody(bill) {
       <div class="total-input-wrap" style="margin-top:12px;">
         <label>Total Bill ($)</label>
         <input type="number" placeholder="0.00" step="0.01" value="${fixedTotal||''}"
-               oninput="onTotalInput('${bill.id}', this.value)" style="max-width:140px;">
+               data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown" style="font-size:11px;color:var(--muted);">
           ${fixedTotal > 0 ? 'Remainder → <span style="color:'+remainderPerson.color+'">'+remainderPerson.name+'</span>' : 'Enter total, then adjust lines below'}
         </div>
@@ -1414,8 +1480,8 @@ function renderBillBody(bill) {
                        cursor:pointer;font-size:9px;color:${rTxt};font-family:DM Mono,monospace;font-weight:500;">R</button>
             </div>
             <input type="text" value="${line.desc}" placeholder="Description"
-                   oninput="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
-            <select onchange="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+                   data-input="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
+            <select data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
             </select>
             ${isRemainder
@@ -1424,10 +1490,10 @@ function renderBillBody(bill) {
                    ${fixedTotal > 0 ? '$'+remainderVal.toFixed(2) : '—'}
                  </div>`
               : `<input type="number" value="${lineAmt||''}" placeholder="0.00" step="0.01"
-                        oninput="onFixedLineInput('${bill.id}','${line.id}',this.value)"
+                        data-input="onFixedLineInput('${bill.id}','${line.id}',this.value)"
                         style="text-align:right;font-size:12px;" id="fixed-line-input-${bill.id}-${line.id}">`
             }
-            <select onchange="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+            <select data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
                     style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
               <option value="">— none —</option>
               ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
@@ -1445,14 +1511,14 @@ function renderBillBody(bill) {
   const preserveToggle = `
     <div class="preserve-row">
       <label class="tog">
-        <input type="checkbox" id="preserve-${bill.id}" ${bill.preserve ? 'checked' : ''} onchange="togglePreserve('${bill.id}', this.checked)">
+        <input type="checkbox" id="preserve-${bill.id}" ${bill.preserve ? 'checked' : ''} data-change="togglePreserve('${bill.id}',this.checked)">
         <span class="tog-slider"></span>
       </label>
       <label class="preserve-row-label" for="preserve-${bill.id}">Carry amounts forward each month</label>
     </div>
     <div class="preserve-row">
       <label class="tog">
-        <input type="checkbox" id="autopay-${bill.id}" ${bill.autoPay ? 'checked' : ''} onchange="toggleAutoPay('${bill.id}', this.checked)">
+        <input type="checkbox" id="autopay-${bill.id}" ${bill.autoPay ? 'checked' : ''} data-change="toggleAutoPay('${bill.id}',this.checked)">
         <span class="tog-slider"></span>
       </label>
       <label class="preserve-row-label" for="autopay-${bill.id}">Auto-pay — skip &ldquo;paid&rdquo; task in checklist</label>
@@ -2072,7 +2138,7 @@ function renderSendCards() {
           <input type="url" class="send-url-input ${hasUrl ? 'has-url' : ''}"
                  placeholder="https://your-bank.com/pay"
                  value="${url}"
-                 oninput="updateBillPayUrl('${bill.id}', this.value)"
+                 data-input="updateBillPayUrl('${bill.id}',this.value)"
                  title="Payment portal URL for this bill">
           ${payBtn}
         </div>
@@ -2085,7 +2151,7 @@ function updateBillPayUrl(billId, url) {
   if (!bill) return;
   bill.payUrl = url.trim();
   // Update the pay button in-place without re-rendering the whole list
-  const card = [...document.querySelectorAll('.send-card')].find(c => c.querySelector(`[oninput*="${billId}"]`));
+  const card = [...document.querySelectorAll('.send-card')].find(c => c.querySelector(`[data-input*="${billId}"]`));
   if (card) {
     const right = card.querySelector('.send-card-right');
     const input = right.querySelector('input');
@@ -2719,7 +2785,7 @@ function renderGreetingConfig() {
         </div>
         <input type="text" value="${p.greeting||''}"
                placeholder="Hi ${p.name},"
-               oninput="S.people[${idx}].greeting=this.value" onchange="save()"
+               data-input="updatePersonField(${idx},'greeting',this.value)" data-change="save()"
                style="font-size:12px;">
       </div>`;
   }).join('') || '<div style="color:var(--muted);font-size:12px;">Add people above first.</div>';
@@ -2752,26 +2818,26 @@ function renderPeopleConfig() {
         <div class="person-field">
           <div class="person-field-label">Phone / Email</div>
           <input type="text" value="${p.payId||''}" placeholder="phone or email"
-                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+                 data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>
         <div class="person-field">
           <div class="person-field-label">Zelle URL</div>
           <input type="url" value="${p.zelleUrl||''}" placeholder="Custom URL (optional)"
-                 oninput="S.people[${idx}].zelleUrl=this.value" onchange="save()">
+                 data-input="updatePersonField(${idx},'zelleUrl',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'venmo') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Venmo Handle</div>
           <input type="text" value="${p.payId||''}" placeholder="@handle"
-                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+                 data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'cashapp') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Cash Tag</div>
           <input type="text" value="${p.payId||''}" placeholder="$cashtag"
-                 oninput="S.people[${idx}].payId=this.value" onchange="save()">
+                 data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     }
 
@@ -2791,15 +2857,15 @@ function renderPeopleConfig() {
             <div style="display:flex;align-items:center;gap:8px;">
               <input type="color" value="${p.color}" title="Pick color"
                      style="width:34px;height:34px;padding:2px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;flex-shrink:0;"
-                     oninput="S.people[${idx}].color=this.value"
-                     onchange="S.people[${idx}].color=this.value;save()">
+                     data-input="updatePersonField(${idx},'color',this.value)"
+                     data-change="updatePersonFieldAndSave(${idx},'color',this.value)">
               <input type="text" value="${p.name||''}" placeholder="Name"
-                     oninput="S.people[${idx}].name=this.value" onchange="save()">
+                     data-input="updatePersonField(${idx},'name',this.value)" data-change="save()">
             </div>
           </div>
           <div class="person-field">
             <div class="person-field-label">Payment</div>
-            <select onchange="S.people[${idx}].payMethod=this.value;save();renderPeopleConfig();">
+            <select data-change="updatePersonPayMethod(${idx},this.value)">
               <option value="none"    ${p.payMethod==='none'    ?'selected':''}>None</option>
               <option value="zelle"   ${p.payMethod==='zelle'   ?'selected':''}>Zelle</option>
               <option value="venmo"   ${p.payMethod==='venmo'   ?'selected':''}>Venmo</option>
@@ -2811,7 +2877,7 @@ function renderPeopleConfig() {
           <div class="person-field">
             <div class="person-field-label">Email</div>
             <input type="email" value="${p.email||''}" placeholder="Notifications email"
-                   oninput="S.people[${idx}].email=this.value" onchange="save()">
+                   data-input="updatePersonField(${idx},'email',this.value)" data-change="save()">
           </div>
           ${!isMe ? `
           <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
@@ -3069,7 +3135,7 @@ init();
 <div id="modal-overlay" data-click="_modalCancel()">
   <div id="modal-box" data-click="event.stopPropagation()">
     <div id="modal-title"></div>
-    <input id="modal-input" type="text" onkeydown="if(event.key==='Enter')_modalOk()">
+    <input id="modal-input" type="text" data-keydown="_modalOk()" data-keydown-key="Enter">
     <div id="modal-footer">
       <button class="btn btn-ghost btn-sm" id="modal-cancel-btn" data-click="_modalCancel()">Cancel</button>
       <button class="btn btn-green btn-sm" id="modal-ok-btn" data-click="_modalOk()">OK</button>
