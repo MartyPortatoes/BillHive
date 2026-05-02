@@ -839,23 +839,86 @@ function setThemePref(pref) {
   applyTheme();
   save();
 }
-// Universal click delegator — drop-in replacement for inline `onclick=""`
-// attributes, which some browsers (privacy extensions, stricter CSP profiles,
-// or stale half-cached pages) silently neutralize. Every element that used to
-// say `onclick="someFn(args)"` now says `data-click="someFn(args)"` and is
-// dispatched here.
+// Universal click delegator — drop-in replacement for inline `onclick=""`,
+// which gets silently neutralized in some browsers (privacy extensions, stale
+// caches). Every element that used to say `onclick="fn(args)"` now says
+// `data-click="fn(args)"` and is dispatched here.
 //
-// Security note: data-click bodies are author-controlled HTML written by this
-// app; never user input. Function constructor runs in the global scope so all
-// top-level `function` declarations (toggleBill, addPerson, …) resolve.
+// We parse the expression instead of using `new Function()` / eval, because the
+// production CSP (Helmet) does not allow 'unsafe-eval'. Supports the small
+// subset of expressions actually used by this app:
+//   - "fn(arg, …)" — string literals, number literals, true/false/null,
+//                    and `this.dataset.X` references resolved on the element.
+//   - "event.stopPropagation()" — handled specially.
+//   - "stmt; stmt; …" — semicolon-separated statements, each parsed.
+//
+// Function names are checked against an allowlist so a stray data-click cannot
+// invoke arbitrary globals.
+function _parseClickArg(raw, el) {
+  const s = raw.trim();
+  if (!s) return undefined;
+  if ((s[0] === "'" || s[0] === '"') && s[s.length-1] === s[0]) return s.slice(1, -1);
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (s === 'null') return null;
+  if (s.startsWith('this.dataset.')) return el.dataset[s.slice('this.dataset.'.length)];
+  return s;
+}
+function _splitTopLevel(text, sep) {
+  const out = []; let buf = '', q = null;
+  for (const ch of text) {
+    if (q) { buf += ch; if (ch === q) q = null; }
+    else if (ch === '"' || ch === "'") { buf += ch; q = ch; }
+    else if (ch === sep) { out.push(buf); buf = ''; }
+    else buf += ch;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+function _runClickStmt(stmt, el, ev) {
+  const s = stmt.trim();
+  if (!s) return;
+  if (s === 'event.stopPropagation()') { ev.stopPropagation(); return; }
+  const m = s.match(/^(\w+)\((.*)\)$/);
+  if (!m) { console.warn('Unparseable data-click:', s); return; }
+  const name = m[1], argText = m[2];
+  const fn = _CLICK_FNS[name];
+  if (typeof fn !== 'function') { console.warn('Unknown data-click action:', name); return; }
+  const args = argText.trim()
+    ? _splitTopLevel(argText, ',').map(a => _parseClickArg(a, el))
+    : [];
+  fn.apply(null, args);
+}
+// _CLICK_FNS is populated lazily on first click so all the function
+// declarations below this point are already hoisted and visible.
+let _CLICK_FNS = null;
+function _initClickFns() {
+  _CLICK_FNS = {
+    // Bills page
+    addNewBill, toggleBill, removeBill, addLine, removeLine,
+    setSplitType, setRemainderLine,
+    // Settings — people
+    addPerson, removePerson, togglePerson,
+    // Settings — email/devices/data
+    saveEmailConfig, testEmailConfig, generateDeviceKey, copyDeviceKey,
+    revokeDeviceKey, exportData, clearAll,
+    // Pay & Collect
+    toggleReceiveCard, openZelle, openVenmo, openCashApp,
+    openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
+    // Trends
+    setTrendsView, setTrendsMonthLimit,
+    // Theme
+    setThemePref,
+    // Modal
+    closeBhModal, _modalCancel, _modalOk,
+  };
+}
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-click]');
   if (!el) return;
-  try {
-    new Function('event', el.dataset.click).call(el, e);
-  } catch (err) {
-    console.warn('data-click handler failed:', err, el);
-  }
+  if (!_CLICK_FNS) _initClickFns();
+  for (const stmt of _splitTopLevel(el.dataset.click, ';')) _runClickStmt(stmt, el, e);
 });
 
 // Chart.js instances — kept in module scope so they can be destroyed before
