@@ -563,9 +563,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <div class="appearance-sub">Match your system, or pin to light or dark.</div>
       </div>
       <div class="appearance-seg" id="themeSeg">
-        <button data-theme-pref="system" onclick="setThemePref('system')">System</button>
-        <button data-theme-pref="light" onclick="setThemePref('light')">Light</button>
-        <button data-theme-pref="dark" onclick="setThemePref('dark')">Dark</button>
+        <button type="button" data-theme-pref="system">System</button>
+        <button type="button" data-theme-pref="light">Light</button>
+        <button type="button" data-theme-pref="dark">Dark</button>
       </div>
     </div>
   </div>
@@ -839,6 +839,13 @@ function setThemePref(pref) {
   applyTheme();
   save();
 }
+// Event delegation — survives any future re-render of #themeSeg and is
+// more robust than inline onclick attributes (which some CSP profiles or
+// browser extensions can interfere with).
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('#themeSeg button[data-theme-pref]');
+  if (btn) setThemePref(btn.dataset.themePref);
+});
 
 // Chart.js instances — kept in module scope so they can be destroyed before
 // re-creation on tab switch (prevents canvas memory leaks).
