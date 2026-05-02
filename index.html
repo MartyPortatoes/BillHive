@@ -179,6 +179,17 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .tog input:checked+.tog-slider{background:rgba(245,168,0,.25);border:1px solid var(--green);}
 .tog input:checked+.tog-slider:before{transform:translateX(13px);background:var(--green);}
 
+/* Modal overlay (used by Connected Devices key-reveal) */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;backdrop-filter:blur(2px);}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;letter-spacing:-.01em;}
+.modal-body{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.55;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;}
+.key-display{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid rgba(245,168,0,.4);padding:12px;border-radius:6px;color:var(--green);word-break:break-all;margin-bottom:8px;line-height:1.4;}
+.device-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
+.device-row-name{font-size:13px;color:var(--text);font-weight:500;}
+.device-row-meta{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px;letter-spacing:.02em;}
+
 /* bill total input */
 .total-input-wrap{display:flex;align-items:center;gap:8px;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;}
 .total-input-wrap label{font-size:11px;color:var(--muted);white-space:nowrap;}
@@ -545,6 +556,34 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <div class="setting-group-title">Email Greetings</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Custom opening line per person in their bill email.</div>
       <div id="greetingConfig"></div>
+    </div>
+  </div>
+
+  <!-- Connected Devices (iOS API keys) -->
+  <div class="card">
+    <div class="setting-group">
+      <div class="setting-group-title">Connected Devices</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+        Generate per-device API keys so SelfHive (iOS) can authenticate to this server. Keys are hashed before storage; the plaintext is shown <strong>once</strong> at creation time and never again.
+      </div>
+
+      <!-- Require keys toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;color:var(--text);font-weight:500;">Require API key for iOS apps</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;">When on, SelfHive can't connect without a valid key. Browser access here is unaffected.</div>
+        </div>
+        <label class="tog">
+          <input type="checkbox" id="requireDeviceKeysToggle" onchange="onRequireDeviceKeysChange(this)">
+          <span class="tog-slider"></span>
+        </label>
+      </div>
+
+      <div id="devicesList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+      <div class="action-row" style="margin-top:12px;">
+        <button class="btn btn-green btn-sm" onclick="generateDeviceKey()">+ Generate Device Key</button>
+      </div>
     </div>
   </div>
 
@@ -2119,7 +2158,184 @@ function renderSettings() {
   loadEmailConfig();
   renderPeopleConfig();
   renderGreetingConfig();
+  loadDevices();
 }
+
+// ── Connected Devices (iOS API keys) ─────────────────────────────────────────
+// All key management is scoped server-side to req.userId, so this only ever
+// shows the current browser-session user's keys. Plaintext keys are returned
+// only at creation time — the reveal modal is the user's one chance to copy.
+
+async function loadDevices() {
+  try {
+    const [keysRes, settingsRes] = await Promise.all([
+      fetch(`${API}/keys`),
+      fetch(`${API}/auth/settings`),
+    ]);
+    if (!keysRes.ok || !settingsRes.ok) return;
+    const keys     = await keysRes.json();
+    const settings = await settingsRes.json();
+    const toggle = document.getElementById('requireDeviceKeysToggle');
+    if (toggle) toggle.checked = !!settings.requireDeviceKeys;
+    renderDevicesList(keys);
+  } catch (e) {
+    console.warn('Could not load devices:', e);
+  }
+}
+
+function renderDevicesList(keys) {
+  const list = document.getElementById('devicesList');
+  if (!list) return;
+  if (!keys.length) {
+    list.innerHTML = `<div style="font-size:11px;color:var(--muted);padding:8px 0;font-style:italic;">No device keys yet. Click "Generate Device Key" to create one for SelfHive.</div>`;
+    return;
+  }
+  list.innerHTML = keys.map(k => {
+    const created  = new Date(k.createdAt * 1000).toLocaleDateString();
+    const lastUsed = k.lastUsedAt
+      ? `last used ${formatRelative(k.lastUsedAt)}`
+      : 'never used';
+    return `
+      <div class="device-row">
+        <div style="flex:1;min-width:0;overflow:hidden;">
+          <div class="device-row-name">${esc(k.name)}</div>
+          <div class="device-row-meta">${esc(k.keyPrefix)}…  ·  created ${esc(created)}  ·  ${esc(lastUsed)}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" data-key-id="${esc(k.id)}" data-key-name="${esc(k.name)}" onclick="revokeDeviceKey(this.dataset.keyId, this.dataset.keyName)">Revoke</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatRelative(epochMs) {
+  const diffSec = Math.floor((Date.now() - epochMs) / 1000);
+  if (diffSec < 60)        return 'just now';
+  if (diffSec < 3600)      return `${Math.floor(diffSec/60)}m ago`;
+  if (diffSec < 86400)     return `${Math.floor(diffSec/3600)}h ago`;
+  if (diffSec < 86400*30)  return `${Math.floor(diffSec/86400)}d ago`;
+  return new Date(epochMs).toLocaleDateString();
+}
+
+async function generateDeviceKey() {
+  const raw = prompt('Name this device (e.g. "iPhone 16", "Wife\'s iPad"):');
+  if (raw === null) return; // user cancelled
+  const name = (raw || '').trim().slice(0, 64);
+  if (!name) { toast('Device name required'); return; }
+  try {
+    const res = await fetch(`${API}/keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    const data = await res.json();
+    showKeyRevealModal(data);
+    loadDevices();
+  } catch (e) {
+    toast('Failed to generate key: ' + e.message);
+  }
+}
+
+function showKeyRevealModal(data) {
+  showModal(`
+    <div class="modal-title">Your new device key</div>
+    <div class="modal-body">
+      Copy this key now — we hash keys before storing, so we can't show it to you again.
+      Paste it into SelfHive: <strong>Settings → Server → API Key</strong>.
+    </div>
+    <div class="key-display" id="bhKeyDisplay">${esc(data.key)}</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px;font-family:'DM Mono',monospace;">
+      ${esc(data.name)}  ·  ${esc(data.id)}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="copyDeviceKey()">📋 Copy</button>
+      <button class="btn btn-green btn-sm" onclick="closeBhModal()">I saved it</button>
+    </div>
+  `);
+}
+
+function copyDeviceKey() {
+  const el = document.getElementById('bhKeyDisplay');
+  if (!el) return;
+  const text = el.textContent;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toast('Key copied to clipboard'),
+      () => toast('Copy failed — select and copy manually')
+    );
+  } else {
+    // Fallback for older browsers / non-secure contexts
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    try { document.execCommand('copy'); toast('Key copied to clipboard'); }
+    catch { toast('Copy failed — select and copy manually'); }
+  }
+}
+
+async function revokeDeviceKey(id, name) {
+  if (!confirm(`Revoke "${name}"?\n\nThe device using this key will be disconnected immediately.`)) return;
+  try {
+    const res = await fetch(`${API}/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    toast(`Revoked: ${name}`);
+    loadDevices();
+  } catch (e) {
+    toast('Failed to revoke: ' + e.message);
+  }
+}
+
+async function onRequireDeviceKeysChange(checkbox) {
+  const wantOn = checkbox.checked;
+  if (wantOn) {
+    // Confirm before enabling — give the user a clear escape hatch.
+    let count = 0;
+    try {
+      const r = await fetch(`${API}/auth/settings`);
+      if (r.ok) count = (await r.json()).deviceKeyCount || 0;
+    } catch {}
+    const warning = count === 0
+      ? `⚠ You have no device keys yet.\n\nEnabling this will lock out any iOS app that's currently connected. You'll need to generate a key for each device after enabling.\n\nContinue?`
+      : `Enable required-key mode?\n\nYou have ${count} device key${count === 1 ? '' : 's'}. Make sure each iOS device has one configured before enabling.\n\nThe browser session here keeps working either way.`;
+    if (!confirm(warning)) {
+      checkbox.checked = false;
+      return;
+    }
+  }
+  try {
+    const res = await fetch(`${API}/auth/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requireDeviceKeys: wantOn }),
+    });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    toast(wantOn ? 'iOS apps now require an API key' : 'Key requirement disabled');
+  } catch (e) {
+    toast('Failed: ' + e.message);
+    checkbox.checked = !wantOn;
+  }
+}
+
+// ── Generic modal helper ─────────────────────────────────────────────────────
+function showModal(innerHtml) {
+  closeBhModal();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'bhModal';
+  overlay.innerHTML = `<div class="modal-box">${innerHtml}</div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeBhModal(); });
+  document.body.appendChild(overlay);
+  // Esc closes
+  document.addEventListener('keydown', _bhModalEsc);
+}
+function closeBhModal() {
+  const m = document.getElementById('bhModal');
+  if (m) m.remove();
+  document.removeEventListener('keydown', _bhModalEsc);
+}
+function _bhModalEsc(e) { if (e.key === 'Escape') closeBhModal(); }
 
 // ── Email config UI ───────────────────────────────────────────────────────────
 let _emailCfgLoaded = false;

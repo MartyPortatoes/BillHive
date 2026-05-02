@@ -182,6 +182,21 @@ A native iOS app called **SelfHive** is available on the App Store: [SelfHive �
 
 A standalone version of the app, simply called "BillHive", will also be available for anyone not interested in self-hosting.
 
+### Securing iOS connections (optional)
+
+If your server is reachable on a network where you don't fully trust every device — or you just want defense-in-depth — you can require iOS apps to authenticate with a per-device API key.
+
+In the BillHive web app, go to **Settings → Connected Devices**:
+
+1. Click **+ Generate Device Key**, name the device (e.g. "Marty's iPhone")
+2. The key is shown **once** in plaintext — copy it now (we hash before storing)
+3. In SelfHive, go to **Settings → Server → API Key** and paste it
+4. Optionally flip **Require API key for iOS apps** to ON — any iOS app without a valid key will be rejected
+
+To revoke: open **Connected Devices**, click **Revoke** next to the device. The key stops working immediately.
+
+The web app keeps working with no key — browser sessions authenticate via a signed cookie issued on page load.
+
 ---
 
 <p align="center">

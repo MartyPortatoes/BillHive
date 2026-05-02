@@ -28,6 +28,7 @@ const helmet = require('helmet');
 const Database = require('better-sqlite3');   // Sync SQLite — never use async/await for DB calls
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { sendEmail, maskConfig } = require('./email.js');
 const { buildEmailHtml } = require('./emailTemplate.js');
 
@@ -91,6 +92,28 @@ db.exec(`
     updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
     PRIMARY KEY (user_id, month_key)
   );
+
+  -- Per-device API keys for iOS clients (M1/M3 hardening).
+  -- Keys are hashed with SHA-256 before storage so a DB leak doesn't
+  -- expose usable tokens. The plaintext key is shown to the user EXACTLY
+  -- ONCE at generation time and never persisted in plaintext.
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id           TEXT    PRIMARY KEY,
+    user_id      TEXT    NOT NULL,
+    name         TEXT    NOT NULL,
+    key_hash     TEXT    NOT NULL,
+    key_prefix   TEXT    NOT NULL,
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+    last_used_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+  CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
+
+  -- Server-wide settings (HMAC secret, "require device keys" toggle).
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
@@ -105,7 +128,110 @@ const stmts = {
   deleteMonth:  db.prepare('DELETE FROM monthly_data WHERE user_id = ? AND month_key = ?'),
   getEmailCfg:  db.prepare('SELECT config FROM email_config WHERE user_id = ?'),
   setEmailCfg:  db.prepare('INSERT OR REPLACE INTO email_config (user_id, config, updated_at) VALUES (?, ?, unixepoch())'),
+
+  // API keys
+  findApiKeyByHash:    db.prepare('SELECT id, user_id FROM api_keys WHERE key_hash = ?'),
+  listApiKeysForUser:  db.prepare('SELECT id, name, key_prefix, created_at, last_used_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC'),
+  insertApiKey:        db.prepare('INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?, ?)'),
+  deleteApiKey:        db.prepare('DELETE FROM api_keys WHERE id = ? AND user_id = ?'),
+  touchApiKey:         db.prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?'),
+  countApiKeysForUser: db.prepare('SELECT COUNT(*) AS c FROM api_keys WHERE user_id = ?'),
+
+  // App settings
+  getSetting: db.prepare('SELECT value FROM app_settings WHERE key = ?'),
+  setSetting: db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)'),
 };
+
+// ── Crypto helpers ────────────────────────────────────────────────────────────
+function sha256Hex(s) {
+  return crypto.createHash('sha256').update(s).digest('hex');
+}
+
+function generateApiKey() {
+  // 32 random bytes → 43-char URL-safe base64. Plus the "bh_live_" prefix
+  // so leaked tokens are recognizable in logs and code-search dumps.
+  return 'bh_live_' + crypto.randomBytes(32).toString('base64url');
+}
+
+function generateApiKeyId() {
+  return 'ak_' + crypto.randomBytes(4).toString('hex');
+}
+
+// ── Server secret (used for cookie HMAC) ──────────────────────────────────────
+// Generated on first startup and persisted; the same value is reused across
+// restarts so existing browser sessions stay valid. Rotate by deleting the
+// row from app_settings — all bh_session cookies become invalid.
+function getServerSecret() {
+  const row = stmts.getSetting.get('server_secret');
+  if (row) return row.value;
+  const secret = crypto.randomBytes(32).toString('hex');
+  stmts.setSetting.run('server_secret', secret);
+  return secret;
+}
+const SERVER_SECRET = getServerSecret();
+
+// ── "Require device keys" toggle ──────────────────────────────────────────────
+// When true, any /api/* request that didn't successfully authenticate via
+// Bearer key, browser session cookie, or reverse-proxy header is rejected
+// with 401. Off by default — enabling is a deliberate user action via the
+// web UI.
+function getRequireDeviceKeys() {
+  return stmts.getSetting.get('require_device_keys')?.value === 'true';
+}
+function setRequireDeviceKeys(v) {
+  stmts.setSetting.run('require_device_keys', v ? 'true' : 'false');
+}
+
+// ── Cookie helpers (HMAC-signed, stateless) ───────────────────────────────────
+// bh_session cookie format: <base64url(payload)>.<hex(hmac)>
+// Payload: { uid: "<userId>", iat: <unix>, exp: <unix> }
+// Signed with SERVER_SECRET. Verified on every request via constant-time
+// compare. 30-day lifetime; refreshes whenever the SPA reloads.
+function signCookie(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig  = crypto.createHmac('sha256', SERVER_SECRET).update(body).digest('hex');
+  return body + '.' + sig;
+}
+
+function verifyCookie(token) {
+  if (!token) return null;
+  try {
+    const idx = token.indexOf('.');
+    if (idx < 1) return null;
+    const body = token.slice(0, idx);
+    const sig  = token.slice(idx + 1);
+    if (!/^[0-9a-f]+$/i.test(sig)) return null; // sig must be hex
+    const expected = crypto.createHmac('sha256', SERVER_SECRET).update(body).digest('hex');
+    if (sig.length !== expected.length) return null;
+    // timingSafeEqual requires equal-length buffers
+    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (typeof payload.exp === 'number' && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+function parseCookie(header, name) {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const k = part.slice(0, eq).trim();
+    if (k === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
+
+const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+function setSessionCookie(req, res, userId) {
+  const now = Math.floor(Date.now() / 1000);
+  const token = signCookie({ uid: userId, iat: now, exp: now + COOKIE_MAX_AGE_SECONDS });
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  res.setHeader('Set-Cookie',
+    `bh_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE_SECONDS}` +
+    (secure ? '; Secure' : '')
+  );
+}
 
 // ── SSE client tracking ───────────────────────────────────────────────────────
 // Maps each userId to a Set of open SSE response objects. When any write endpoint
@@ -183,17 +309,18 @@ app.use(limiter);
 // while protecting against accidental mega-payloads.
 app.use(express.json({ limit: '2mb' }));
 
-// Auth middleware — identifies the current user from reverse-proxy headers.
-// Supported proxies: Authelia (Remote-User), Authentik (X-Authentik-Username),
-// and generic forward-auth setups (X-Forwarded-User, X-Remote-User).
-// When no proxy is present (e.g. local Docker Compose), defaults to "local"
-// so the app works seamlessly in single-user mode.
+// ── Auth resolution ──────────────────────────────────────────────────────────
+// Three trusted identity signals, in order of preference:
+//   1. Authorization: Bearer <key>  — iOS device key (per-key user mapping)
+//   2. bh_session cookie            — issued by the SPA on load (browser users)
+//   3. Reverse-proxy header         — Authelia / Authentik / forward-auth
+// Falls back to "local" so single-user setups keep working with no auth at all.
 //
-// Security boundary: these headers are TRUSTED. The reverse proxy MUST strip
-// them from incoming client requests before forwarding. If you expose this
-// container directly without a proxy, anyone can spoof Remote-User and
-// impersonate any user. Set TRUSTED_AUTH_HEADERS to restrict which header(s)
-// are honored — e.g. TRUSTED_AUTH_HEADERS=remote-user for Authelia-only.
+// Security boundary: proxy headers are TRUSTED. The proxy MUST strip them from
+// incoming client requests before forwarding. If you expose this container
+// directly without a proxy, anyone can spoof Remote-User and impersonate any
+// user. Set TRUSTED_AUTH_HEADERS to restrict which header(s) are honored —
+// e.g. TRUSTED_AUTH_HEADERS=remote-user for Authelia-only.
 const TRUSTED_AUTH_HEADERS = (process.env.TRUSTED_AUTH_HEADERS ||
   'remote-user,x-authentik-username,x-forwarded-user,x-remote-user'
 ).toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
@@ -211,11 +338,80 @@ function pickAuthHeader(headers) {
     // could break log lines or SQL.
     if (v && /^[A-Za-z0-9._@-]{1,128}$/.test(v)) return v;
   }
-  return 'local';
+  return null;
 }
 
+// Resolves req.userId + req.authMethod from any of the trusted signals.
+// Never rejects on its own — that's requireAuth's job. Two exceptions:
+//   - An invalid Bearer token gets rejected immediately (a revoked key
+//     should fail loudly, not silently downgrade to 'local')
+function resolveAuth(req, res, next) {
+  // 1. Bearer key — strongest signal
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader === 'string' && /^Bearer /i.test(authHeader)) {
+    const key = authHeader.replace(/^Bearer /i, '').trim();
+    if (key) {
+      const row = stmts.findApiKeyByHash.get(sha256Hex(key));
+      if (row) {
+        req.userId = row.user_id;
+        req.authMethod = 'bearer';
+        try { stmts.touchApiKey.run(Date.now(), row.id); } catch {}
+        return next();
+      }
+      // Bearer was provided but didn't match any stored key.
+      return res.status(401).json({ error: 'Invalid API key' });
+    }
+  }
+
+  // 2. Session cookie — for browser sessions
+  const cookieToken = parseCookie(req.headers.cookie, 'bh_session');
+  if (cookieToken) {
+    const payload = verifyCookie(cookieToken);
+    if (payload && payload.uid) {
+      req.userId = payload.uid;
+      req.authMethod = 'cookie';
+      return next();
+    }
+    // Invalid/expired cookie — fall through, let other signals try.
+  }
+
+  // 3. Reverse-proxy header
+  const proxyUser = pickAuthHeader(req.headers);
+  if (proxyUser) {
+    req.userId = proxyUser;
+    req.authMethod = 'proxy';
+    return next();
+  }
+
+  // 4. No auth identified
+  req.userId = 'local';
+  req.authMethod = 'fallback';
+  next();
+}
+
+// Enforces authentication on /api/* routes. Only kicks in when the
+// require-device-keys toggle is on; rejects requests whose only "auth"
+// was the 'local' fallback.
+function requireAuth(req, res, next) {
+  if (!getRequireDeviceKeys()) return next();
+  if (req.authMethod === 'fallback') {
+    return res.status(401).json({
+      error: 'Authentication required',
+      hint: 'Generate an API key in the BillHive web UI under Settings → Devices, then add it to your iOS app.',
+    });
+  }
+  next();
+}
+
+app.use(resolveAuth);
+
+// Attach a fresh bh_session cookie to any GET that wants HTML — i.e. browser
+// SPA loads. API calls (Accept: application/json) and asset fetches don't
+// trigger it. Each visit refreshes the 30-day expiry.
 app.use((req, res, next) => {
-  req.userId = pickAuthHeader(req.headers);
+  if (req.method === 'GET' && typeof req.headers.accept === 'string' && req.headers.accept.includes('text/html')) {
+    setSessionCookie(req, res, req.userId);
+  }
   next();
 });
 
@@ -235,9 +431,22 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // ── Health check ──────────────────────────────────────────────────────────────
+// Public: never gated by requireAuth. The iOS app uses this during onboarding
+// to test whether a server is reachable AND whether a Bearer key is required,
+// before asking the user to paste a key.
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, user: req.userId, ts: Date.now() });
+  res.json({
+    ok: true,
+    user: req.userId,
+    authMethod: req.authMethod,
+    requireDeviceKeys: getRequireDeviceKeys(),
+    ts: Date.now(),
+  });
 });
+
+// ── Enforce auth on the rest of /api/* ────────────────────────────────────────
+// Anything below this line requires authentication when the toggle is on.
+app.use('/api', requireAuth);
 
 // ── State API ─────────────────────────────────────────────────────────────────
 // GET  /api/state       — returns all key/value pairs for the current user
@@ -436,6 +645,73 @@ app.post('/api/email/send', emailLimiter, async (req, res) => {
     console.error('Email send failed:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── API keys (per-device tokens for iOS clients) ─────────────────────────────
+// All endpoints scope by req.userId — a user can only manage their own keys.
+// Plaintext keys are returned ONLY at creation time; everything else exposes
+// only the prefix (first 12 chars) for identification in the UI.
+
+app.get('/api/keys', (req, res) => {
+  const rows = stmts.listApiKeysForUser.all(req.userId);
+  res.json(rows.map(r => ({
+    id:          r.id,
+    name:        r.name,
+    keyPrefix:   r.key_prefix,
+    createdAt:   r.created_at,
+    lastUsedAt:  r.last_used_at,
+  })));
+});
+
+app.post('/api/keys', (req, res) => {
+  const rawName = (req.body && typeof req.body.name === 'string') ? req.body.name.trim() : '';
+  const name = rawName.slice(0, 64) || 'Unnamed device';
+  const key = generateApiKey();
+  const id = generateApiKeyId();
+  const prefix = key.slice(0, 12); // "bh_live_xxxx"
+  try {
+    stmts.insertApiKey.run(id, req.userId, name, sha256Hex(key), prefix);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to create key' });
+  }
+  // Plaintext key is returned exactly once — the client must save it now.
+  res.json({
+    id,
+    name,
+    key,
+    keyPrefix: prefix,
+    createdAt: Math.floor(Date.now() / 1000),
+  });
+  broadcastChange(req.userId);
+});
+
+app.delete('/api/keys/:id', (req, res) => {
+  const result = stmts.deleteApiKey.run(req.params.id, req.userId);
+  if (result.changes === 0) return res.status(404).json({ error: 'Key not found' });
+  res.json({ ok: true });
+  broadcastChange(req.userId);
+});
+
+// ── Auth settings (server-wide toggle) ────────────────────────────────────────
+app.get('/api/auth/settings', (req, res) => {
+  const row = stmts.countApiKeysForUser.get(req.userId);
+  res.json({
+    requireDeviceKeys: getRequireDeviceKeys(),
+    deviceKeyCount:    row ? row.c : 0,
+  });
+});
+
+app.put('/api/auth/settings', (req, res) => {
+  if (!req.body || typeof req.body.requireDeviceKeys !== 'boolean') {
+    return res.status(400).json({ error: 'requireDeviceKeys (boolean) required' });
+  }
+  setRequireDeviceKeys(req.body.requireDeviceKeys);
+  const row = stmts.countApiKeysForUser.get(req.userId);
+  res.json({
+    requireDeviceKeys: getRequireDeviceKeys(),
+    deviceKeyCount:    row ? row.c : 0,
+  });
+  broadcastChange(req.userId);
 });
 
 // ── SSE event stream ─────────────────────────────────────────────────────────

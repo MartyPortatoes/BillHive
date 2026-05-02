@@ -11,14 +11,26 @@
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8080` | HTTP listen port |
-| `DB_PATH` | `/data/billflow.db` | SQLite database path |
-| `BILLFLOW_PORT` | `8080` | Host port mapping in docker-compose |
+| `DB_PATH` | `/data/billhive.db` | SQLite database path |
+| `BILLHIVE_PORT` | `8080` | Host port mapping in docker-compose |
+| `TRUST_PROXY` | `1` | Express trust-proxy hop count (set to `0` to disable, higher for chained proxies) |
+| `TRUSTED_AUTH_HEADERS` | `remote-user,x-authentik-username,x-forwarded-user,x-remote-user` | Comma-separated list of headers to honor for proxy-auth. Restrict to lock down spoofing. |
 
 ### Auth
-Reads user identity from reverse-proxy headers, falls back to `"local"`.
+Three trusted identity signals, in order of preference:
+1. `Authorization: Bearer <key>` — iOS device key (per-key user mapping)
+2. `bh_session` cookie — issued by the SPA on HTML load (browser users)
+3. Reverse-proxy header (`Remote-User` etc.) — Authelia / Authentik / forward-auth
 
-Header priority: `Remote-User` → `X-Authentik-Username` → `X-Forwarded-User`
-→ `X-Remote-User` → `"local"` (single-user mode).
+Falls back to `"local"` so single-user setups keep working with no auth at all.
+
+The `bh_session` cookie is HMAC-signed (server secret persisted in `app_settings`),
+30-day lifetime, refreshed on every HTML page load. HttpOnly + SameSite=Lax.
+
+If the **Connected Devices → Require API key** toggle is on (`require_device_keys`
+in `app_settings`), `/api/*` requests must successfully authenticate via one of
+the three signals above. `/api/health` is always public so the iOS app can probe
+reachability and detect whether keys are required before asking the user to paste one.
 
 All API data is scoped per `userId`.
 
@@ -27,11 +39,14 @@ All API data is scoped per `userId`.
 user_state    (user_id, key, value, updated_at)        -- settings/people/bills/checklist
 monthly_data  (user_id, month_key, data, updated_at)   -- per-month amounts (YYYY-MM)
 email_config  (user_id, config, updated_at)            -- email provider credentials
+api_keys      (id, user_id, name, key_hash, key_prefix,
+               created_at, last_used_at)               -- iOS device keys (SHA-256 hashed)
+app_settings  (key, value)                             -- server_secret, require_device_keys
 ```
 
 ### API Endpoints
 ```
-GET    /api/health              → { ok, user, ts }
+GET    /api/health              → { ok, user, authMethod, requireDeviceKeys, ts }   PUBLIC
 GET    /api/state               → full config object
 PUT    /api/state               → save full config (settings + people + bills + checklist)
 PATCH  /api/state/:key          → save single key
@@ -45,6 +60,11 @@ GET    /api/email/config        → masked email config (secrets redacted)
 PUT    /api/email/config        → save/merge email config (skips masked fields)
 POST   /api/email/test          → send test email
 POST   /api/email/send          → send bill summary email to a person
+GET    /api/keys                → list current user's device keys (no plaintext)
+POST   /api/keys                → generate new key, returns plaintext ONCE
+DELETE /api/keys/:id            → revoke a key
+GET    /api/auth/settings       → { requireDeviceKeys, deviceKeyCount }
+PUT    /api/auth/settings       → toggle require-device-keys mode
 ```
 
 ---
