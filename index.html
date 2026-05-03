@@ -1287,6 +1287,12 @@ function computeMyTotal() {
 // ═══════════════════════════════════════════════
 function renderBills() {
   const container = document.getElementById('billsList');
+
+  // Preserve expanded state across re-renders (e.g. SSE reload after toggle)
+  const wasExpanded = new Set(
+    [...container.querySelectorAll('.bill-card.expanded')].map(c => c.id)
+  );
+
   container.innerHTML = '';
   let filled = 0;
 
@@ -1357,6 +1363,12 @@ function renderBills() {
       </div>
     `;
     container.appendChild(card);
+  });
+
+  // Restore expanded state
+  wasExpanded.forEach(id => {
+    const card = document.getElementById(id);
+    if (card) card.classList.add('expanded');
   });
 
   document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
