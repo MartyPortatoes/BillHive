@@ -2515,23 +2515,24 @@ function formatRelative(epochMs) {
 }
 
 async function generateDeviceKey() {
-  const raw = prompt('Name this device (e.g. "iPhone 16", "Wife\'s iPad"):');
-  if (raw === null) return; // user cancelled
-  const name = (raw || '').trim().slice(0, 64);
-  if (!name) { toast('Device name required'); return; }
-  try {
-    const res = await fetch(`${API}/keys`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    const data = await res.json();
-    showKeyRevealModal(data);
-    loadDevices();
-  } catch (e) {
-    toast('Failed to generate key: ' + e.message);
-  }
+  showPrompt('Name this device', 'e.g. iPhone 16, Wife\'s iPad…', async raw => {
+    if (!raw) return;
+    const name = raw.trim().slice(0, 64);
+    if (!name) { toast('Device name required'); return; }
+    try {
+      const res = await fetch(`${API}/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+      const data = await res.json();
+      showKeyRevealModal(data);
+      loadDevices();
+    } catch (e) {
+      toast('Failed to generate key: ' + e.message);
+    }
+  });
 }
 
 function showKeyRevealModal(data) {
