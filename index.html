@@ -2575,15 +2575,17 @@ function copyDeviceKey() {
 }
 
 async function revokeDeviceKey(id, name) {
-  if (!confirm(`Revoke "${name}"?\n\nThe device using this key will be disconnected immediately.`)) return;
-  try {
-    const res = await fetch(`${API}/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    toast(`Revoked: ${name}`);
-    loadDevices();
-  } catch (e) {
-    toast('Failed to revoke: ' + e.message);
-  }
+  showConfirm(`Revoke "${name}"? The device using this key will be disconnected immediately.`, async ok => {
+    if (!ok) return;
+    try {
+      const res = await fetch(`${API}/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+      toast(`Revoked: ${name}`);
+      loadDevices();
+    } catch (e) {
+      toast('Failed to revoke: ' + e.message);
+    }
+  }, { okLabel: 'Revoke', danger: true });
 }
 
 async function onRequireDeviceKeysChange(checkbox) {
@@ -2595,14 +2597,22 @@ async function onRequireDeviceKeysChange(checkbox) {
       const r = await fetch(`${API}/auth/settings`);
       if (r.ok) count = (await r.json()).deviceKeyCount || 0;
     } catch {}
-    const warning = count === 0
-      ? `⚠ You have no device keys yet.\n\nEnabling this will lock out any iOS app that's currently connected. You'll need to generate a key for each device after enabling.\n\nContinue?`
-      : `Enable required-key mode?\n\nYou have ${count} device key${count === 1 ? '' : 's'}. Make sure each iOS device has one configured before enabling.\n\nThe browser session here keeps working either way.`;
-    if (!confirm(warning)) {
-      checkbox.checked = false;
-      return;
-    }
+    const title = count === 0
+      ? '⚠ No device keys yet — enable anyway?'
+      : 'Enable required-key mode?';
+    const body = count === 0
+      ? 'Enabling this will lock out any iOS app currently connected. Generate a key for each device first.'
+      : `You have ${count} device key${count === 1 ? '' : 's'}. Make sure each iOS device has one configured. The browser session here keeps working either way.`;
+    showConfirm(`${title}\n\n${body}`, async ok => {
+      if (!ok) { checkbox.checked = false; return; }
+      await _applyRequireDeviceKeys(checkbox, wantOn);
+    }, { okLabel: 'Enable' });
+    return;
   }
+  await _applyRequireDeviceKeys(checkbox, wantOn);
+}
+
+async function _applyRequireDeviceKeys(checkbox, wantOn) {
   try {
     const res = await fetch(`${API}/auth/settings`, {
       method: 'PUT',
