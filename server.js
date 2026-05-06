@@ -623,7 +623,7 @@ app.post('/api/email/test', emailLimiter, async (req, res) => {
 
 // POST /api/email/send — send bill summary to a person
 app.post('/api/email/send', emailLimiter, async (req, res) => {
-  const { to, greeting, personName, accentColor, monthLabel, bills, total, payMethod, payId, zelleUrl } = req.body;
+  const { to, greeting, personName, accentColor, monthLabel, bills, total, payMethod, payId, zelleUrl, currencyCode } = req.body;
   if (!to) return res.status(400).json({ error: 'recipient (to) required' });
 
   const row = stmts.getEmailCfg.get(req.userId);
@@ -635,6 +635,7 @@ app.post('/api/email/send', emailLimiter, async (req, res) => {
     greeting, personName, accentColor,
     monthLabel, bills, total, payMethod, payId, zelleUrl,
     fromName: cfg.fromName || 'BillHive',
+    currencyCode: currencyCode || 'USD',
   });
 
   const subject = `Bills for ${monthLabel}`;

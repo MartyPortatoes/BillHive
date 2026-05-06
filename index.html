@@ -443,7 +443,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
     <hr>
     <div class="sum-row">
       <div class="sum-label">Total I'm paying this month</div>
-      <div class="sum-val big" id="myGrandTotal">$0.00</div>
+      <div class="sum-val big" id="myGrandTotal">—</div>
     </div>
   </div>
 
@@ -567,6 +567,18 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <button type="button" data-theme-pref="light"  data-click="setThemePref('light')">Light</button>
         <button type="button" data-theme-pref="dark"   data-click="setThemePref('dark')">Dark</button>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="appearance-row">
+      <div class="appearance-icon">💱</div>
+      <div class="appearance-label">
+        <div class="appearance-name">Currency</div>
+        <div class="appearance-sub" id="currencySubtitle">Auto</div>
+      </div>
+      <select id="currencySelect" style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;max-width:200px;cursor:pointer;" data-change="onCurrencyChange(this.value)">
+      </select>
     </div>
   </div>
 
@@ -767,7 +779,7 @@ function safeWebUrl(raw) {
 // mutated by UI interactions, and persisted back via debounced save().
 // These defaults are used only on first launch before any server data exists.
 let S = {
-  settings: { myEmail: '', themePref: 'system' },
+  settings: { myEmail: '', themePref: 'system', currencyCode: '' },
   people: [
     { id:'me',   name:'Me',   color:'#F5A800', payMethod:'none',   payId:'', email:'' },
     { id:'wife', name:'Wife', color:'#5bc4f5', payMethod:'zelle',  payId:'', email:'' },
@@ -1078,7 +1090,7 @@ async function load() {
     const stateRes = await fetch(`${API}/state`);
     if (stateRes.ok) {
       const parsed = await stateRes.json();
-      if (parsed.settings)  Object.assign(S.settings, parsed.settings);
+      if (parsed.settings)  { Object.assign(S.settings, parsed.settings); _currFmt = null; }
       if (parsed.people)    S.people   = parsed.people;
       if (parsed.bills)     S.bills    = parsed.bills;
       if (parsed.checklist) S.checklist = parsed.checklist;
@@ -1328,10 +1340,10 @@ function renderBills() {
     card.id = `bill-card-${bill.id}`;
 
     const totalDisplay = billTotal > 0
-      ? `<div class="bill-total-display has-val">$${billTotal.toFixed(2)}</div>`
+      ? `<div class="bill-total-display has-val">${fmtCurrency(billTotal)}</div>`
       : `<div class="bill-total-display">—</div>`;
     const myShareDisplay = billTotal > 0
-      ? `<div class="bill-my-share">my share: $${myShare.toFixed(2)}</div>`
+      ? `<div class="bill-my-share">my share: ${fmtCurrency(myShare)}</div>`
       : `<div class="bill-my-share">—</div>`;
 
     // Build participants pills — show payers (covered-by) with arrow indicator
@@ -1398,7 +1410,7 @@ function renderBillBody(bill) {
       <span class="split-label">Split type:</span>
       <div class="split-type-toggle">
         <button class="${bill.splitType==='pct'?'active':''}" data-click="setSplitType('${bill.id}','pct')">% Percent</button>
-        <button class="${bill.splitType==='fixed'?'active':''}" data-click="setSplitType('${bill.id}','fixed')">$ Fixed</button>
+        <button class="${bill.splitType==='fixed'?'active':''}" data-click="setSplitType('${bill.id}','fixed')">${getCurrSymbol()} Fixed</button>
       </div>
       <button class="btn btn-danger btn-xs" style="margin-left:auto" data-click="removeBill('${bill.id}')">Remove Bill</button>
     </div>
@@ -1414,7 +1426,7 @@ function renderBillBody(bill) {
 
     bodyContent = `
       <div class="total-input-wrap" style="margin-top:12px;">
-        <label>Total Bill ($)</label>
+        <label>Total Bill (${getCurrSymbol()})</label>
         <input type="number" placeholder="0.00" step="0.01" value="${total||''}"
                data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown"></div>
@@ -1438,7 +1450,7 @@ function renderBillBody(bill) {
                    data-input="updateLinePct('${bill.id}','${line.id}',this.value)"
                    style="text-align:right;font-size:12px;">
             <div class="line-item-owed ${line.personId==='me'?'is-mine':''}" style="text-align:right;">
-              ${total ? `$${lineAmt.toFixed(2)}` : '—'}
+              ${total ? fmtCurrency(lineAmt) : '—'}
             </div>
             <select data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
                     style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
@@ -1463,7 +1475,7 @@ function renderBillBody(bill) {
 
     bodyContent = `
       <div class="total-input-wrap" style="margin-top:12px;">
-        <label>Total Bill ($)</label>
+        <label>Total Bill (${getCurrSymbol()})</label>
         <input type="number" placeholder="0.00" step="0.01" value="${fixedTotal||''}"
                data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown" style="font-size:11px;color:var(--muted);">
@@ -1499,7 +1511,7 @@ function renderBillBody(bill) {
             ${isRemainder
               ? `<div id="remainder-display-${bill.id}"
                       style="text-align:right;font-size:13px;color:var(--green);font-weight:600;padding-right:10px;display:flex;align-items:center;justify-content:flex-end;">
-                   ${fixedTotal > 0 ? '$'+remainderVal.toFixed(2) : '—'}
+                   ${fixedTotal > 0 ? fmtCurrency(remainderVal) : '—'}
                  </div>`
               : `<input type="number" value="${lineAmt||''}" placeholder="0.00" step="0.01"
                         data-input="onFixedLineInput('${bill.id}','${line.id}',this.value)"
@@ -1601,11 +1613,11 @@ function updateBillComputedDisplays(billId) {
   // Update card header
   const totalEl = card.querySelector('.bill-total-display');
   if (totalEl) {
-    totalEl.textContent = billTotal>0 ? '$'+billTotal.toFixed(2) : '—';
+    totalEl.textContent = billTotal>0 ? fmtCurrency(billTotal) : '—';
     totalEl.classList.toggle('has-val', billTotal>0);
   }
   const myEl = card.querySelector('.bill-my-share');
-  if (myEl) myEl.textContent = billTotal>0 ? 'my share: $'+myShare.toFixed(2) : '—';
+  if (myEl) myEl.textContent = billTotal>0 ? 'my share: '+fmtCurrency(myShare) : '—';
 
   // Update per-line computed amount spans (class line-item-owed)
   if (bill.splitType==='pct') {
@@ -1614,7 +1626,7 @@ function updateBillComputedDisplays(billId) {
     bill.lines.forEach((line, i) => {
       if (owedEls[i]) {
         const amt = total*(line.value/100);
-        owedEls[i].textContent = total ? '$'+amt.toFixed(2) : '—';
+        owedEls[i].textContent = total ? fmtCurrency(amt) : '—';
       }
     });
   }
@@ -1627,7 +1639,7 @@ function updateBillComputedDisplays(billId) {
     const remainderVal = Math.max(0, fixedTotal - otherSum);
 
     const remDisplay = card.querySelector('#remainder-display-'+billId);
-    if (remDisplay) remDisplay.textContent = fixedTotal > 0 ? '$'+remainderVal.toFixed(2) : '—';
+    if (remDisplay) remDisplay.textContent = fixedTotal > 0 ? fmtCurrency(remainderVal) : '—';
 
     const hint = card.querySelector('.total-breakdown');
     const remainLine = bill.lines.find(l=>l.id===remainId) || bill.lines[0] || {};
@@ -1754,11 +1766,11 @@ function refreshBillBody(billId) {
   const billTotal = getBillTotal(bill.id);
   const totalEl = card.querySelector('.bill-total-display');
   if (totalEl) {
-    totalEl.textContent = billTotal > 0 ? `$${billTotal.toFixed(2)}` : '—';
+    totalEl.textContent = billTotal > 0 ? fmtCurrency(billTotal) : '—';
     totalEl.classList.toggle('has-val', billTotal > 0);
   }
   const myEl = card.querySelector('.bill-my-share');
-  if (myEl) myEl.textContent = billTotal > 0 ? `my share: $${myShare.toFixed(2)}` : '—';
+  if (myEl) myEl.textContent = billTotal > 0 ? `my share: ${fmtCurrency(myShare)}` : '—';
 }
 
 // ═══════════════════════════════════════════════
@@ -1822,13 +1834,13 @@ function renderSummary() {
   S.people.filter(p => p.id !== 'me').forEach(person => {
     const d = owes[person.id] || { total:0, bills:[] };
     if (d.total === 0) return;
-    const billList = d.bills.map(b=>`${b.name}: $${b.amount.toFixed(2)}`).join(' · ');
+    const billList = d.bills.map(b=>`${b.name}: ${fmtCurrency(b.amount)}`).join(' · ');
     const card = document.createElement('div');
     card.className = 'person-summary-card';
     card.style.setProperty('--pc', person.color);
     card.innerHTML = `
       <div class="ps-name" style="color:${person.color}">${esc(person.name)}</div>
-      <div class="ps-amount" style="color:${person.color}">$${d.total.toFixed(2)}</div>
+      <div class="ps-amount" style="color:${person.color}">${fmtCurrency(d.total)}</div>
       <div class="ps-bills">${billList || 'No bills assigned'}</div>
     `;
     cardsContainer.appendChild(card);
@@ -1849,13 +1861,13 @@ function renderSummary() {
       const split = computeBillSplit(bill);
       const mine = split['me'] || 0;
       if (mine > 0) {
-        html += `<div class="sum-row"><span class="sum-label">${esc(bill.icon)} ${esc(bill.name)}</span><span class="sum-val" style="font-size:14px;">$${mine.toFixed(2)}</span></div>`;
+        html += `<div class="sum-row"><span class="sum-label">${esc(bill.icon)} ${esc(bill.name)}</span><span class="sum-val" style="font-size:14px;">${fmtCurrency(mine)}</span></div>`;
       }
     });
     myOutlay.innerHTML = html || `<div style="color:var(--muted);font-size:12px;padding:12px 0">No amounts entered yet.</div>`;
   }
   const myGrand = document.getElementById('myGrandTotal');
-  if (myGrand) myGrand.textContent = `$${myTotal.toFixed(2)}`;
+  if (myGrand) myGrand.textContent = fmtCurrency(myTotal);
 
   // Full breakdown
   const fb = document.getElementById('fullBreakdown');
@@ -1866,13 +1878,13 @@ function renderSummary() {
       const billTotal = getBillTotal(bill.id);
       if (billTotal === 0) return;
       html += `<div style="margin-bottom:16px;">
-        <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${esc(bill.icon)} ${esc(bill.name)} — $${billTotal.toFixed(2)} total</div>`;
+        <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${esc(bill.icon)} ${esc(bill.name)} — ${fmtCurrency(billTotal)} total</div>`;
       S.people.forEach(p => {
         const amt = split[p.id] || 0;
         if (!amt) return;
         html += `<div class="sum-row" style="padding:6px 0 6px 12px;">
           <span class="sum-label" style="color:${p.color}">${esc(p.name)}</span>
-          <span style="font-size:13px;color:${p.color}">$${amt.toFixed(2)}</span>
+          <span style="font-size:13px;color:${p.color}">${fmtCurrency(amt)}</span>
         </div>`;
       });
       html += `</div>`;
@@ -1933,7 +1945,7 @@ function renderReceiveCards() {
 
     const greetingLine = person.greeting || ('Hi ' + person.name + ',');
     const billRows = d.bills.map(b =>
-      `<div class="receive-bill-row"><span style="color:var(--muted)">${esc(b.name)}</span><span style="color:var(--text)">$${b.amount.toFixed(2)}</span></div>`
+      `<div class="receive-bill-row"><span style="color:var(--muted)">${esc(b.name)}</span><span style="color:var(--text)">${fmtCurrency(b.amount)}</span></div>`
     ).join('');
 
     return `
@@ -1947,7 +1959,7 @@ function renderReceiveCards() {
             </div>
           </div>
           <div class="receive-actions">
-            <div class="receive-amount" style="color:${person.color}">$${d.total.toFixed(2)}</div>
+            <div class="receive-amount" style="color:${person.color}">${fmtCurrency(d.total)}</div>
             ${emailBtn}
             ${payBtn}
             <button class="receive-expand" data-click="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
@@ -1994,11 +2006,11 @@ function buildPersonEmail(personId) {
     '',
   ];
   d.bills.forEach(b => {
-    lines.push('  ' + b.name.padEnd(22) + ' $' + b.amount.toFixed(2));
+    lines.push('  ' + b.name.padEnd(22) + ' ' + fmtCurrency(b.amount));
   });
   lines.push('');
   lines.push('  ' + '─'.repeat(29));
-  lines.push('  Total you owe:        $' + d.total.toFixed(2));
+  lines.push('  Total you owe:        ' + fmtCurrency(d.total));
   lines.push('');
   lines.push(payHint);
   lines.push('');
@@ -2034,6 +2046,7 @@ async function openPersonEmail(personId) {
         payMethod:   person.payMethod,
         payId:       person.payId || '',
         zelleUrl:    person.zelleUrl || '',
+        currencyCode: getResolvedCurrency(),
       })
     });
     const data = await res.json();
@@ -2107,7 +2120,7 @@ function openCashApp(personId) {
   const tag = encodeURIComponent((person.payId||'').replace('$',''));
   const url = tag ? 'https://cash.app/$' + tag : 'https://cash.app/';
   window.open(url, '_blank', 'noopener');
-  toast('Cash App opened — request $' + amt + ' from ' + person.name);
+  toast('Cash App opened — request ' + fmtCurrency(parseFloat(amt)) + ' from ' + person.name);
 }
 
 // ── SEND section ────────────────────────────────
@@ -2143,7 +2156,7 @@ function renderSendCards() {
           <div class="send-bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
             <div class="send-bill-name">${esc(bill.name)}</div>
-            <div class="send-bill-amount">${billTotal > 0 ? 'My share: $' + myAmt.toFixed(2) + ' of $' + billTotal.toFixed(2) : 'No amount entered'}</div>
+            <div class="send-bill-amount">${billTotal > 0 ? 'My share: ' + fmtCurrency(myAmt) + ' of ' + fmtCurrency(billTotal) : 'No amount entered'}</div>
           </div>
         </div>
         <div class="send-card-right">
@@ -2315,7 +2328,7 @@ function renderTrendsPersonView() {
     plugins:{ legend:{ labels:{ color:'#767880', font:{ family:'DM Mono', size:11 } } } },
     scales:{
       x:{ grid:{ color:'#2a2c31' }, ticks:{ color:'#767880', font:{ family:'DM Mono', size:10 } } },
-      y:{ grid:{ color:'#2a2c31' }, ticks:{ color:'#767880', font:{ family:'DM Mono', size:10 }, callback:v=>`$${v}` } }
+      y:{ grid:{ color:'#2a2c31' }, ticks:{ color:'#767880', font:{ family:'DM Mono', size:10 }, callback:v=>fmtCurrency(v) } }
     }
   };
 
@@ -2352,14 +2365,14 @@ function renderTrendsPersonView() {
       const d = S.monthly[k];
       const owesStr = Object.entries(d._owes||{}).filter(([,v])=>v>0).map(([pid,v])=>{
         const p = getPerson(pid);
-        return `<span style="color:${p.color}">${p.name}: $${v.toFixed(2)}</span>`;
+        return `<span style="color:${p.color}">${p.name}: ${fmtCurrency(v)}</span>`;
       }).join(' · ');
       return `<div class="sum-row" style="padding:8px 0;">
         <div>
           <div style="font-size:12px;">${monthLabel(k)}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px;">${owesStr||'—'}</div>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-weight:700;color:var(--green)">$${(d._myTotal||0).toFixed(2)}</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:700;color:var(--green)">${fmtCurrency((d._myTotal||0))}</div>
       </div>`;
     }).join('');
   }
@@ -2383,7 +2396,7 @@ function renderTrendsBillView() {
     plugins: { legend: { labels: { color: '#767880', font: { family: 'DM Mono', size: 11 } } } },
     scales: {
       x: { grid: { color: '#2a2c31' }, ticks: { color: '#767880', font: { family: 'DM Mono', size: 10 } } },
-      y: { grid: { color: '#2a2c31' }, ticks: { color: '#767880', font: { family: 'DM Mono', size: 10 }, callback: v => `$${v}` } }
+      y: { grid: { color: '#2a2c31' }, ticks: { color: '#767880', font: { family: 'DM Mono', size: 10 }, callback: v => fmtCurrency(v) } }
     }
   };
 
@@ -2450,12 +2463,12 @@ function renderTrendsBillView() {
           <div style="width:8px;height:8px;border-radius:50%;background:${bill.color};flex-shrink:0;"></div>
           <div style="font-size:12px;">${esc(bill.name)}</div>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-weight:700;color:${bill.color};">$${total.toFixed(2)}</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:700;color:${bill.color};">${fmtCurrency(total)}</div>
       </div>`;
     }).filter(Boolean).join('') +
     `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Grand Total</div>
-      <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);">$${grandTotal.toFixed(2)}</div>
+      <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);">${fmtCurrency(grandTotal)}</div>
     </div>`;
   }
 }
@@ -2465,6 +2478,7 @@ function renderTrendsBillView() {
 // ═══════════════════════════════════════════════
 function renderSettings() {
   applyTheme();
+  populateCurrencySelect();
   loadEmailConfig();
   renderPeopleConfig();
   renderGreetingConfig();
@@ -2990,6 +3004,73 @@ function clearAll() {
 
 // Add mortgage URL/provider to settings
 Object.assign(S.settings, { mortgageUrl:'', mortgageProvider:'' });
+
+// ═══════════════════════════════════════════════
+//  CURRENCY FORMATTING
+// ═══════════════════════════════════════════════
+const REGION_CURRENCIES = {
+  US:'USD',GB:'GBP',CA:'CAD',AU:'AUD',NZ:'NZD',JP:'JPY',CN:'CNY',
+  KR:'KRW',IN:'INR',MX:'MXN',BR:'BRL',SG:'SGD',HK:'HKD',CH:'CHF',
+  SE:'SEK',NO:'NOK',DK:'DKK',
+  DE:'EUR',FR:'EUR',IT:'EUR',ES:'EUR',NL:'EUR',BE:'EUR',AT:'EUR',
+  IE:'EUR',PT:'EUR',FI:'EUR',GR:'EUR',LU:'EUR',SK:'EUR',SI:'EUR',
+  EE:'EUR',LT:'EUR',LV:'EUR',MT:'EUR',CY:'EUR',HR:'EUR',
+};
+function detectCurrency() {
+  try {
+    const region = new Intl.Locale(navigator.language).region;
+    return region && REGION_CURRENCIES[region] || 'USD';
+  } catch { return 'USD'; }
+}
+let _currFmt = null;
+function getResolvedCurrency() {
+  return (S.settings.currencyCode || detectCurrency());
+}
+function buildCurrFmt() {
+  _currFmt = new Intl.NumberFormat(navigator.language || 'en-US', { style:'currency', currency:getResolvedCurrency() });
+}
+function fmtCurrency(v) {
+  if (!_currFmt) buildCurrFmt();
+  return _currFmt.format(v);
+}
+function getCurrSymbol() {
+  if (!_currFmt) buildCurrFmt();
+  const p = _currFmt.formatToParts(0).find(p => p.type === 'currency');
+  return p ? p.value : '$';
+}
+function setCurrencyCode(code) {
+  S.settings.currencyCode = code;
+  _currFmt = null;
+  save();
+  renderBills(); renderSummary(); renderSendPay();
+}
+const POPULAR_CURRENCIES = ['USD','EUR','GBP','CAD','AUD','JPY','CHF','CNY','INR','MXN','BRL','KRW','SGD','HKD','NZD','SEK','NOK','DKK'];
+function currencyName(code) {
+  try { return new Intl.DisplayNames([navigator.language||'en'], {type:'currency'}).of(code); } catch { return code; }
+}
+function populateCurrencySelect() {
+  const sel = document.getElementById('currencySelect');
+  if (!sel) return;
+  const current = S.settings.currencyCode || '';
+  const auto = detectCurrency();
+  let html = `<option value=""${current===''?' selected':''}>Auto (${auto})</option>`;
+  html += '<optgroup label="Popular">';
+  POPULAR_CURRENCIES.forEach(c => { html += `<option value="${c}"${current===c?' selected':''}>${c} — ${currencyName(c)}</option>`; });
+  html += '</optgroup>';
+  const all = Intl.supportedValuesOf ? Intl.supportedValuesOf('currency') : [];
+  if (all.length) {
+    html += '<optgroup label="All Currencies">';
+    all.filter(c => !POPULAR_CURRENCIES.includes(c)).forEach(c => { html += `<option value="${c}"${current===c?' selected':''}>${c} — ${currencyName(c)}</option>`; });
+    html += '</optgroup>';
+  }
+  sel.innerHTML = html;
+  const sub = document.getElementById('currencySubtitle');
+  if (sub) sub.textContent = current ? `${currencyName(current)} (${current})` : `Auto · ${currencyName(auto)} (${auto})`;
+}
+function onCurrencyChange(code) {
+  setCurrencyCode(code);
+  populateCurrencySelect();
+}
 
 // ═══════════════════════════════════════════════
 //  NAVIGATION

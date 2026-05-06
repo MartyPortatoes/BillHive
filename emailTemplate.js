@@ -12,6 +12,7 @@
  * @param {string} opts.payId         — zelle phone/email or venmo @handle
  * @param {string} opts.zelleUrl      — custom Zelle URL (overrides default enroll.zellepay.com link)
  * @param {string} opts.fromName      — sender display name
+ * @param {string} opts.currencyCode  — ISO 4217 currency code (default 'USD')
  */
 function escapeHtml(str) {
   if (str == null) return '';
@@ -46,7 +47,10 @@ function buildEmailHtml(opts) {
   const {
     greeting, personName, accentColor: rawAccent = '#F5A800',
     monthLabel, bills, total, payMethod, payId, zelleUrl: customZelleUrl, fromName = 'BillHive',
+    currencyCode = 'USD',
   } = opts;
+
+  const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode });
 
   // Validate accentColor is a safe hex value before embedding in HTML/CSS
   const accentColor = /^#[0-9A-Fa-f]{3,8}$/.test(rawAccent) ? rawAccent : '#F5A800';
@@ -68,7 +72,7 @@ function buildEmailHtml(opts) {
       if (safeZelleUrl) {
         payButtonHtml = `
         <tr><td align="center" style="padding:24px 0 6px;">
-          <a href="${safeZelleUrl}" style="${btnStyle}">Pay via Zelle — $${total.toFixed(2)}</a>
+          <a href="${safeZelleUrl}" style="${btnStyle}">Pay via Zelle — ${fmt.format(total)}</a>
         </td></tr>
         <tr><td align="center" style="padding:0 0 4px;">
           <span style="${subStyle}">Zelle to ${escapeHtml(payId)}</span>
@@ -80,7 +84,7 @@ function buildEmailHtml(opts) {
         <div style="display:inline-block;background:${accentBg};border:1px solid ${accentBorder};
           color:${accentColor};font-family:'Courier New',Courier,monospace;font-weight:700;
           font-size:14px;padding:13px 32px;border-radius:8px;letter-spacing:.04em;">
-          $${total.toFixed(2)} due via Zelle
+          ${fmt.format(total)} due via Zelle
         </div>
       </td></tr>
       <tr><td align="center" style="padding:0 0 4px;">
@@ -93,7 +97,7 @@ function buildEmailHtml(opts) {
     const url     = `https://venmo.com/${handle}?txn=charge&amount=${total.toFixed(2)}&note=${note}`;
     payButtonHtml = `
     <tr><td align="center" style="padding:24px 0 6px;">
-      <a href="${url}" style="${btnStyle}">Pay via Venmo — $${total.toFixed(2)}</a>
+      <a href="${url}" style="${btnStyle}">Pay via Venmo — ${fmt.format(total)}</a>
     </td></tr>
     <tr><td align="center" style="padding:0 0 4px;">
       <span style="${subStyle}">Venmo @${escapeHtml(payId.replace('@', ''))}</span>
@@ -103,7 +107,7 @@ function buildEmailHtml(opts) {
     const url = `https://cash.app/$${tag}`;
     payButtonHtml = `
     <tr><td align="center" style="padding:24px 0 6px;">
-      <a href="${url}" style="${btnStyle}">Pay via Cash App — $${total.toFixed(2)}</a>
+      <a href="${url}" style="${btnStyle}">Pay via Cash App — ${fmt.format(total)}</a>
     </td></tr>
     <tr><td align="center" style="padding:0 0 4px;">
       <span style="${subStyle}">Cash App $${escapeHtml(payId.replace('$', ''))}</span>
@@ -114,7 +118,7 @@ function buildEmailHtml(opts) {
       <div style="display:inline-block;background:${accentBg};border:1px solid ${accentBorder};
         color:${accentColor};font-family:'Courier New',Courier,monospace;font-weight:700;
         font-size:14px;padding:13px 32px;border-radius:8px;letter-spacing:.04em;">
-        Total Due: $${total.toFixed(2)}
+        Total Due: ${fmt.format(total)}
       </div>
     </td></tr>`;
   }
@@ -126,7 +130,7 @@ function buildEmailHtml(opts) {
                  color:#767880;border-bottom:1px solid #2a2c31;">${escapeHtml(b.name)}</td>
       <td style="padding:10px 16px;font-family:'Courier New',Courier,monospace;font-size:13px;
                  color:${accentColor};font-weight:600;text-align:right;
-                 border-bottom:1px solid #2a2c31;">$${b.amount.toFixed(2)}</td>
+                 border-bottom:1px solid #2a2c31;">${fmt.format(b.amount)}</td>
     </tr>`).join('');
 
   // ── Full HTML ─────────────────────────────────────────────────────────────
@@ -225,7 +229,7 @@ function buildEmailHtml(opts) {
                              font-weight:700;color:#e4e5e8;">Total</td>
                   <td style="padding:12px 16px;font-family:'Courier New',Courier,monospace;
                              font-size:18px;font-weight:700;color:${accentColor};text-align:right;">
-                    $${total.toFixed(2)}
+                    ${fmt.format(total)}
                   </td>
                 </tr>
               </tfoot>
@@ -280,10 +284,10 @@ function buildEmailHtml(opts) {
     '',
     `Here's your share of the bills for ${monthLabel}:`,
     '',
-    ...bills.map(b => `  ${b.name.padEnd(24)} $${b.amount.toFixed(2)}`),
+    ...bills.map(b => `  ${b.name.padEnd(24)} ${fmt.format(b.amount)}`),
     '',
     '  ' + '─'.repeat(30),
-    `  Total you owe:         $${total.toFixed(2)}`,
+    `  Total you owe:         ${fmt.format(total)}`,
     '',
     payMethod === 'zelle'   && payId ? `Please pay via Zelle to ${payId}.` :
     payMethod === 'venmo'   && payId ? `Please pay via Venmo @${payId.replace('@','')}.` :
