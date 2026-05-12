@@ -335,6 +335,21 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .status-ok{color:var(--green)!important;}
 .status-err{color:#f87171!important;}
 
+/* ── DUE DATE URGENCY ── */
+.due-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500;letter-spacing:.04em;white-space:nowrap;}
+.due-overdue{background:rgba(239,83,80,.15);color:#ef5350;border:1px solid rgba(239,83,80,.25);}
+.due-soon{background:rgba(245,166,35,.15);color:var(--orange);border:1px solid rgba(245,166,35,.25);}
+.due-upcoming{background:rgba(118,120,128,.1);color:var(--muted);border:1px solid var(--border);}
+
+/* ── PAYMENT PROGRESS ── */
+.pay-progress{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;}
+.pay-progress-bar{flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;}
+.pay-progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s;}
+.pay-progress-text{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;}
+.paid-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-family:'DM Mono',monospace;background:rgba(245,168,0,.12);color:var(--green);border:1px solid rgba(245,168,0,.3);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.paid-badge:hover{background:rgba(245,168,0,.2);}
+.paid-badge.unpaid{background:transparent;color:var(--muted);border-color:var(--border);}
+
 /* ── EMPTY STATE (legacy single-line) ── */
 .empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:12px;}
 .empty-icon{font-size:32px;margin-bottom:8px;}
@@ -435,6 +450,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   <div class="page-title">Summary</div>
   <div class="page-sub">What everyone owes this month.</div>
 
+  <div id="paymentProgress"></div>
   <div class="grid2" id="personSummaryCards" style="margin-bottom:16px;"></div>
 
   <div class="card">
@@ -506,6 +522,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <button class="trend-toggle-btn" id="toggle-bill" data-click="setTrendsView('bill')">By Bill</button>
       </div>
       <div class="trend-toggle">
+        <button class="trend-toggle-btn" id="toggle-months-6" data-click="setTrendsMonthLimit(6)">6M</button>
         <button class="trend-toggle-btn active" id="toggle-months-12" data-click="setTrendsMonthLimit(12)">12M</button>
         <button class="trend-toggle-btn" id="toggle-months-24" data-click="setTrendsMonthLimit(24)">24M</button>
         <button class="trend-toggle-btn" id="toggle-months-0" data-click="setTrendsMonthLimit(0)">All</button>
@@ -963,13 +980,14 @@ function _initEvtFns() {
     revokeDeviceKey, exportData, clearAll,
     toggleReceiveCard, openZelle, openVenmo, openCashApp,
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
+    togglePayReceived,
     setTrendsView, setTrendsMonthLimit,
     setThemePref,
     closeBhModal, _modalCancel, _modalOk,
     // input actions (bill fields)
     updateBillIcon, updateBillName, updateBillColor,
     onTotalInput, updateLineDesc, updateLinePct, onFixedLineInput,
-    updateBillPayUrl,
+    updateBillPayUrl, updateBillDueDay,
     // input actions (person fields)
     updatePersonField,
     // change actions
@@ -1363,7 +1381,7 @@ function renderBills() {
           <div class="bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
             <div class="bill-name">${esc(bill.name)}</div>
-            <div class="bill-sub">${pillsHtml} &nbsp;<span style="color:var(--muted2);font-size:10px">${bill.splitType==='pct'?'% split':'fixed split'}</span></div>
+            <div class="bill-sub">${pillsHtml} &nbsp;<span style="color:var(--muted2);font-size:10px">${bill.splitType==='pct'?'% split':'fixed split'}</span>${bill.dueDay ? '&nbsp;'+dueBadgeHtml(bill.dueDay) : ''}</div>
           </div>
         </div>
         ${totalDisplay}
@@ -1532,6 +1550,9 @@ function renderBillBody(bill) {
     `;
   }
 
+  const dueDayOptions = '<option value="">— none —</option>' +
+    Array.from({length:31},(_,i)=>`<option value="${i+1}" ${bill.dueDay===(i+1)?'selected':''}>${ordinal(i+1)}</option>`).join('');
+
   const preserveToggle = `
     <div class="preserve-row">
       <label class="tog">
@@ -1546,6 +1567,11 @@ function renderBillBody(bill) {
         <span class="tog-slider"></span>
       </label>
       <label class="preserve-row-label" for="autopay-${bill.id}">Auto-pay — skip &ldquo;paid&rdquo; task in checklist</label>
+    </div>
+    <div class="preserve-row" style="gap:12px;">
+      <label class="preserve-row-label" style="min-width:80px;">Due day</label>
+      <select style="font-size:11px;padding:4px 8px;max-width:120px;" data-change="updateBillDueDay('${bill.id}',this.value)">${dueDayOptions}</select>
+      ${bill.dueDay ? `<span style="font-size:10px;color:var(--muted);">shows urgency in Pay tab</span>` : `<span style="font-size:10px;color:var(--muted2);">optional — day of month (1–31)</span>`}
     </div>
   `;
 
@@ -1574,6 +1600,51 @@ function toggleAutoPay(billId, val) {
   if (!bill) return;
   bill.autoPay = !!val;
   save();
+}
+
+function updateBillDueDay(billId, val) {
+  const bill = S.bills.find(b => b.id === billId);
+  if (!bill) return;
+  const n = parseInt(val);
+  bill.dueDay = (!val || val === '' || isNaN(n) || n < 1 || n > 31) ? null : n;
+  renderBills();
+  save();
+}
+
+// Returns ordinal suffix string, e.g. 1 → "1st", 15 → "15th"
+function ordinal(n) {
+  const s = ['th','st','nd','rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Returns 'overdue' | 'soon' | 'upcoming' | null based on day of month
+function dueUrgency(dueDay) {
+  if (!dueDay) return null;
+  const today = new Date().getDate();
+  const diff = dueDay - today;
+  if (diff < 0) return 'overdue';
+  if (diff <= 3) return 'soon';
+  return 'upcoming';
+}
+
+function dueBadgeHtml(dueDay) {
+  if (!dueDay) return '';
+  const urgency = dueUrgency(dueDay);
+  const cls = urgency === 'overdue' ? 'due-overdue' : urgency === 'soon' ? 'due-soon' : 'due-upcoming';
+  const prefix = urgency === 'overdue' ? '⚠ ' : '';
+  return `<span class="due-badge ${cls}">${prefix}Due ${ordinal(dueDay)}</span>`;
+}
+
+// Toggle "payment received from this person" for the current month
+function togglePayReceived(personId) {
+  const k = monthKey();
+  if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
+  if (!S.monthly[k].payReceived) S.monthly[k].payReceived = {};
+  S.monthly[k].payReceived[personId] = !S.monthly[k].payReceived[personId];
+  saveMonthNow(k, S.monthly[k]);
+  renderReceiveCards();
+  renderSummary();
 }
 
 function onTotalInput(billId, val) {
@@ -1827,6 +1898,25 @@ function renderSummary() {
   const owes = computePersonOwes();
   const myTotal = computeMyTotal();
 
+  // Payment progress indicator
+  const mk = monthKey();
+  const payReceived = S.monthly[mk]?.payReceived || {};
+  const owing = S.people.filter(p => p.id !== 'me' && (owes[p.id]?.total || 0) > 0);
+  const paidCount = owing.filter(p => payReceived[p.id]).length;
+  const progressEl = document.getElementById('paymentProgress');
+  if (progressEl) {
+    if (owing.length > 0) {
+      const pct = Math.round((paidCount / owing.length) * 100);
+      progressEl.innerHTML = `
+        <div class="pay-progress">
+          <div class="pay-progress-bar"><div class="pay-progress-fill" style="width:${pct}%"></div></div>
+          <div class="pay-progress-text">${paidCount} of ${owing.length} paid</div>
+        </div>`;
+    } else {
+      progressEl.innerHTML = '';
+    }
+  }
+
   // Person cards (people who owe me, excluding me)
   const cardsContainer = document.getElementById('personSummaryCards');
   if (!cardsContainer) return;
@@ -1834,13 +1924,18 @@ function renderSummary() {
   S.people.filter(p => p.id !== 'me').forEach(person => {
     const d = owes[person.id] || { total:0, bills:[] };
     if (d.total === 0) return;
+    const isPaid = !!payReceived[person.id];
     const billList = d.bills.map(b=>`${b.name}: ${fmtCurrency(b.amount)}`).join(' · ');
     const card = document.createElement('div');
     card.className = 'person-summary-card';
     card.style.setProperty('--pc', person.color);
+    if (isPaid) card.style.opacity = '0.6';
     card.innerHTML = `
-      <div class="ps-name" style="color:${person.color}">${esc(person.name)}</div>
-      <div class="ps-amount" style="color:${person.color}">${fmtCurrency(d.total)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div class="ps-name" style="color:${person.color}">${esc(person.name)}</div>
+        ${isPaid ? `<span style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;">✓ paid</span>` : ''}
+      </div>
+      <div class="ps-amount" style="color:${isPaid ? 'var(--muted)' : person.color};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
       <div class="ps-bills">${billList || 'No bills assigned'}</div>
     `;
     cardsContainer.appendChild(card);
@@ -1919,8 +2014,12 @@ function renderReceiveCards() {
     return;
   }
 
+  const k = monthKey();
+  const payReceived = S.monthly[k]?.payReceived || {};
+
   container.innerHTML = people.map(person => {
     const d = owes[person.id] || { total:0, bills:[] };
+    const isPaid = !!payReceived[person.id];
     const payDesc = person.payMethod === 'zelle'
       ? 'Zelle · ' + (person.payId || 'set ID in Settings')
       : person.payMethod === 'venmo'
@@ -1928,7 +2027,6 @@ function renderReceiveCards() {
       : person.payMethod === 'cashapp'
       ? 'Cash App · ' + (person.payId || 'set $cashtag in Settings')
       : 'Manual';
-    const emailDesc = person.email ? person.email : '(no email — add in Settings)';
 
     let payBtn = '';
     if (person.payMethod === 'zelle') {
@@ -1943,13 +2041,14 @@ function renderReceiveCards() {
       ? `<button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Email</button>`
       : `<button class="btn btn-ghost btn-sm" style="opacity:.4;cursor:default" title="Add email in Settings">✉️ Email</button>`;
 
-    const greetingLine = person.greeting || ('Hi ' + person.name + ',');
     const billRows = d.bills.map(b =>
       `<div class="receive-bill-row"><span style="color:var(--muted)">${esc(b.name)}</span><span style="color:var(--text)">${fmtCurrency(b.amount)}</span></div>`
     ).join('');
 
+    const paidToggle = `<span class="paid-badge ${isPaid ? '' : 'unpaid'}" data-click="event.stopPropagation();togglePayReceived('${person.id}')" title="${isPaid ? 'Mark as unpaid' : 'Mark payment received'}">${isPaid ? '✓ Paid' : 'Mark Paid'}</span>`;
+
     return `
-      <div class="receive-card" id="rc-${person.id}">
+      <div class="receive-card" id="rc-${person.id}" ${isPaid ? 'style="opacity:.7;"' : ''}>
         <div class="receive-card-head" data-click="toggleReceiveCard('${person.id}')">
           <div class="receive-person">
             <div class="receive-person-dot" style="background:${person.color}"></div>
@@ -1959,7 +2058,8 @@ function renderReceiveCards() {
             </div>
           </div>
           <div class="receive-actions">
-            <div class="receive-amount" style="color:${person.color}">${fmtCurrency(d.total)}</div>
+            <div class="receive-amount" style="color:${isPaid ? 'var(--muted)' : person.color};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
+            ${paidToggle}
             ${emailBtn}
             ${payBtn}
             <button class="receive-expand" data-click="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
@@ -2137,7 +2237,19 @@ function renderSendCards() {
     return;
   }
 
-  container.innerHTML = S.bills.map(bill => {
+  // Sort: overdue first, then soon, then upcoming (by day asc), then no due date
+  const urgencyOrder = { overdue: 0, soon: 1, upcoming: 2 };
+  const sortedBills = [...S.bills].sort((a, b) => {
+    const ua = dueUrgency(a.dueDay), ub = dueUrgency(b.dueDay);
+    if (!ua && !ub) return 0;
+    if (!ua) return 1;
+    if (!ub) return -1;
+    const diff = (urgencyOrder[ua] ?? 3) - (urgencyOrder[ub] ?? 3);
+    if (diff !== 0) return diff;
+    return (a.dueDay || 99) - (b.dueDay || 99);
+  });
+
+  container.innerHTML = sortedBills.map(bill => {
     const split = computeBillSplit(bill);
     const myAmt = split['me'] || 0;
     const billTotal = getBillTotal(bill.id) || bill.lines.reduce((s,l)=>s+getLineAmount(bill.id,l.id),0);
@@ -2155,7 +2267,7 @@ function renderSendCards() {
         <div class="send-card-left">
           <div class="send-bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
-            <div class="send-bill-name">${esc(bill.name)}</div>
+            <div class="send-bill-name">${esc(bill.name)}${bill.dueDay ? '&ensp;' + dueBadgeHtml(bill.dueDay) : ''}</div>
             <div class="send-bill-amount">${billTotal > 0 ? 'My share: ' + fmtCurrency(myAmt) + ' of ' + fmtCurrency(billTotal) : 'No amount entered'}</div>
           </div>
         </div>
@@ -2300,6 +2412,7 @@ function setTrendsView(view) {
 
 function setTrendsMonthLimit(n) {
   trendsMonthLimit = n;
+  document.getElementById('toggle-months-6').classList.toggle('active', n === 6);
   document.getElementById('toggle-months-12').classList.toggle('active', n === 12);
   document.getElementById('toggle-months-24').classList.toggle('active', n === 24);
   document.getElementById('toggle-months-0').classList.toggle('active', n === 0);
