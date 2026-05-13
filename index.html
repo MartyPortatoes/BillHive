@@ -371,6 +371,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .setting-group-heading{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
 .setting-group-name{font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em;}
 .setting-group-desc{font-size:11px;color:var(--muted);line-height:1.4;}
+.sg-sub-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 14px 12px;margin-bottom:12px;}
+.sg-sub-card:last-child{margin-bottom:0;}
+.sg-sub-title{font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;letter-spacing:.02em;}
 
 /* ── APPEARANCE SEGMENTED PICKER ── */
 .appearance-row{display:flex;align-items:center;gap:12px;}
@@ -632,152 +635,132 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
     </div>
   </div>
 
-  <!-- 4. Email Relay (collapsible) -->
+  <!-- 4. Server Settings (collapsible — contains Email Relay, Greetings, Connected Devices) -->
   <div class="card">
-    <div class="setting-group collapsed" id="sg-email-relay">
-      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-email-relay')">
-        <div class="setting-group-icon">✉️</div>
+    <div class="setting-group collapsed" id="sg-server">
+      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-server')">
+        <div class="setting-group-icon">🖥️</div>
         <div class="setting-group-heading">
-          <div class="setting-group-name">Email Relay</div>
-          <div class="setting-group-desc">SMTP or API provider used to send bill summaries</div>
+          <div class="setting-group-name">Server Settings</div>
+          <div class="setting-group-desc">Email relay, greetings, and connected devices</div>
         </div>
         <span class="sg-chevron">▼</span>
       </div>
       <div class="sg-body">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
-          Configure a mail provider so BillHive can send HTML bill summaries directly. API keys are stored server-side and never exposed to the browser.
-        </div>
 
-        <div class="setting-row">
-          <div class="setting-label">Provider<div class="setting-hint">How emails are sent</div></div>
-          <select id="em-provider" data-change="renderEmailProviderFields()" style="font-size:12px;">
-            <option value="">— disabled —</option>
-            <option value="smtp">SMTP (Gmail, Outlook, self-hosted…)</option>
-            <option value="mailgun">Mailgun</option>
-            <option value="sendgrid">SendGrid</option>
-            <option value="resend">Resend</option>
-          </select>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-label">From Name<div class="setting-hint">Sender display name</div></div>
-          <input type="text" id="em-fromName" placeholder="e.g. Marty" style="font-size:12px;">
-        </div>
-        <div class="setting-row">
-          <div class="setting-label">From Email<div class="setting-hint">Sender address</div></div>
-          <input type="email" id="em-fromEmail" placeholder="you@yourdomain.com" style="font-size:12px;">
-        </div>
-
-        <!-- Dynamic provider fields -->
-        <div id="emailProviderFields"></div>
-
-        <div class="action-row" style="margin-top:12px;">
-          <button class="btn btn-green btn-sm" data-click="saveEmailConfig()">Save Email Config</button>
-          <button class="btn btn-ghost btn-sm" data-click="testEmailConfig()">Send Test Email</button>
-          <span id="emailConfigStatus" style="font-size:11px;color:var(--muted);"></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5. Email Greetings (collapsible) -->
-  <div class="card">
-    <div class="setting-group collapsed" id="sg-greetings">
-      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-greetings')">
-        <div class="setting-group-icon">💬</div>
-        <div class="setting-group-heading">
-          <div class="setting-group-name">Email Greetings</div>
-          <div class="setting-group-desc">Custom opening line per person in their bill email</div>
-        </div>
-        <span class="sg-chevron">▼</span>
-      </div>
-      <div class="sg-body">
-        <div id="greetingConfig"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 6. Connected Devices (collapsible) -->
-  <div class="card">
-    <div class="setting-group collapsed" id="sg-devices">
-      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-devices')">
-        <div class="setting-group-icon">📱</div>
-        <div class="setting-group-heading">
-          <div class="setting-group-name">Connected Devices</div>
-          <div class="setting-group-desc">API keys for SelfHive iOS authentication</div>
-        </div>
-        <span class="sg-chevron">▼</span>
-      </div>
-      <div class="sg-body">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
-          Generate per-device API keys so SelfHive (iOS) can authenticate to this server. Keys are hashed before storage; the plaintext is shown <strong>once</strong> at creation time and never again.
-        </div>
-
-        <!-- Require keys toggle -->
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;color:var(--text);font-weight:500;">Require API key for iOS apps</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;">When on, SelfHive can't connect without a valid key. Browser access here is unaffected.</div>
+        <!-- Email Relay sub-card -->
+        <div class="sg-sub-card">
+          <div class="sg-sub-title">✉️ Email Relay</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+            Configure a mail provider so BillHive can send HTML bill summaries directly. API keys are stored server-side and never exposed to the browser.
           </div>
-          <label class="tog">
-            <input type="checkbox" id="requireDeviceKeysToggle" data-change="onRequireDeviceKeysChange(this)">
-            <span class="tog-slider"></span>
-          </label>
+
+          <div class="setting-row">
+            <div class="setting-label">Provider<div class="setting-hint">How emails are sent</div></div>
+            <select id="em-provider" data-change="renderEmailProviderFields()" style="font-size:12px;">
+              <option value="">— disabled —</option>
+              <option value="smtp">SMTP (Gmail, Outlook, self-hosted…)</option>
+              <option value="mailgun">Mailgun</option>
+              <option value="sendgrid">SendGrid</option>
+              <option value="resend">Resend</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">From Name<div class="setting-hint">Sender display name</div></div>
+            <input type="text" id="em-fromName" placeholder="e.g. Marty" style="font-size:12px;">
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">From Email<div class="setting-hint">Sender address</div></div>
+            <input type="email" id="em-fromEmail" placeholder="you@yourdomain.com" style="font-size:12px;">
+          </div>
+
+          <div id="emailProviderFields"></div>
+
+          <div class="action-row" style="margin-top:12px;">
+            <button class="btn btn-green btn-sm" data-click="saveEmailConfig()">Save Email Config</button>
+            <button class="btn btn-ghost btn-sm" data-click="testEmailConfig()">Send Test Email</button>
+            <span id="emailConfigStatus" style="font-size:11px;color:var(--muted);"></span>
+          </div>
         </div>
 
-        <div id="devicesList" style="display:flex;flex-direction:column;gap:6px;"></div>
-
-        <div class="action-row" style="margin-top:12px;">
-          <button class="btn btn-green btn-sm" data-click="generateDeviceKey()">+ Generate Device Key</button>
+        <!-- Email Greetings sub-card -->
+        <div class="sg-sub-card">
+          <div class="sg-sub-title">💬 Email Greetings</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+            Custom opening line per person in their bill email.
+          </div>
+          <div id="greetingConfig"></div>
         </div>
+
+        <!-- Connected Devices sub-card -->
+        <div class="sg-sub-card">
+          <div class="sg-sub-title">📱 Connected Devices</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+            Generate per-device API keys so SelfHive (iOS) can authenticate to this server. Keys are hashed before storage; the plaintext is shown <strong>once</strong> at creation time and never again.
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;color:var(--text);font-weight:500;">Require API key for iOS apps</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;">When on, SelfHive can't connect without a valid key. Browser access here is unaffected.</div>
+            </div>
+            <label class="tog">
+              <input type="checkbox" id="requireDeviceKeysToggle" data-change="onRequireDeviceKeysChange(this)">
+              <span class="tog-slider"></span>
+            </label>
+          </div>
+
+          <div id="devicesList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+          <div class="action-row" style="margin-top:12px;">
+            <button class="btn btn-green btn-sm" data-click="generateDeviceKey()">+ Generate Device Key</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 
-  <!-- 7. Backup (collapsible — matches iOS Data & Privacy > Backup) -->
+  <!-- 5. Data & Privacy (collapsible — contains Backup + Danger Zone) -->
   <div class="card">
-    <div class="setting-group collapsed" id="sg-backup">
-      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-backup')">
-        <div class="setting-group-icon">💾</div>
+    <div class="setting-group collapsed" id="sg-data-privacy">
+      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-data-privacy')">
+        <div class="setting-group-icon">🔒</div>
         <div class="setting-group-heading">
-          <div class="setting-group-name">Backup</div>
-          <div class="setting-group-desc">Export or restore a JSON backup of all data</div>
+          <div class="setting-group-name">Data & Privacy</div>
+          <div class="setting-group-desc">Backup, restore, and data management</div>
         </div>
         <span class="sg-chevron">▼</span>
       </div>
       <div class="sg-body">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
-          Download a JSON backup of all bills, people, and monthly data from your server, or restore from a previous backup.
-        </div>
-        <div class="action-row">
-          <button class="btn btn-ghost btn-sm" data-click="exportData()">Export Backup</button>
-          <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
-            Import Backup
-            <input type="file" accept=".json" style="display:none" data-change="onImportFileChange(this)">
-          </label>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- 8. Danger Zone (collapsible — matches iOS Data & Privacy > Danger Zone) -->
-  <div class="card">
-    <div class="setting-group collapsed" id="sg-danger">
-      <div class="setting-group-header" data-click="toggleSettingsGroup('sg-danger')">
-        <div class="setting-group-icon" style="background:rgba(239,83,80,.15);color:#ef5350;">⚠️</div>
-        <div class="setting-group-heading">
-          <div class="setting-group-name" style="color:#ef5350;">Danger Zone</div>
-          <div class="setting-group-desc">Permanently remove all data</div>
+        <!-- Backup sub-card -->
+        <div class="sg-sub-card">
+          <div class="sg-sub-title">💾 Backup</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+            Download a JSON backup of all bills, people, and monthly data from your server, or restore from a previous backup.
+          </div>
+          <div class="action-row">
+            <button class="btn btn-ghost btn-sm" data-click="exportData()">Export Backup</button>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+              Import Backup
+              <input type="file" accept=".json" style="display:none" data-change="onImportFileChange(this)">
+            </label>
+          </div>
         </div>
-        <span class="sg-chevron">▼</span>
-      </div>
-      <div class="sg-body">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
-          Permanently remove all bills, people, and monthly data. This cannot be undone.
+
+        <!-- Danger Zone sub-card -->
+        <div class="sg-sub-card" style="border-color:rgba(239,83,80,.3);">
+          <div class="sg-sub-title" style="color:#ef5350;">⚠️ Danger Zone</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+            Permanently remove all bills, people, and monthly data. This cannot be undone.
+          </div>
+          <div class="action-row">
+            <button class="btn btn-danger btn-sm" data-click="clearAll()">Clear All Data</button>
+          </div>
         </div>
-        <div class="action-row">
-          <button class="btn btn-danger btn-sm" data-click="clearAll()">Clear All Data</button>
-        </div>
+
       </div>
     </div>
   </div>
@@ -1034,7 +1017,7 @@ function _initEvtFns() {
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
     togglePayReceived,
     setTrendsView, setTrendsMonthLimit,
-    setThemePref,
+    setThemePref, toggleSettingsGroup, setSummaryView,
     closeBhModal, _modalCancel, _modalOk,
     // input actions (bill fields)
     updateBillIcon, updateBillName, updateBillColor,
