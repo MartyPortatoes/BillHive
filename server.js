@@ -143,8 +143,9 @@ const stmts = {
 };
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
-function sha256Hex(s) {
-  return crypto.createHash('sha256').update(s).digest('hex');
+function hashApiKey(key) {
+  const salt = getServerSecret();
+  return crypto.scryptSync(key, salt, 32).toString('hex');
 }
 
 function generateApiKey() {
@@ -351,7 +352,7 @@ function resolveAuth(req, res, next) {
   if (typeof authHeader === 'string' && /^Bearer /i.test(authHeader)) {
     const key = authHeader.replace(/^Bearer /i, '').trim();
     if (key) {
-      const row = stmts.findApiKeyByHash.get(sha256Hex(key));
+      const row = stmts.findApiKeyByHash.get(hashApiKey(key));
       if (row) {
         req.userId = row.user_id;
         req.authMethod = 'bearer';
@@ -671,7 +672,7 @@ app.post('/api/keys', (req, res) => {
   const id = generateApiKeyId();
   const prefix = key.slice(0, 12); // "bh_live_xxxx"
   try {
-    stmts.insertApiKey.run(id, req.userId, name, sha256Hex(key), prefix);
+    stmts.insertApiKey.run(id, req.userId, name, hashApiKey(key), prefix);
   } catch (e) {
     return res.status(500).json({ error: 'Failed to create key' });
   }
