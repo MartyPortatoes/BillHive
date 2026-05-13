@@ -451,25 +451,41 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
 <!-- ════════════════ SUMMARY ════════════════ -->
 <div id="page-summary" class="page">
-  <div class="page-title">Summary</div>
-  <div class="page-sub">What everyone owes this month.</div>
-
-  <div id="paymentProgress"></div>
-  <div class="grid2" id="personSummaryCards" style="margin-bottom:16px;"></div>
-
-  <div class="card">
-    <div class="card-head"><div class="card-title">My Total Outlay</div></div>
-    <div id="myOutlaySummary"></div>
-    <hr>
-    <div class="sum-row">
-      <div class="sum-label">Total I'm paying this month</div>
-      <div class="sum-val big" id="myGrandTotal">—</div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <div class="page-title" style="margin-bottom:4px;">Summary</div>
+      <div class="page-sub" id="summarySubtitle" style="margin-bottom:0;">What everyone owes this month.</div>
+    </div>
+    <div class="trend-toggle" style="margin-top:4px;">
+      <button class="trend-toggle-btn active" id="toggle-summary" data-click="setSummaryView('summary')">Summary</button>
+      <button class="trend-toggle-btn" id="toggle-checklist" data-click="setSummaryView('checklist')">Checklist</button>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-head"><div class="card-title">Full Bill Breakdown</div></div>
-    <div id="fullBreakdown"></div>
+  <div id="summaryContent">
+    <div id="paymentProgress"></div>
+    <div class="grid2" id="personSummaryCards" style="margin-bottom:16px;"></div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">My Total Outlay</div></div>
+      <div id="myOutlaySummary"></div>
+      <hr>
+      <div class="sum-row">
+        <div class="sum-label">Total I'm paying this month</div>
+        <div class="sum-val big" id="myGrandTotal">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div class="card-title">Full Bill Breakdown</div></div>
+      <div id="fullBreakdown"></div>
+    </div>
+  </div>
+
+  <div id="checklistContent" style="display:none;">
+    <div class="card">
+      <div id="checklist"></div>
+    </div>
   </div>
 </div>
 
@@ -499,18 +515,6 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   </div>
 
   <div id="sendCards"></div>
-
-  <!-- CHECKLIST -->
-  <div class="sr-section-label" style="margin-top:28px;">
-    <div class="sr-section-icon" style="background:var(--surface3);color:var(--muted);">✓</div>
-    <div>
-      <div class="sr-section-title">Monthly Checklist</div>
-      <div class="sr-section-sub">Track what's been done this month</div>
-    </div>
-  </div>
-  <div class="card">
-    <div id="checklist"></div>
-  </div>
 </div>
 
 <!-- ════════════════ TRENDS ════════════════ -->
@@ -1942,7 +1946,21 @@ function updateTabBadge() {
 // ═══════════════════════════════════════════════
 //  SUMMARY PAGE
 // ═══════════════════════════════════════════════
+let summaryView = 'summary';
+
+function setSummaryView(view) {
+  summaryView = view;
+  document.getElementById('toggle-summary').classList.toggle('active', view === 'summary');
+  document.getElementById('toggle-checklist').classList.toggle('active', view === 'checklist');
+  document.getElementById('summaryContent').style.display = view === 'summary' ? '' : 'none';
+  document.getElementById('checklistContent').style.display = view === 'checklist' ? '' : 'none';
+  const sub = document.getElementById('summarySubtitle');
+  if (sub) sub.textContent = view === 'summary' ? 'What everyone owes this month.' : 'Track your monthly to-dos.';
+  if (view === 'checklist') renderChecklist();
+}
+
 function renderSummary() {
+  if (summaryView === 'checklist') { renderChecklist(); return; }
   const owes = computePersonOwes();
   const myTotal = computeMyTotal();
 
@@ -2043,7 +2061,6 @@ function renderSummary() {
 function renderSendPay() {
   renderReceiveCards();
   renderSendCards();
-  renderChecklist();
 }
 
 // ── RECEIVE section ────────────────────────────
