@@ -1668,6 +1668,8 @@ function dueBadgeHtml(dueDay, billId) {
   if (!dueDay) return '';
   const paid = billId && (S.checklist[monthKey()] || {})['pay_' + billId];
   if (paid) return `<span class="due-badge due-paid">✓ Paid</span>`;
+  const bill = billId && S.bills.find(b => b.id === billId);
+  if (bill && bill.autoPay && new Date().getDate() >= dueDay) return `<span class="due-badge due-paid">✓ Paid</span>`;
   const urgency = dueUrgency(dueDay);
   const cls = urgency === 'overdue' ? 'due-overdue' : urgency === 'soon' ? 'due-soon' : 'due-upcoming';
   const prefix = urgency === 'overdue' ? '⚠ ' : '';
