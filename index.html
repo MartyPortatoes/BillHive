@@ -338,6 +338,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── DUE DATE URGENCY ── */
 .due-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500;letter-spacing:.04em;white-space:nowrap;}
 .due-overdue{background:rgba(239,83,80,.15);color:#ef5350;border:1px solid rgba(239,83,80,.25);}
+.due-paid{background:rgba(52,199,89,.15);color:#34c759;border:1px solid rgba(52,199,89,.25);}
 .due-soon{background:rgba(245,166,35,.15);color:var(--orange);border:1px solid rgba(245,166,35,.25);}
 .due-upcoming{background:rgba(118,120,128,.1);color:var(--muted);border:1px solid var(--border);}
 
@@ -1416,7 +1417,7 @@ function renderBills() {
           <div class="bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
             <div class="bill-name">${esc(bill.name)}</div>
-            <div class="bill-sub">${pillsHtml} &nbsp;<span style="color:var(--muted2);font-size:10px">${bill.splitType==='pct'?'% split':'fixed split'}</span>${bill.dueDay ? '&nbsp;'+dueBadgeHtml(bill.dueDay) : ''}</div>
+            <div class="bill-sub">${pillsHtml} &nbsp;<span style="color:var(--muted2);font-size:10px">${bill.splitType==='pct'?'% split':'fixed split'}</span>${bill.dueDay ? '&nbsp;'+dueBadgeHtml(bill.dueDay, bill.id) : ''}</div>
           </div>
         </div>
         ${totalDisplay}
@@ -1663,8 +1664,10 @@ function dueUrgency(dueDay) {
   return 'upcoming';
 }
 
-function dueBadgeHtml(dueDay) {
+function dueBadgeHtml(dueDay, billId) {
   if (!dueDay) return '';
+  const paid = billId && (S.checklist[monthKey()] || {})['pay_' + billId];
+  if (paid) return `<span class="due-badge due-paid">✓ Paid</span>`;
   const urgency = dueUrgency(dueDay);
   const cls = urgency === 'overdue' ? 'due-overdue' : urgency === 'soon' ? 'due-soon' : 'due-upcoming';
   const prefix = urgency === 'overdue' ? '⚠ ' : '';
@@ -2315,7 +2318,7 @@ function renderSendCards() {
         <div class="send-card-left">
           <div class="send-bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
-            <div class="send-bill-name">${esc(bill.name)}${bill.dueDay ? '&ensp;' + dueBadgeHtml(bill.dueDay) : ''}</div>
+            <div class="send-bill-name">${esc(bill.name)}${bill.dueDay ? '&ensp;' + dueBadgeHtml(bill.dueDay, bill.id) : ''}</div>
             <div class="send-bill-amount">${billTotal > 0 ? 'My share: ' + fmtCurrency(myAmt) + ' of ' + fmtCurrency(billTotal) : 'No amount entered'}</div>
           </div>
         </div>
@@ -2428,6 +2431,7 @@ function toggleCheck(id) {
   S.checklist[k][id] = !S.checklist[k][id];
   save();
   renderChecklist();
+  if (id.startsWith('pay_')) renderBills();
 }
 
 function markCheck(id) {
@@ -2436,6 +2440,7 @@ function markCheck(id) {
   S.checklist[k][id] = true;
   save();
   renderChecklist();
+  if (id.startsWith('pay_')) renderBills();
 }
 
 // ═══════════════════════════════════════════════
