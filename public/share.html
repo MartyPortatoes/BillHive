@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>BillHive · Claim Your Share</title>
+<style>
+  :root {
+    --bg:       #f4ecda;
+    --surface:  #fbf5e8;
+    --surface2: #ede1c6;
+    --surface3: #e0d2b1;
+    --border:   #d8c8a4;
+    --border2:  #b8a578;
+    --text:     #2b1d11;
+    --text2:    #4a3826;
+    --muted:    #7a6a52;
+    --muted2:   #a08e72;
+    --amber:    #d8923e;
+    --honey-deep: #b8721e;
+    --honey-soft: #f0c073;
+    --red:      #a04a2e;
+    --green:    #5b6f3f;
+    --shadow:   rgba(73, 56, 38, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 24px 18px 80px;
+  }
+
+  /* ── Header ───────────────────────────────────────────────── */
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--honey-deep);
+    font-weight: 600; font-size: 14px;
+    margin-bottom: 22px;
+  }
+  .brand-hex {
+    width: 18px; height: 18px;
+    background: var(--amber);
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  }
+
+  h1.check-name {
+    font-size: 28px; font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .check-date {
+    color: var(--muted); font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  /* ── Cards ────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin: 0 0 18px;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 11px; font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* ── Item rows ────────────────────────────────────────────── */
+  .item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 4px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .item + .item {
+    border-top: 1px solid var(--border);
+  }
+  .item .check {
+    flex: 0 0 26px; height: 26px;
+    border-radius: 8px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .item .check svg { display: none; }
+  .item.on .check {
+    background: var(--amber);
+    border-color: var(--honey-deep);
+  }
+  .item.on .check svg {
+    display: block;
+    width: 16px; height: 16px;
+    color: var(--text);
+  }
+  .item .name {
+    flex: 1 1 auto;
+    font-size: 15px; font-weight: 500;
+  }
+  .item .price {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--text2);
+  }
+  .item.taken {
+    opacity: 0.6;
+  }
+  .item.taken .name {
+    text-decoration: line-through;
+    text-decoration-color: var(--muted2);
+  }
+  .item-claimers {
+    font-size: 11px; color: var(--muted);
+    margin-left: 38px; margin-top: -4px; margin-bottom: 8px;
+  }
+
+  /* ── Totals strip ────────────────────────────────────────── */
+  .totals {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background: var(--surface2);
+    border-radius: 10px;
+    margin-top: 8px;
+  }
+  .totals .col {
+    text-align: center;
+  }
+  .totals .label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .totals .val {
+    font-size: 15px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .totals .col.your .val {
+    color: var(--honey-deep);
+    font-size: 18px;
+  }
+
+  /* ── Name field + button ─────────────────────────────────── */
+  .name-row {
+    display: flex; gap: 10px;
+    margin-top: 12px;
+  }
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+    color: var(--text);
+    font-family: inherit;
+  }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--amber);
+  }
+  button.primary {
+    background: var(--amber);
+    border: 1px solid var(--honey-deep);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 15px; font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, transform 0.1s;
+  }
+  button.primary:hover { background: var(--honey-soft); }
+  button.primary:active { transform: scale(0.97); }
+  button.primary:disabled {
+    background: var(--surface2);
+    border-color: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  button.full {
+    display: block; width: 100%;
+    margin-top: 12px;
+  }
+
+  /* ── Claims list ─────────────────────────────────────────── */
+  .claims {
+    margin-bottom: 18px;
+  }
+  .claim-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 8px 4px;
+    font-size: 13px;
+  }
+  .claim-row + .claim-row {
+    border-top: 1px solid var(--border);
+  }
+  .claim-row .who { font-weight: 600; color: var(--text2); }
+  .claim-row .what { color: var(--muted); font-size: 12px; }
+
+  /* ── States ──────────────────────────────────────────────── */
+  .empty, .error {
+    text-align: center; padding: 60px 24px;
+  }
+  .empty .icon, .error .icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+  .error .title { color: var(--red); font-weight: 600; margin-bottom: 4px; }
+  .empty .title { color: var(--text); font-weight: 600; margin-bottom: 4px; }
+  .empty .body, .error .body { color: var(--muted); font-size: 14px; }
+
+  .toast {
+    position: fixed;
+    left: 50%; bottom: 24px;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: 22px;
+    font-size: 14px; font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+  .toast.show { opacity: 1; }
+
+  /* Dark mode tweaks — make readable on dark phones */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:       #221810;
+      --surface:  #332618;
+      --surface2: #332618;
+      --surface3: #332618;
+      --border:   #7a6442;
+      --border2:  #8a7450;
+      --text:     #f0e6d0;
+      --text2:    #d4c5a0;
+      --muted:    #a08e6e;
+      --muted2:   #786750;
+      --amber:    #7eb8d6;
+      --honey-deep: #5497b8;
+      --honey-soft: #b4d5e6;
+      --red:      #c46a4a;
+      --green:    #8aa468;
+      --shadow:   rgba(0, 0, 0, 0.25);
+    }
+    button.primary { color: #0c0d0f; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="root">
+  <div class="empty">
+    <div class="icon">🐝</div>
+    <div class="title">Loading…</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const token = location.pathname.replace(/^\/share\//, '').split(/[\/?#]/)[0];
+  const root = document.getElementById('root');
+  const toastEl = document.getElementById('toast');
+  let claimerName = localStorage.getItem('bh.share.name') || '';
+  const selected = new Set();
+  let check = null;
+  let claims = [];
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  }
+
+  function fmtMoney(n) {
+    return '$' + (Number(n) || 0).toFixed(2);
+  }
+
+  function fmtDate(iso) {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    } catch { return ''; }
+  }
+
+  // Map item id → list of claimer names so we can render "taken by Alice" inline.
+  function claimsByItem() {
+    const map = new Map();
+    for (const c of claims) {
+      for (const id of (c.itemIds || [])) {
+        if (!map.has(id)) map.set(id, []);
+        map.get(id).push(c.claimerName);
+      }
+    }
+    return map;
+  }
+
+  function render() {
+    if (!check) return;
+    const taken = claimsByItem();
+
+    // Compute claimer's share: sum of their selected items + their share of tax/tip.
+    const totalSubtotal = check.items.reduce((s, i) => s + Number(i.price || 0), 0);
+    let mySubtotal = 0;
+    for (const id of selected) {
+      const it = check.items.find(i => i.id === id);
+      if (it) mySubtotal += Number(it.price || 0);
+    }
+    const myShare = totalSubtotal > 0 ? mySubtotal / totalSubtotal : 0;
+    const myExtras = (Number(check.taxAmount) + Number(check.tipAmount)) * myShare;
+    const myTotal = mySubtotal + myExtras;
+
+    const itemsHtml = check.items.map(it => {
+      const takenBy = taken.get(it.id) || [];
+      const isOn = selected.has(it.id);
+      const cls = ['item', isOn ? 'on' : '', takenBy.length ? 'taken' : ''].filter(Boolean).join(' ');
+      return `
+        <div class="${cls}" data-id="${it.id}">
+          <div class="check">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3.5 8.5 6.6 11.6 12.6 5.2"></polyline>
+            </svg>
+          </div>
+          <div class="name">${escapeHtml(it.name || 'Item')}</div>
+          <div class="price">${fmtMoney(it.price)}</div>
+        </div>
+        ${takenBy.length ? `<div class="item-claimers">Claimed by ${escapeHtml(takenBy.join(', '))}</div>` : ''}
+      `;
+    }).join('');
+
+    const claimsHtml = claims.length ? claims.slice().reverse().map(c => {
+      const itemNames = (c.itemIds || []).map(id => {
+        const it = check.items.find(i => i.id === id);
+        return it ? it.name : null;
+      }).filter(Boolean);
+      const summary = itemNames.length
+        ? itemNames.slice(0, 2).join(', ') + (itemNames.length > 2 ? `, +${itemNames.length - 2} more` : '')
+        : 'no items selected';
+      return `
+        <div class="claim-row">
+          <div class="who">${escapeHtml(c.claimerName)}</div>
+          <div class="what">${escapeHtml(summary)}</div>
+        </div>
+      `;
+    }).join('') : '<div class="claim-row"><div class="what">No one has claimed yet — be the first!</div></div>';
+
+    root.innerHTML = `
+      <div class="brand">
+        <div class="brand-hex"></div>
+        <span>BillHive</span>
+      </div>
+
+      <h1 class="check-name">${escapeHtml(check.name)}</h1>
+      <div class="check-date">${fmtDate(check.dateISO)}</div>
+
+      <div class="card">
+        <h2>Already Claimed</h2>
+        <div class="claims" id="claims">${claimsHtml}</div>
+      </div>
+
+      <div class="card">
+        <h2>Items — tap to claim yours</h2>
+        ${itemsHtml || '<div class="empty"><div class="body">No items on this check yet.</div></div>'}
+
+        <div class="totals">
+          <div class="col">
+            <div class="label">Your subtotal</div>
+            <div class="val">${fmtMoney(mySubtotal)}</div>
+          </div>
+          <div class="col">
+            <div class="label">Tax + Tip</div>
+            <div class="val">${fmtMoney(myExtras)}</div>
+          </div>
+          <div class="col your">
+            <div class="label">Your total</div>
+            <div class="val">${fmtMoney(myTotal)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Your name</h2>
+        <div class="name-row">
+          <input type="text" id="nameInput" placeholder="e.g. Alice" value="${escapeAttr(claimerName)}" maxlength="80" />
+        </div>
+        <button class="primary full" id="confirmBtn"${selected.size === 0 || !claimerName.trim() ? ' disabled' : ''}>
+          ${selected.size === 0 ? 'Pick at least one item' : `Confirm — I'll pay ${fmtMoney(myTotal)}`}
+        </button>
+      </div>
+    `;
+
+    // Wire up taps. Items toggle. Name updates state + button.
+    root.querySelectorAll('.item').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-id');
+        if (selected.has(id)) selected.delete(id); else selected.add(id);
+        render();
+      });
+    });
+    const nameInput = document.getElementById('nameInput');
+    if (nameInput) {
+      nameInput.addEventListener('input', e => {
+        claimerName = e.target.value;
+        localStorage.setItem('bh.share.name', claimerName);
+        const btn = document.getElementById('confirmBtn');
+        if (btn) btn.disabled = selected.size === 0 || !claimerName.trim();
+      });
+    }
+    const confirmBtn = document.getElementById('confirmBtn');
+    if (confirmBtn) confirmBtn.addEventListener('click', submitClaim);
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, '&#39;');
+  }
+
+  async function submitClaim() {
+    if (selected.size === 0 || !claimerName.trim()) return;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    try {
+      const r = await fetch(`/public/share/check/${encodeURIComponent(token)}/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claimerName: claimerName.trim(),
+          itemIds: Array.from(selected),
+        }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${r.status}`);
+      }
+      toast('Claim recorded — thanks!');
+      // Refresh server state so the new claim shows in the "Already Claimed" list.
+      await load();
+      // Clear current selection so a second person on the same device starts fresh.
+      selected.clear();
+      render();
+    } catch (e) {
+      toast(e.message || 'Failed to submit');
+      btn.disabled = false;
+      render();
+    }
+  }
+
+  async function load() {
+    try {
+      const r = await fetch(`/public/share/check/${encodeURIComponent(token)}`);
+      if (r.status === 404) return showError('Link not found', 'This share link doesn\'t exist or was deleted.');
+      if (r.status === 410) return showError('Link revoked', 'The host has revoked this link. Ask them to send a new one.');
+      if (!r.ok) return showError('Couldn\'t load', `Server returned HTTP ${r.status}.`);
+      const data = await r.json();
+      check = data.check;
+      claims = data.claims || [];
+      render();
+    } catch (e) {
+      showError('Network error', e.message || 'Couldn\'t reach the server.');
+    }
+  }
+
+  function showError(title, body) {
+    root.innerHTML = `
+      <div class="brand">
+        <div class="brand-hex"></div>
+        <span>BillHive</span>
+      </div>
+      <div class="error">
+        <div class="icon">⚠️</div>
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="body">${escapeHtml(body)}</div>
+      </div>
+    `;
+  }
+
+  if (!token) showError('No token', 'This URL is missing a share token.');
+  else load();
+})();
+</script>
+</body>
+</html>

@@ -114,6 +114,23 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  -- No-account share links for restaurant checks. Each row binds a random
+  -- URL-safe token to a check inside a host's user_state JSON blob. Anyone
+  -- with the token can read the check (stripped of host-only fields) and
+  -- POST claims (a name + item IDs). Claims are stored as a JSON array
+  -- in this row, separate from the host's state so they ride their own
+  -- write path and don't get clobbered by the host's debounced save().
+  CREATE TABLE IF NOT EXISTS share_checks (
+    token       TEXT    PRIMARY KEY,
+    user_id     TEXT    NOT NULL,
+    check_id    TEXT    NOT NULL,
+    claims      TEXT    NOT NULL DEFAULT '[]',
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    revoked_at  INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_share_checks_user ON share_checks(user_id);
+  CREATE INDEX IF NOT EXISTS idx_share_checks_check ON share_checks(user_id, check_id);
 `);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
@@ -140,6 +157,13 @@ const stmts = {
   // App settings
   getSetting: db.prepare('SELECT value FROM app_settings WHERE key = ?'),
   setSetting: db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)'),
+
+  // Check share links
+  findShareByToken:           db.prepare('SELECT * FROM share_checks WHERE token = ?'),
+  findActiveShareForCheck:    db.prepare('SELECT * FROM share_checks WHERE user_id = ? AND check_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1'),
+  insertShare:                db.prepare('INSERT INTO share_checks (token, user_id, check_id, claims) VALUES (?, ?, ?, ?)'),
+  setShareClaims:             db.prepare('UPDATE share_checks SET claims = ? WHERE token = ? AND revoked_at IS NULL'),
+  revokeSharesForCheck:       db.prepare('UPDATE share_checks SET revoked_at = unixepoch() WHERE user_id = ? AND check_id = ? AND revoked_at IS NULL'),
 };
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
@@ -303,6 +327,17 @@ const emailLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Email rate limit exceeded. Try again in a minute.' },
 });
+// Public limiter for /public/share/* and /share/:token. Tighter than the
+// global limit so an attacker can't brute-force tokens by enumeration,
+// loose enough that legitimate visitors loading a claim page and posting
+// a few claim updates stay under the cap.
+const publicLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Try again later.' },
+});
 app.use(limiter);
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -445,6 +480,113 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ── No-account check share — PUBLIC endpoints ────────────────────────────────
+// Anonymous read + claim flow for restaurant check splits. Hosts generate a
+// link via POST /api/share/check/:checkId (auth required, see authed section
+// below). Visitors with the link can fetch the check + post claims without an
+// account. publicLimiter protects against token brute-force enumeration.
+
+// Pull the check object out of the host's user_state JSON blob. Returns
+// null if the user has no state, has no checks, or the requested check
+// doesn't exist. Used by the public read endpoint and the authed share
+// info endpoint.
+function getCheckFromState(userId, checkId) {
+  const row = stmts.getState.get(userId, 'checks');
+  if (!row) return null;
+  let checksState;
+  try { checksState = JSON.parse(row.value); } catch { return null; }
+  const list = (checksState && checksState.checks) || [];
+  return list.find(c => c.id === checkId) || null;
+}
+
+// Public-safe shape: keep item names + prices + name + date, drop any
+// payment / email metadata the host might add later. Participants list is
+// kept because the page shows who's already on the check, but their
+// linkedPersonId is dropped (no need to expose internal IDs).
+function publicCheckShape(check) {
+  return {
+    id: check.id,
+    name: check.name,
+    dateISO: check.dateISO,
+    items: (check.items || []).map(i => ({
+      id: i.id,
+      name: i.name,
+      price: i.price,
+    })),
+    participants: (check.participants || []).map(p => ({
+      id: p.id,
+      name: p.name,
+    })),
+    taxAmount: check.taxAmount || 0,
+    tipAmount: check.tipAmount || 0,
+  };
+}
+
+// GET /public/share/check/:token — anonymous read of a shared check.
+app.get('/public/share/check/:token', publicLimiter, (req, res) => {
+  const share = stmts.findShareByToken.get(req.params.token);
+  if (!share) return res.status(404).json({ error: 'Share not found' });
+  if (share.revoked_at) return res.status(410).json({ error: 'This share link has been revoked' });
+
+  const check = getCheckFromState(share.user_id, share.check_id);
+  if (!check) return res.status(404).json({ error: 'Check not found' });
+
+  let claims = [];
+  try { claims = JSON.parse(share.claims); } catch {}
+
+  res.json({
+    check: publicCheckShape(check),
+    claims,
+    createdAt: share.created_at,
+  });
+});
+
+// POST /public/share/check/:token/claim — anonymous claim of items.
+// Body: { claimerName: String, itemIds: [String] }. Appends a new claim
+// to the share's claims array. We don't deduplicate (a claimer can return
+// multiple times to adjust); the iOS app reconciles claims on read.
+app.post('/public/share/check/:token/claim', publicLimiter, (req, res) => {
+  const share = stmts.findShareByToken.get(req.params.token);
+  if (!share) return res.status(404).json({ error: 'Share not found' });
+  if (share.revoked_at) return res.status(410).json({ error: 'This share link has been revoked' });
+
+  const body = req.body || {};
+  const claimerName = typeof body.claimerName === 'string' ? body.claimerName.trim() : '';
+  const itemIds = Array.isArray(body.itemIds)
+    ? body.itemIds.filter(x => typeof x === 'string').slice(0, 200)
+    : [];
+  if (!claimerName || claimerName.length > 80) {
+    return res.status(400).json({ error: 'claimerName is required (1–80 chars)' });
+  }
+
+  let claims = [];
+  try { claims = JSON.parse(share.claims); } catch {}
+
+  claims.push({
+    claimerName,
+    itemIds,
+    claimedAt: new Date().toISOString(),
+  });
+
+  // Cap total claims per share to prevent unbounded growth from abuse.
+  if (claims.length > 500) claims = claims.slice(-500);
+
+  stmts.setShareClaims.run(JSON.stringify(claims), req.params.token);
+
+  // Tell the host's open SSE clients to refresh — they'll re-fetch
+  // /api/share/check/:checkId and see the new claim. C.1 leaves the
+  // iOS app at "manual refresh"; C.2 will hook this up.
+  broadcastChange(share.user_id);
+
+  res.json({ ok: true });
+});
+
+// GET /share/:token — serves the static claim page. Has to be registered
+// BEFORE the SPA fallback so /share/* doesn't fall through to index.html.
+app.get('/share/:token', publicLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'share.html'));
+});
+
 // ── Enforce auth on the rest of /api/* ────────────────────────────────────────
 // Anything below this line requires authentication when the toggle is on.
 app.use('/api', requireAuth);
@@ -558,6 +700,78 @@ app.post('/api/import', (req, res) => {
   importAll(req.userId, state, monthly);
   res.json({ ok: true });
   broadcastChange(req.userId);
+});
+
+// ── Check share links (AUTH) ─────────────────────────────────────────────────
+// Host-side endpoints for managing no-account share links. The public-facing
+// `/public/share/check/*` and `/share/:token` routes live above (before the
+// requireAuth gate). The token + URL returned by POST is what the iOS app
+// drops into the iOS share sheet.
+//
+// PUBLIC_BASE_URL env var lets self-hosters set the URL that gets embedded
+// in share links (e.g. https://billhive.example.com). Falls back to deriving
+// from the inbound request, which is correct when the user clicks Share from
+// the same network they're hosting on but wrong behind a reverse proxy with
+// a different external hostname — hence the env override.
+function publicBaseURL(req) {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+function shareInfoResponse(share, req) {
+  let claims = [];
+  try { claims = JSON.parse(share.claims); } catch {}
+  return {
+    token: share.token,
+    url: `${publicBaseURL(req)}/share/${share.token}`,
+    createdAt: share.created_at,
+    claims,
+  };
+}
+
+// POST /api/share/check/:checkId — create (or rotate) a share link.
+// If a non-revoked share already exists for this check, returns it
+// (idempotent for the simple case). Pass ?rotate=1 to force a new token
+// and revoke the previous one (useful if the user accidentally posted
+// the old link publicly).
+app.post('/api/share/check/:checkId', (req, res) => {
+  const checkId = req.params.checkId;
+  if (!getCheckFromState(req.userId, checkId)) {
+    return res.status(404).json({ error: 'Check not found' });
+  }
+
+  const rotate = req.query.rotate === '1' || req.query.rotate === 'true';
+  if (!rotate) {
+    const existing = stmts.findActiveShareForCheck.get(req.userId, checkId);
+    if (existing) return res.json(shareInfoResponse(existing, req));
+  } else {
+    stmts.revokeSharesForCheck.run(req.userId, checkId);
+  }
+
+  const token = crypto.randomBytes(24).toString('base64url');
+  stmts.insertShare.run(token, req.userId, checkId, '[]');
+  const share = stmts.findShareByToken.get(token);
+  res.json(shareInfoResponse(share, req));
+});
+
+// GET /api/share/check/:checkId — fetch the current active share + claims.
+// 404 if there's no active share. Used by the iOS app to refresh claim
+// counts after the host receives the SSE "data-changed" event (C.2)
+// or via manual refresh (C.1).
+app.get('/api/share/check/:checkId', (req, res) => {
+  const share = stmts.findActiveShareForCheck.get(req.userId, req.params.checkId);
+  if (!share) return res.status(404).json({ error: 'No active share' });
+  res.json(shareInfoResponse(share, req));
+});
+
+// DELETE /api/share/check/:checkId — revoke any active share for this check.
+// All future reads of the token return 410 Gone. Claims are kept in the row
+// for audit but the link no longer works.
+app.delete('/api/share/check/:checkId', (req, res) => {
+  stmts.revokeSharesForCheck.run(req.userId, req.params.checkId);
+  res.json({ ok: true });
 });
 
 
