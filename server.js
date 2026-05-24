@@ -131,6 +131,22 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_share_checks_user ON share_checks(user_id);
   CREATE INDEX IF NOT EXISTS idx_share_checks_check ON share_checks(user_id, check_id);
+
+  -- Per-member invite links for trip sharing. Each row binds a token to a
+  -- specific member within a trip in the host's user_state. The invitee's
+  -- device presents the token on every read/write request, so revoking
+  -- immediately cuts access with no separate session invalidation needed.
+  CREATE TABLE IF NOT EXISTS trip_invites (
+    token           TEXT    PRIMARY KEY,
+    owner_user_id   TEXT    NOT NULL,
+    trip_id         TEXT    NOT NULL,
+    member_id       TEXT    NOT NULL,
+    joined_at       INTEGER,
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+    revoked_at      INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_trip_invites_owner ON trip_invites(owner_user_id, trip_id);
+  CREATE INDEX IF NOT EXISTS idx_trip_invites_member ON trip_invites(owner_user_id, trip_id, member_id);
 `);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
@@ -164,6 +180,15 @@ const stmts = {
   insertShare:                db.prepare('INSERT INTO share_checks (token, user_id, check_id, claims) VALUES (?, ?, ?, ?)'),
   setShareClaims:             db.prepare('UPDATE share_checks SET claims = ? WHERE token = ? AND revoked_at IS NULL'),
   revokeSharesForCheck:       db.prepare('UPDATE share_checks SET revoked_at = unixepoch() WHERE user_id = ? AND check_id = ? AND revoked_at IS NULL'),
+
+  // Trip invites
+  findTripInviteByToken:      db.prepare('SELECT * FROM trip_invites WHERE token = ?'),
+  findActiveInviteForMember:  db.prepare('SELECT * FROM trip_invites WHERE owner_user_id = ? AND trip_id = ? AND member_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1'),
+  listInvitesForTrip:         db.prepare('SELECT * FROM trip_invites WHERE owner_user_id = ? AND trip_id = ? AND revoked_at IS NULL ORDER BY created_at DESC'),
+  insertTripInvite:           db.prepare('INSERT INTO trip_invites (token, owner_user_id, trip_id, member_id) VALUES (?, ?, ?, ?)'),
+  markTripInviteJoined:       db.prepare('UPDATE trip_invites SET joined_at = unixepoch() WHERE token = ? AND revoked_at IS NULL'),
+  revokeTripInvite:           db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND trip_id = ? AND member_id = ? AND revoked_at IS NULL'),
+  revokeAllTripInvites:       db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND trip_id = ? AND revoked_at IS NULL'),
 };
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
@@ -518,6 +543,9 @@ function publicCheckShape(check) {
       name: p.name,
     })),
     taxAmount: check.taxAmount || 0,
+    discountAmount: check.discountAmount || 0,
+    compAmount: check.compAmount || 0,
+    serviceFeeAmount: check.serviceFeeAmount || 0,
     tipAmount: check.tipAmount || 0,
   };
 }
@@ -578,6 +606,216 @@ app.post('/public/share/check/:token/claim', publicLimiter, (req, res) => {
   // iOS app at "manual refresh"; C.2 will hook this up.
   broadcastChange(share.user_id);
 
+  res.json({ ok: true });
+});
+
+// ── Trip invite public routes ────────────────────────────────────────────────
+// Public-facing endpoints for trip invites. The invite token acts as both
+// identity (which member) and auth (right to read/write the trip). Rate-
+// limited via publicLimiter to prevent brute-force token scanning.
+
+/// Extracts a trip from the owner's user_state by id. Returns null if
+/// the owner or trip doesn't exist.
+function getTripFromState(ownerUserId, tripId) {
+  const row = stmts.getState.get(ownerUserId, 'trips');
+  if (!row) return null;
+  try {
+    const tripsState = JSON.parse(row.value);
+    const trips = tripsState.trips || [];
+    return trips.find(t => t.id === tripId) || null;
+  } catch { return null; }
+}
+
+/// Strips a trip down to the fields safe for public sharing.
+function publicTripShape(trip) {
+  return {
+    id: trip.id,
+    name: trip.name || '',
+    startDateISO: trip.startDateISO || '',
+    endDateISO: trip.endDateISO || '',
+    currency: trip.currency || '',
+    members: (trip.members || []).map(m => ({
+      id: m.id,
+      name: m.name || '',
+    })),
+    expenses: (trip.expenses || []).map(e => ({
+      id: e.id,
+      name: e.name || '',
+      amount: e.amount || 0,
+      paidByAmounts: e.paidByAmounts || {},
+      splitBetweenIds: e.splitBetweenIds || [],
+      dateISO: e.dateISO || '',
+      category: e.category || 'other',
+      customCategoryName: e.customCategoryName || '',
+      sourceAmount: e.sourceAmount || 0,
+      sourceCurrency: e.sourceCurrency || '',
+      exchangeRate: e.exchangeRate || 1,
+      notes: e.notes || '',
+    })),
+    notes: trip.notes || '',
+    isArchived: trip.isArchived || false,
+    settlements: trip.settlements || [],
+    checklistItems: trip.checklistItems || [],
+  };
+}
+
+// GET /public/trip/invite/:token — preview the trip before joining.
+// Returns the trip data (stripped of host-only info) + invite metadata.
+app.get('/public/trip/invite/:token', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+
+  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const member = (trip.members || []).find(m => m.id === invite.member_id);
+  res.json({
+    trip: publicTripShape(trip),
+    memberId: invite.member_id,
+    memberName: member ? member.name : '',
+    joined: !!invite.joined_at,
+    createdAt: invite.created_at,
+  });
+});
+
+// POST /public/trip/invite/:token/join — claim the invite. Idempotent:
+// calling twice on an already-joined invite is a no-op success.
+app.post('/public/trip/invite/:token/join', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+
+  if (!invite.joined_at) {
+    stmts.markTripInviteJoined.run(req.params.token);
+  }
+
+  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+
+  const member = (trip.members || []).find(m => m.id === invite.member_id);
+  res.json({
+    ok: true,
+    trip: publicTripShape(trip),
+    memberId: invite.member_id,
+    memberName: member ? member.name : '',
+  });
+});
+
+// GET /public/trip/invite/:token/trip — full trip data for a joined invite.
+// The iOS app calls this to refresh the trip while the member has it open.
+app.get('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
+
+  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  res.json({ trip: publicTripShape(trip) });
+});
+
+// POST /public/trip/invite/:token/expense — add or update an expense on
+// the shared trip. Body: a full Expense object. If an expense with the
+// same id already exists, it's replaced (update); otherwise it's appended.
+app.post('/public/trip/invite/:token/expense', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
+
+  const expense = req.body;
+  if (!expense || !expense.id || typeof expense.name !== 'string') {
+    return res.status(400).json({ error: 'Invalid expense payload' });
+  }
+
+  // Read the owner's state, find the trip, mutate, and write back.
+  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
+  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
+
+  let tripsState;
+  try { tripsState = JSON.parse(stateRow.value); } catch {
+    return res.status(500).json({ error: 'Corrupt trip state' });
+  }
+
+  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
+  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
+
+  const trip = tripsState.trips[tripIdx];
+  const expenses = trip.expenses || [];
+  const existingIdx = expenses.findIndex(e => e.id === expense.id);
+  if (existingIdx >= 0) {
+    expenses[existingIdx] = expense;
+  } else {
+    expenses.unshift(expense);
+  }
+  trip.expenses = expenses;
+  tripsState.trips[tripIdx] = trip;
+
+  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
+  broadcastChange(invite.owner_user_id);
+  res.json({ ok: true });
+});
+
+// DELETE /public/trip/invite/:token/expense/:expenseId — delete a single
+// expense from the shared trip.
+app.delete('/public/trip/invite/:token/expense/:expenseId', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
+
+  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
+  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
+
+  let tripsState;
+  try { tripsState = JSON.parse(stateRow.value); } catch {
+    return res.status(500).json({ error: 'Corrupt trip state' });
+  }
+
+  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
+  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
+
+  const trip = tripsState.trips[tripIdx];
+  trip.expenses = (trip.expenses || []).filter(e => e.id !== req.params.expenseId);
+  tripsState.trips[tripIdx] = trip;
+
+  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
+  broadcastChange(invite.owner_user_id);
+  res.json({ ok: true });
+});
+
+// POST /public/trip/invite/:token/settlement — record a settlement on
+// the shared trip. Body: a SettledTransfer object.
+app.post('/public/trip/invite/:token/settlement', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
+
+  const settlement = req.body;
+  if (!settlement || !settlement.id) {
+    return res.status(400).json({ error: 'Invalid settlement payload' });
+  }
+
+  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
+  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
+
+  let tripsState;
+  try { tripsState = JSON.parse(stateRow.value); } catch {
+    return res.status(500).json({ error: 'Corrupt trip state' });
+  }
+
+  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
+  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
+
+  const trip = tripsState.trips[tripIdx];
+  if (!trip.settlements) trip.settlements = [];
+  trip.settlements.push(settlement);
+  tripsState.trips[tripIdx] = trip;
+
+  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
+  broadcastChange(invite.owner_user_id);
   res.json({ ok: true });
 });
 
@@ -682,7 +920,7 @@ app.post('/api/import', (req, res) => {
   const { state, monthly } = req.body || {};
   // Whitelist state keys we manage; reject anything else so a crafted backup
   // can't pollute user_state with arbitrary rows.
-  const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist']);
+  const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist', 'requestDates', 'checks', 'trips']);
   const importAll = db.transaction((userId, s, m) => {
     if (s && typeof s === 'object') {
       for (const [k, v] of Object.entries(s)) {
@@ -771,6 +1009,77 @@ app.get('/api/share/check/:checkId', (req, res) => {
 // for audit but the link no longer works.
 app.delete('/api/share/check/:checkId', (req, res) => {
   stmts.revokeSharesForCheck.run(req.userId, req.params.checkId);
+  res.json({ ok: true });
+});
+
+
+// ── Trip invite links (AUTH) ─────────────────────────────────────────────────
+// Host-side endpoints for managing per-member trip invites. Same pattern as
+// check share links: POST creates, GET lists, DELETE revokes. The public-
+// facing endpoints live above the auth gate.
+
+// POST /api/trips/:tripId/invite — create a per-member invite link.
+// Body: { memberId }. Idempotent if an active invite already exists for
+// this member — returns the existing token. Pass ?rotate=1 to revoke any
+// prior invite for that member and mint a fresh one.
+app.post('/api/trips/:tripId/invite', (req, res) => {
+  const { tripId } = req.params;
+  const { memberId } = req.body || {};
+  if (!memberId) return res.status(400).json({ error: 'memberId is required' });
+
+  const trip = getTripFromState(req.userId, tripId);
+  if (!trip) return res.status(404).json({ error: 'Trip not found' });
+  if (!(trip.members || []).find(m => m.id === memberId)) {
+    return res.status(404).json({ error: 'Member not found on this trip' });
+  }
+
+  const rotate = req.query.rotate === '1' || req.query.rotate === 'true';
+  if (!rotate) {
+    const existing = stmts.findActiveInviteForMember.get(req.userId, tripId, memberId);
+    if (existing) {
+      return res.json({
+        token: existing.token,
+        memberId: existing.member_id,
+        joined: !!existing.joined_at,
+        createdAt: existing.created_at,
+      });
+    }
+  } else {
+    stmts.revokeTripInvite.run(req.userId, tripId, memberId);
+  }
+
+  const token = crypto.randomBytes(24).toString('base64url');
+  stmts.insertTripInvite.run(token, req.userId, tripId, memberId);
+  const invite = stmts.findTripInviteByToken.get(token);
+  res.json({
+    token: invite.token,
+    memberId: invite.member_id,
+    joined: !!invite.joined_at,
+    createdAt: invite.created_at,
+  });
+});
+
+// GET /api/trips/:tripId/invites — list all active invites for a trip.
+app.get('/api/trips/:tripId/invites', (req, res) => {
+  const invites = stmts.listInvitesForTrip.all(req.userId, req.params.tripId);
+  res.json(invites.map(inv => ({
+    token: inv.token,
+    memberId: inv.member_id,
+    joined: !!inv.joined_at,
+    createdAt: inv.created_at,
+  })));
+});
+
+// DELETE /api/trips/:tripId/invite/:memberId — revoke an invite for a
+// specific member. The member immediately loses access on their next request.
+app.delete('/api/trips/:tripId/invite/:memberId', (req, res) => {
+  stmts.revokeTripInvite.run(req.userId, req.params.tripId, req.params.memberId);
+  res.json({ ok: true });
+});
+
+// DELETE /api/trips/:tripId/invites — revoke ALL invites for a trip.
+app.delete('/api/trips/:tripId/invites', (req, res) => {
+  stmts.revokeAllTripInvites.run(req.userId, req.params.tripId);
   res.json({ ok: true });
 });
 
