@@ -507,7 +507,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
     </div>
 
     <div class="card">
-      <div class="card-head"><div class="card-title">Full Bill Breakdown</div></div>
+      <div class="card-head">
+        <div class="card-title">Full Bill Breakdown</div>
+        <button class="btn btn-ghost btn-sm" data-click="printBillBreakdown()">Print / PDF</button>
+      </div>
       <div id="fullBreakdown"></div>
     </div>
   </div>
@@ -910,6 +913,7 @@ let S = {
   ],
   monthly: {},   // key: "YYYY-MM" → { totals:{billId:number}, amounts:{billId:{lineId:number}} }
   checklist: {}, // key: "YYYY-MM" → { itemId: bool }
+  requestDates: {}, // key: "YYYY-MM" → { personId: ISO date string }
 };
 
 // ═══════════════════════════════════════════════
@@ -1044,6 +1048,7 @@ function _initEvtFns() {
     toggleReceiveCard, openZelle, openVenmo, openCashApp,
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
     togglePayReceived,
+    requestPayment, printBillBreakdown,
     setTrendsView, setTrendsMonthLimit,
     setThemePref, toggleSettingsGroup, setSummaryView,
     closeBhModal, _modalCancel, _modalOk,
@@ -1125,6 +1130,7 @@ async function _flushState() {
         people:   S.people,
         bills:    S.bills,
         checklist: S.checklist,
+        requestDates: S.requestDates,
       })
     });
   } catch(e) { console.warn('State save failed:', e); }
@@ -1163,6 +1169,31 @@ function normalizeState() {
     });
     save();
   }
+  normalizePaymentTrackingState();
+}
+
+function normalizePaymentTrackingState() {
+  if (!S.requestDates || typeof S.requestDates !== 'object') S.requestDates = {};
+  if (!S.checklist || typeof S.checklist !== 'object') S.checklist = {};
+
+  // Older web builds stored "payment received" under monthly.payReceived.
+  // iOS uses checklist[month]["received_<personId>"], so migrate in memory
+  // and keep the older snapshot untouched for backward compatibility.
+  let changed = false;
+  Object.entries(S.monthly || {}).forEach(([key, monthData]) => {
+    const payReceived = monthData && monthData.payReceived;
+    if (!payReceived || typeof payReceived !== 'object') return;
+    if (!S.checklist[key]) S.checklist[key] = {};
+    Object.entries(payReceived).forEach(([personId, received]) => {
+      if (!received) return;
+      const itemId = 'received_' + personId;
+      if (!(itemId in S.checklist[key])) {
+        S.checklist[key][itemId] = true;
+        changed = true;
+      }
+    });
+  });
+  if (changed) save();
 }
 
 async function load() {
@@ -1175,6 +1206,7 @@ async function load() {
       if (parsed.people)    S.people   = parsed.people;
       if (parsed.bills)     S.bills    = parsed.bills;
       if (parsed.checklist) S.checklist = parsed.checklist;
+      if (parsed.requestDates) S.requestDates = parsed.requestDates;
     }
     // Load all months for trend data
     const monthsRes = await fetch(`${API}/months`);
@@ -1249,6 +1281,7 @@ async function _reloadFromServer() {
   _reloading = true;
   try {
     await load();
+    normalizeState();
     // renderBills() → recalcAll() → saveMonthSnapshot() but saveMonthSnapshot
     // checks _reloading and skips writes, so no broadcast → no loop.
     renderBills();
@@ -1373,6 +1406,39 @@ function computeMyTotal() {
     total += split['me'] || 0;
   });
   return total;
+}
+
+function ensureChecklistMonth(key = monthKey()) {
+  if (!S.checklist[key]) S.checklist[key] = {};
+  return S.checklist[key];
+}
+
+function isPaymentReceived(personId, key = monthKey()) {
+  return !!(S.checklist[key] && S.checklist[key]['received_' + personId]);
+}
+
+function setPaymentReceived(personId, received, key = monthKey()) {
+  const cl = ensureChecklistMonth(key);
+  cl['received_' + personId] = !!received;
+  if (received && S.requestDates[key]) {
+    delete S.requestDates[key][personId];
+  }
+}
+
+function recordPaymentRequest(personId, key = monthKey()) {
+  if (!S.requestDates[key]) S.requestDates[key] = {};
+  S.requestDates[key][personId] = new Date().toISOString();
+  save();
+  renderReceiveCards();
+  renderSummary();
+}
+
+function requestDateLabel(personId, key = monthKey()) {
+  const raw = S.requestDates[key]?.[personId];
+  if (!raw) return '';
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 // ═══════════════════════════════════════════════
@@ -1706,12 +1772,12 @@ function dueBadgeHtml(dueDay, billId) {
 // Toggle "payment received from this person" for the current month
 function togglePayReceived(personId) {
   const k = monthKey();
-  if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
-  if (!S.monthly[k].payReceived) S.monthly[k].payReceived = {};
-  S.monthly[k].payReceived[personId] = !S.monthly[k].payReceived[personId];
-  saveMonthNow(k, S.monthly[k]);
+  const next = !isPaymentReceived(personId, k);
+  setPaymentReceived(personId, next, k);
+  save();
   renderReceiveCards();
   renderSummary();
+  toast(next ? 'Payment marked received' : 'Payment marked unpaid');
 }
 
 function onTotalInput(billId, val) {
@@ -1981,9 +2047,8 @@ function renderSummary() {
 
   // Payment progress indicator
   const mk = monthKey();
-  const payReceived = S.monthly[mk]?.payReceived || {};
   const owing = S.people.filter(p => p.id !== 'me' && (owes[p.id]?.total || 0) > 0);
-  const paidCount = owing.filter(p => payReceived[p.id]).length;
+  const paidCount = owing.filter(p => isPaymentReceived(p.id, mk)).length;
   const progressEl = document.getElementById('paymentProgress');
   if (progressEl) {
     if (owing.length > 0) {
@@ -2005,7 +2070,7 @@ function renderSummary() {
   S.people.filter(p => p.id !== 'me').forEach(person => {
     const d = owes[person.id] || { total:0, bills:[] };
     if (d.total === 0) return;
-    const isPaid = !!payReceived[person.id];
+    const isPaid = isPaymentReceived(person.id, mk);
     const billList = d.bills.map(b=>`${b.name}: ${fmtCurrency(b.amount)}`).join(' · ');
     const card = document.createElement('div');
     card.className = 'person-summary-card';
@@ -2069,6 +2134,76 @@ function renderSummary() {
   }
 }
 
+function printBillBreakdown() {
+  const billsWithTotals = S.bills.filter(bill => getBillTotal(bill.id) > 0);
+  if (!billsWithTotals.length) {
+    toast('Enter bill amounts before exporting the breakdown');
+    return;
+  }
+
+  const myTotal = computeMyTotal();
+  const rows = billsWithTotals.map(bill => {
+    const split = computeBillSplit(bill);
+    const peopleRows = S.people.map(p => {
+      const amt = split[p.id] || 0;
+      if (!amt) return '';
+      return `<tr><td><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.name)}</td><td>${fmtCurrency(amt)}</td></tr>`;
+    }).join('');
+    return `
+      <section>
+        <h2><span style="color:${esc(bill.color)}">${esc(bill.icon)}</span> ${esc(bill.name)}</h2>
+        <div class="total">${fmtCurrency(getBillTotal(bill.id))} total</div>
+        <table>${peopleRows}</table>
+      </section>`;
+  }).join('');
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    toast('Allow pop-ups to print or save this PDF');
+    return;
+  }
+
+  const title = `BillHive breakdown - ${monthLabelLong(monthKey())}`;
+  w.document.open();
+  w.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${esc(title)}</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#221810;margin:32px;line-height:1.45;}
+    header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #d8c8a4;padding-bottom:16px;margin-bottom:20px;}
+    h1{font-size:22px;margin:0 0 4px;}
+    .muted{color:#7a6a52;font-size:12px;}
+    .grand{font-size:22px;font-weight:700;color:#d8923e;text-align:right;}
+    section{break-inside:avoid;border-bottom:1px solid #ede1c6;padding:16px 0;}
+    h2{font-size:15px;margin:0 0 4px;}
+    .total{font-size:12px;color:#7a6a52;margin-bottom:8px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    td{padding:6px 0;border-top:1px solid #f1e5cc;}
+    td:last-child{text-align:right;font-variant-numeric:tabular-nums;}
+    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;}
+    @media print{body{margin:20mm;}button{display:none;}}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Full Bill Breakdown</h1>
+      <div class="muted">${esc(monthLabelLong(monthKey()))} · ${esc(_currentUser)}</div>
+    </div>
+    <div>
+      <div class="muted">Total I pay</div>
+      <div class="grand">${fmtCurrency(myTotal)}</div>
+    </div>
+  </header>
+  ${rows}
+  <script>setTimeout(() => { window.focus(); window.print(); }, 250);<\/script>
+</body>
+</html>`);
+  w.document.close();
+}
+
 // ═══════════════════════════════════════════════
 //  SEND & RECEIVE
 // ═══════════════════════════════════════════════
@@ -2095,26 +2230,27 @@ function renderReceiveCards() {
   }
 
   const k = monthKey();
-  const payReceived = S.monthly[k]?.payReceived || {};
 
   container.innerHTML = people.map(person => {
     const d = owes[person.id] || { total:0, bills:[] };
-    const isPaid = !!payReceived[person.id];
-    const payDesc = person.payMethod === 'zelle'
+    const isPaid = isPaymentReceived(person.id, k);
+    const reqLabel = requestDateLabel(person.id, k);
+    const payDescBase = person.payMethod === 'zelle'
       ? 'Zelle · ' + (person.payId || 'set ID in Settings')
       : person.payMethod === 'venmo'
       ? 'Venmo · ' + (person.payId || 'set handle in Settings')
       : person.payMethod === 'cashapp'
       ? 'Cash App · ' + (person.payId || 'set $cashtag in Settings')
       : 'Manual';
+    const payDesc = reqLabel ? payDescBase + ' · requested ' + reqLabel : payDescBase;
 
     let payBtn = '';
     if (person.payMethod === 'zelle') {
-      payBtn = `<button class="btn btn-blue btn-sm" data-click="openZelle('${person.id}');markCheck('zelle_${person.id}')">💰 Zelle</button>`;
+      payBtn = `<button class="btn btn-blue btn-sm" data-click="requestPayment('${person.id}')">💰 Zelle</button>`;
     } else if (person.payMethod === 'venmo') {
-      payBtn = `<button class="btn btn-orange btn-sm" data-click="openVenmo('${person.id}');markCheck('venmo_${person.id}')">💸 Venmo</button>`;
+      payBtn = `<button class="btn btn-orange btn-sm" data-click="requestPayment('${person.id}')">💸 Venmo</button>`;
     } else if (person.payMethod === 'cashapp') {
-      payBtn = `<button class="btn btn-green btn-sm" data-click="openCashApp('${person.id}');markCheck('cashapp_${person.id}')">💵 Cash App</button>`;
+      payBtn = `<button class="btn btn-green btn-sm" data-click="requestPayment('${person.id}')">💵 Cash App</button>`;
     }
 
     const emailBtn = person.email
@@ -2124,6 +2260,9 @@ function renderReceiveCards() {
     const billRows = d.bills.map(b =>
       `<div class="receive-bill-row"><span style="color:var(--muted)">${esc(b.name)}</span><span style="color:var(--text)">${fmtCurrency(b.amount)}</span></div>`
     ).join('');
+    const requestedHtml = reqLabel
+      ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-style:italic;margin-top:10px;">✈ Requested ${esc(reqLabel)}</div>`
+      : '';
 
     const paidToggle = `<span class="paid-badge ${isPaid ? '' : 'unpaid'}" data-click="event.stopPropagation();togglePayReceived('${person.id}')" title="${isPaid ? 'Mark as unpaid' : 'Mark payment received'}">${isPaid ? '✓ Paid' : 'Mark Paid'}</span>`;
 
@@ -2148,12 +2287,14 @@ function renderReceiveCards() {
         <div class="receive-body">
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Bill Breakdown</div>
           ${billRows}
+          ${requestedHtml}
           <div style="margin-top:16px;">
             <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Email preview</div>
             <div class="email-box" style="font-size:11px;max-height:160px;white-space:pre-wrap;">${buildPersonEmail(person.id)}</div>
             <div class="action-row">
               <button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Open in Mail</button>
               <button class="btn btn-ghost btn-sm" data-click="copyPersonEmail('${person.id}')">📋 Copy</button>
+              ${payBtn ? `<button class="btn btn-green btn-sm" data-click="requestPayment('${person.id}')">Request via ${esc(person.payMethod === 'cashapp' ? 'Cash App' : person.payMethod === 'venmo' ? 'Venmo' : 'Zelle')}</button>` : ''}
             </div>
           </div>
         </div>
@@ -2208,7 +2349,7 @@ async function openPersonEmail(personId) {
   }
 
   // Show sending indicator
-  const btns = document.querySelectorAll(`[onclick*="openPersonEmail('${personId}')"]`);
+  const btns = document.querySelectorAll(`[data-click*="openPersonEmail('${personId}')"]`);
   btns.forEach(b => { b.textContent = '⏳ Sending…'; b.disabled = true; });
 
   try {
@@ -2232,6 +2373,7 @@ async function openPersonEmail(personId) {
     const data = await res.json();
     if (res.ok) {
       markCheck('email_' + personId);
+      recordPaymentRequest(personId);
       toast('✓ Email sent to ' + person.name + ' (' + person.email + ')');
       btns.forEach(b => { b.textContent = '✓ Sent'; b.style.color = 'var(--green)'; });
     } else {
@@ -2240,6 +2382,8 @@ async function openPersonEmail(personId) {
         const body = buildPersonEmail(personId);
         const subject = encodeURIComponent('Bills for ' + monthLabelLong(monthKey()));
         window.open('mailto:' + person.email + '?subject=' + subject + '&body=' + encodeURIComponent(body));
+        markCheck('email_' + personId);
+        recordPaymentRequest(personId);
         toast('No relay configured — opening mail client instead');
         btns.forEach(b => { b.textContent = '✉️ Email'; b.disabled = false; });
       } else {
@@ -2303,6 +2447,23 @@ function openCashApp(personId) {
   toast('Cash App opened — request ' + fmtCurrency(parseFloat(amt)) + ' from ' + person.name);
 }
 
+function requestPayment(personId) {
+  const person = getPerson(personId);
+  recordPaymentRequest(personId);
+  if (person.payMethod === 'zelle') {
+    markCheck('zelle_' + personId);
+    openZelle(personId);
+  } else if (person.payMethod === 'venmo') {
+    markCheck('venmo_' + personId);
+    openVenmo(personId);
+  } else if (person.payMethod === 'cashapp') {
+    markCheck('cashapp_' + personId);
+    openCashApp(personId);
+  } else {
+    toast('Payment request date recorded for ' + person.name);
+  }
+}
+
 // ── SEND section ────────────────────────────────
 function renderSendCards() {
   const container = document.getElementById('sendCards');
@@ -2336,11 +2497,11 @@ function renderSendCards() {
     const url = bill.payUrl || '';
     const hasUrl = url.length > 0;
 
-    // Only allow http(s) URLs — block javascript: and other dangerous protocols
-    const safePayUrl = hasUrl && /^https?:\/\//i.test(url) ? esc(url) : '';
+    // Only allow https URLs, matching the iOS bhSafeWebURL posture.
+    const safePayUrl = hasUrl ? safeWebUrl(url) : '';
     const payBtn = safePayUrl
-      ? `<a class="btn btn-green btn-sm" href="${safePayUrl}" target="_blank" rel="noopener" data-click="markCheck('pay_${bill.id}')">Pay ↗</a>`
-      : `<span style="font-size:10px;color:var(--muted2)">${hasUrl ? 'Invalid URL (must start with http)' : 'Add URL to get Pay button'}</span>`;
+      ? `<a class="btn btn-green btn-sm" href="${esc(safePayUrl)}" target="_blank" rel="noopener" data-click="markCheck('pay_${bill.id}')">Pay ↗</a>`
+      : `<span style="font-size:10px;color:var(--muted2)">${hasUrl ? 'Invalid URL (must start with https://)' : 'Add URL to get Pay button'}</span>`;
 
     return `
       <div class="send-card">
@@ -3201,7 +3362,7 @@ async function importData(file) {
 function clearAll() {
   showConfirm('Reset ALL data for "' + _currentUser + '"? This cannot be undone.', async ok => {
     if (!ok) return;
-    await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{}}) });
+    await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{},requestDates:{}}) });
     location.reload();
   }, { okLabel:'Reset', danger:true });
 }

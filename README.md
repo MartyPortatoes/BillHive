@@ -49,11 +49,13 @@
 - **Zelle, Venmo, and Cash App** deep-links auto-generated with the exact amount pre-filled
 - Custom Zelle URLs supported for banks with their own enrollment flows
 - One-click **HTML email summaries** sent to each person with their itemized bill breakdown
+- Payment request dates and paid/unpaid status sync with the SelfHive iOS app
 - Supports **Mailgun, SendGrid, Resend, and SMTP** — API keys stored server-side, never exposed to the browser
 - Per-person greetings configurable from Settings
 
 **Tracking & history**
 - Summary tab shows each person's total owed with a full bill-by-bill breakdown
+- Full Bill Breakdown can be printed or saved as a PDF from the Summary tab
 - **Trend charts** — per-person and per-bill views with line charts, donut breakdowns, and stacked bar charts powered by Chart.js
 - **Monthly checklist** auto-generated from your people and bills — tracks what's been emailed, paid, and collected
 
