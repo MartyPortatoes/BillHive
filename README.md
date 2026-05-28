@@ -56,6 +56,7 @@
 **Tracking & history**
 - Summary tab shows each person's total owed with a full bill-by-bill breakdown
 - Full Bill Breakdown can be printed or saved as a PDF from the Summary tab
+- Read-only **Checks** and **Trips** tabs display iOS restaurant checks, travel expenses, balances, and suggested settlements when those modes are synced
 - **Trend charts** — per-person and per-bill views with line charts, donut breakdowns, and stacked bar charts powered by Chart.js
 - **Monthly checklist** auto-generated from your people and bills — tracks what's been emailed, paid, and collected
 
@@ -180,7 +181,7 @@ Auth: every `/api/*` request must authenticate via one of: `Authorization: Beare
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/health` | Health check + current user + whether device keys are required *(public)* |
-| GET | `/api/state` | Load config (settings, people, bills, checklist) |
+| GET | `/api/state` | Load config and synced mode state (settings, people, bills, checklist, checks, trips) |
 | PUT | `/api/state` | Save full config |
 | PATCH | `/api/state/:key` | Save a single config key |
 | GET | `/api/months` | All monthly data |

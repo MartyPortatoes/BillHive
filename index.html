@@ -377,6 +377,30 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .paid-badge:hover{background:color-mix(in srgb,var(--green) 20%,transparent);}
 .paid-badge.unpaid{background:transparent;color:var(--muted);border-color:var(--border);}
 
+/* ── CHECKS / TRIPS OVERVIEWS ── */
+.mode-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.mode-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.mode-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;}
+.mode-stat-val{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;}
+.mode-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+.mode-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);}
+.mode-title-row{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap;}
+.mode-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.01em;}
+.mode-meta{font-size:10px;color:var(--muted);margin-top:3px;}
+.mode-money{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+.mode-body{padding:12px 18px 16px;background:var(--surface2);}
+.mode-section-title{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:4px 0 8px;}
+.mode-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.mode-row:last-child{border-bottom:none;}
+.mode-row-name{font-size:12px;color:var(--text);font-weight:500;}
+.mode-row-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.mode-row-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--green);font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.mode-row-val.negative{color:var(--orange);}
+.mode-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface3);color:var(--muted);border-radius:4px;padding:1px 6px;font-size:9px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;}
+.mode-chip.good{color:var(--paid);border-color:color-mix(in srgb,var(--paid) 35%,transparent);background:color-mix(in srgb,var(--paid) 12%,transparent);}
+.mode-chip.warn{color:var(--orange);border-color:color-mix(in srgb,var(--orange) 35%,transparent);background:color-mix(in srgb,var(--orange) 12%,transparent);}
+.mode-notes{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+
 /* ── EMPTY STATE (legacy single-line) ── */
 .empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:12px;}
 .empty-icon{font-size:32px;margin-bottom:8px;}
@@ -421,6 +445,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   .bill-my-share{display:none;}
   .line-items-head,.line-item{grid-template-columns:120px 1fr 100px 28px;}
   .line-item-owed{display:none;}
+  .mode-stats{grid-template-columns:1fr;}
+  .mode-card-head{align-items:flex-start;}
+  .mode-money{font-size:18px;}
 }
 </style>
 </head>
@@ -463,6 +490,8 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   <div class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></div>
   <div class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="2.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="4.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="13.3" x2="15" y2="13.3"/></svg> Summary</div>
   <div class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Pay &amp; Collect</div>
+  <div class="tab" data-page="checks"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg> Checks <span class="badge" id="tab-badge-checks">0</span></div>
+  <div class="tab" data-page="trips"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg> Trips <span class="badge" id="tab-badge-trips">0</span></div>
   <div class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</div>
   <div class="tab" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="14.5" y2="4"/><line x1="1.5" y1="8" x2="14.5" y2="8"/><line x1="1.5" y1="12" x2="14.5" y2="12"/><circle cx="10" cy="4" r="1.75"/><circle cx="5" cy="8" r="1.75"/><circle cx="11" cy="12" r="1.75"/></svg> Settings</div>
 </nav>
@@ -548,6 +577,20 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   </div>
 
   <div id="sendCards"></div>
+</div>
+
+<!-- ════════════════ CHECKS ════════════════ -->
+<div id="page-checks" class="page">
+  <div class="page-title">Checks</div>
+  <div class="page-sub">Restaurant checks from your SelfHive iOS data.</div>
+  <div id="checksOverview"></div>
+</div>
+
+<!-- ════════════════ TRIPS ════════════════ -->
+<div id="page-trips" class="page">
+  <div class="page-title">Trips</div>
+  <div class="page-sub">Travel expenses and balances from your SelfHive iOS data.</div>
+  <div id="tripsOverview"></div>
 </div>
 
 <!-- ════════════════ TRENDS ════════════════ -->
@@ -914,6 +957,9 @@ let S = {
   monthly: {},   // key: "YYYY-MM" → { totals:{billId:number}, amounts:{billId:{lineId:number}} }
   checklist: {}, // key: "YYYY-MM" → { itemId: bool }
   requestDates: {}, // key: "YYYY-MM" → { personId: ISO date string }
+  checks: { checks: [] },
+  trips: { trips: [], sharedTrips: [] },
+  sharedBills: [],
 };
 
 // ═══════════════════════════════════════════════
@@ -1175,6 +1221,12 @@ function normalizeState() {
 function normalizePaymentTrackingState() {
   if (!S.requestDates || typeof S.requestDates !== 'object') S.requestDates = {};
   if (!S.checklist || typeof S.checklist !== 'object') S.checklist = {};
+  if (!S.checks || typeof S.checks !== 'object') S.checks = { checks: [] };
+  if (!Array.isArray(S.checks.checks)) S.checks.checks = [];
+  if (!S.trips || typeof S.trips !== 'object') S.trips = { trips: [], sharedTrips: [] };
+  if (!Array.isArray(S.trips.trips)) S.trips.trips = [];
+  if (!Array.isArray(S.trips.sharedTrips)) S.trips.sharedTrips = [];
+  if (!Array.isArray(S.sharedBills)) S.sharedBills = [];
 
   // Older web builds stored "payment received" under monthly.payReceived.
   // iOS uses checklist[month]["received_<personId>"], so migrate in memory
@@ -1207,6 +1259,9 @@ async function load() {
       if (parsed.bills)     S.bills    = parsed.bills;
       if (parsed.checklist) S.checklist = parsed.checklist;
       if (parsed.requestDates) S.requestDates = parsed.requestDates;
+      if (parsed.checks && typeof parsed.checks === 'object') S.checks = parsed.checks;
+      if (parsed.trips && typeof parsed.trips === 'object') S.trips = parsed.trips;
+      if (Array.isArray(parsed.sharedBills)) S.sharedBills = parsed.sharedBills;
     }
     // Load all months for trend data
     const monthsRes = await fetch(`${API}/months`);
@@ -1285,6 +1340,8 @@ async function _reloadFromServer() {
     // renderBills() → recalcAll() → saveMonthSnapshot() but saveMonthSnapshot
     // checks _reloading and skips writes, so no broadcast → no loop.
     renderBills();
+    renderChecks();
+    renderTrips();
     renderSettings();
   } finally {
     _reloading = false;
@@ -1439,6 +1496,388 @@ function requestDateLabel(personId, key = monthKey()) {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════
+//  CHECKS / TRIPS READ-ONLY OVERVIEWS
+// ═══════════════════════════════════════════════
+function asNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+function asList(value) {
+  if (Array.isArray(value)) return value.filter(v => v != null);
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).filter(([, v]) => !!v).map(([k]) => k);
+}
+function uniqueList(list) {
+  return [...new Set(list.filter(v => v != null && v !== ''))];
+}
+function dateFromISO(value) {
+  if (!value) return null;
+  if (typeof value === 'number' && value > 0 && value < 1000000000000) {
+    return new Date(value * 1000);
+  }
+  if (typeof value === 'string') {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function shortDate(value) {
+  const date = dateFromISO(value);
+  if (!date) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function dateRangeLabel(start, end) {
+  const s = shortDate(start);
+  const e = shortDate(end);
+  if (s && e && s !== e) return `${s} – ${e}`;
+  return s || e || '';
+}
+function fmtCurrencyFor(value, currencyCode) {
+  const code = (currencyCode || getResolvedCurrency() || 'USD').toUpperCase();
+  try {
+    return new Intl.NumberFormat(navigator.language || 'en-US', { style:'currency', currency:code }).format(value);
+  } catch {
+    return fmtCurrency(value);
+  }
+}
+function fmtSignedCurrencyFor(value, currencyCode) {
+  const abs = fmtCurrencyFor(Math.abs(value), currencyCode);
+  if (value > 0.005) return `+${abs}`;
+  if (value < -0.005) return `-${abs}`;
+  return fmtCurrencyFor(0, currencyCode);
+}
+
+function checksList() {
+  return Array.isArray(S.checks?.checks) ? S.checks.checks : [];
+}
+function checkParticipants(check) {
+  return Array.isArray(check?.participants) ? check.participants : [];
+}
+function checkItems(check) {
+  return Array.isArray(check?.items) ? check.items : [];
+}
+function checkPaidIds(check) {
+  return new Set(asList(check?.paidParticipantIds));
+}
+function checkSubtotal(check) {
+  return checkItems(check).reduce((sum, item) => sum + asNumber(item.price ?? item.amount), 0);
+}
+function checkCreditAmount(check) {
+  const subtotal = checkSubtotal(check);
+  const credits = asNumber(check?.discountAmount) + asNumber(check?.compAmount);
+  return Math.min(Math.max(0, credits), subtotal);
+}
+function checkAdjustmentTotal(check) {
+  return asNumber(check?.taxAmount) + asNumber(check?.tipAmount) + asNumber(check?.serviceFeeAmount) - checkCreditAmount(check);
+}
+function checkGrandTotal(check) {
+  return Math.max(0, checkSubtotal(check) + checkAdjustmentTotal(check));
+}
+function checkItemAssigneeIds(check, item) {
+  const explicit = asList(item?.sharedByParticipantIds);
+  if (explicit.length) return explicit;
+  return checkParticipants(check).map(p => p.id);
+}
+function checkParticipantSubtotal(check, participantId) {
+  return checkItems(check).reduce((sum, item) => {
+    const assignees = checkItemAssigneeIds(check, item);
+    if (!assignees.includes(participantId) || assignees.length === 0) return sum;
+    return sum + asNumber(item.price ?? item.amount) / assignees.length;
+  }, 0);
+}
+function checkParticipantTotal(check, participantId) {
+  const subtotal = checkSubtotal(check);
+  const participantSubtotal = checkParticipantSubtotal(check, participantId);
+  if (subtotal <= 0) return Math.max(0, participantSubtotal);
+  return Math.max(0, participantSubtotal + (checkAdjustmentTotal(check) * participantSubtotal / subtotal));
+}
+
+function renderChecks() {
+  const container = document.getElementById('checksOverview');
+  if (!container) return;
+  const checks = checksList().slice().sort((a, b) => {
+    const ad = dateFromISO(a.dateISO)?.getTime() || 0;
+    const bd = dateFromISO(b.dateISO)?.getTime() || 0;
+    return bd - ad;
+  });
+  updateTabBadge();
+
+  if (!checks.length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">▤</div>
+      <div class="empty-state-title">No checks yet</div>
+      <div class="empty-state-sub">Checks created in the iOS app will appear here after sync.</div>
+    </div>`;
+    return;
+  }
+
+  const active = checks.filter(c => !c.isCompleted).length;
+  const total = checks.reduce((sum, check) => sum + checkGrandTotal(check), 0);
+  const stats = `<div class="mode-stats">
+    <div class="mode-stat"><div class="mode-stat-label">Total Checks</div><div class="mode-stat-val">${checks.length}</div></div>
+    <div class="mode-stat"><div class="mode-stat-label">Open</div><div class="mode-stat-val">${active}</div></div>
+    <div class="mode-stat"><div class="mode-stat-label">Grand Total</div><div class="mode-stat-val">${fmtCurrency(total)}</div></div>
+  </div>`;
+
+  const cards = checks.map(check => {
+    const participants = checkParticipants(check);
+    const paid = checkPaidIds(check);
+    const requestDates = check.paymentRequestDates && typeof check.paymentRequestDates === 'object' ? check.paymentRequestDates : {};
+    const rows = participants.length ? participants.map(participant => {
+      const amount = checkParticipantTotal(check, participant.id);
+      const requested = shortDate(requestDates[participant.id]);
+      const chip = paid.has(participant.id)
+        ? `<span class="mode-chip good">Paid</span>`
+        : requested
+          ? `<span class="mode-chip warn">Requested ${esc(requested)}</span>`
+          : `<span class="mode-chip">Open</span>`;
+      return `<div class="mode-row">
+        <div>
+          <div class="mode-row-name">${esc(participant.name || participant.id)} ${chip}</div>
+          <div class="mode-row-sub">${esc(checkParticipantSubtotal(check, participant.id).toFixed(2))} subtotal share</div>
+        </div>
+        <div class="mode-row-val">${fmtCurrency(amount)}</div>
+      </div>`;
+    }).join('') : `<div class="mode-row"><div class="mode-row-name">No participants</div><div class="mode-row-val">${fmtCurrency(checkGrandTotal(check))}</div></div>`;
+
+    const metaBits = [
+      shortDate(check.dateISO),
+      `${checkItems(check).length} item${checkItems(check).length === 1 ? '' : 's'}`,
+      `${participants.length} participant${participants.length === 1 ? '' : 's'}`
+    ].filter(Boolean);
+    const shareChip = (check.shareURL || check.shareToken) ? `<span class="mode-chip">Shared</span>` : '';
+    const statusChip = check.isCompleted ? `<span class="mode-chip good">Completed</span>` : `<span class="mode-chip warn">Open</span>`;
+    return `<div class="mode-card">
+      <div class="mode-card-head">
+        <div>
+          <div class="mode-title-row">
+            <div class="mode-title">${esc(check.name || 'Untitled Check')}</div>
+            ${statusChip}
+            ${shareChip}
+          </div>
+          <div class="mode-meta">${esc(metaBits.join(' · '))}</div>
+        </div>
+        <div class="mode-money">${fmtCurrency(checkGrandTotal(check))}</div>
+      </div>
+      <div class="mode-body">
+        <div class="mode-section-title">Participants</div>
+        ${rows}
+        ${check.notes ? `<div class="mode-notes">${esc(check.notes)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = stats + cards;
+}
+
+function tripsList() {
+  return Array.isArray(S.trips?.trips) ? S.trips.trips : [];
+}
+function sharedTripsList() {
+  return Array.isArray(S.trips?.sharedTrips) ? S.trips.sharedTrips : [];
+}
+function tripMembers(trip) {
+  return Array.isArray(trip?.members) ? trip.members : [];
+}
+function tripExpenses(trip) {
+  return Array.isArray(trip?.expenses) ? trip.expenses : [];
+}
+function tripSettlements(trip) {
+  const primary = Array.isArray(trip?.settlements) ? trip.settlements : [];
+  const settled = Array.isArray(trip?.settledTransfers) ? trip.settledTransfers : [];
+  return [...primary, ...settled];
+}
+function tripCurrency(trip) {
+  return (trip?.currency || getResolvedCurrency() || 'USD').toUpperCase();
+}
+function tripMember(trip, id) {
+  return tripMembers(trip).find(m => m.id === id) || { id, name:id, color:'#a08e6e' };
+}
+function tripSpend(trip) {
+  return tripExpenses(trip).reduce((sum, expense) => sum + asNumber(expense.amount), 0);
+}
+function expenseSplitIds(trip, expense) {
+  const explicit = asList(expense?.splitBetweenIds);
+  if (explicit.length) return explicit;
+  return tripMembers(trip).map(member => member.id);
+}
+function expensePaidByAmounts(expense) {
+  const amount = asNumber(expense?.amount);
+  const raw = expense?.paidByAmounts;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const entries = Object.entries(raw).filter(([id, value]) => id && asNumber(value) > 0);
+    const paidTotal = entries.reduce((sum, [, value]) => sum + asNumber(value), 0);
+    if (entries.length && Math.abs(paidTotal - amount) <= 0.01) {
+      return Object.fromEntries(entries.map(([id, value]) => [id, asNumber(value)]));
+    }
+    if (entries.length && amount > 0) {
+      const even = amount / entries.length;
+      return Object.fromEntries(entries.map(([id]) => [id, even]));
+    }
+  }
+  if (expense?.paidById && amount > 0) return { [expense.paidById]: amount };
+  return {};
+}
+function tripMemberShare(trip, memberId) {
+  return tripExpenses(trip).reduce((sum, expense) => {
+    const splitIds = expenseSplitIds(trip, expense);
+    if (!splitIds.includes(memberId) || splitIds.length === 0) return sum;
+    return sum + asNumber(expense.amount) / splitIds.length;
+  }, 0);
+}
+function tripMemberPaid(trip, memberId) {
+  return tripExpenses(trip).reduce((sum, expense) => {
+    const paid = expensePaidByAmounts(expense);
+    return sum + asNumber(paid[memberId]);
+  }, 0);
+}
+function tripSettlementAdjustment(trip, memberId) {
+  return tripSettlements(trip).reduce((sum, settlement) => {
+    const amount = asNumber(settlement.amount);
+    if (settlement.fromMemberId === memberId) return sum + amount;
+    if (settlement.toMemberId === memberId) return sum - amount;
+    return sum;
+  }, 0);
+}
+function tripMemberBalance(trip, memberId) {
+  return tripMemberPaid(trip, memberId) - tripMemberShare(trip, memberId) + tripSettlementAdjustment(trip, memberId);
+}
+function tripSuggestedSettlements(trip) {
+  const creditors = [];
+  const debtors = [];
+  tripMembers(trip).forEach(member => {
+    const balance = tripMemberBalance(trip, member.id);
+    if (balance > 0.01) creditors.push({ memberId:member.id, amount:balance });
+    if (balance < -0.01) debtors.push({ memberId:member.id, amount:-balance });
+  });
+  creditors.sort((a, b) => b.amount - a.amount);
+  debtors.sort((a, b) => b.amount - a.amount);
+  const out = [];
+  let i = 0, j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const amount = Math.min(debtors[i].amount, creditors[j].amount);
+    if (amount > 0.01) out.push({ fromMemberId:debtors[i].memberId, toMemberId:creditors[j].memberId, amount });
+    debtors[i].amount -= amount;
+    creditors[j].amount -= amount;
+    if (debtors[i].amount <= 0.01) i++;
+    if (creditors[j].amount <= 0.01) j++;
+  }
+  return out;
+}
+
+function renderTrips() {
+  const container = document.getElementById('tripsOverview');
+  if (!container) return;
+  const trips = tripsList().slice().sort((a, b) => {
+    const archivedDelta = Number(!!a.isArchived) - Number(!!b.isArchived);
+    if (archivedDelta) return archivedDelta;
+    const ad = dateFromISO(a.startDateISO)?.getTime() || 0;
+    const bd = dateFromISO(b.startDateISO)?.getTime() || 0;
+    return bd - ad;
+  });
+  const sharedTrips = sharedTripsList();
+  updateTabBadge();
+
+  if (!trips.length && !sharedTrips.length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">◇</div>
+      <div class="empty-state-title">No trips yet</div>
+      <div class="empty-state-sub">Trips created in the iOS app will appear here after sync.</div>
+    </div>`;
+    return;
+  }
+
+  const active = trips.filter(t => !t.isArchived).length;
+  const currencyCodes = uniqueList(trips.map(tripCurrency));
+  const spend = trips.reduce((sum, trip) => sum + tripSpend(trip), 0);
+  const spendLabel = currencyCodes.length <= 1 ? fmtCurrencyFor(spend, currencyCodes[0]) : `${currencyCodes.length} currencies`;
+  const stats = `<div class="mode-stats">
+    <div class="mode-stat"><div class="mode-stat-label">Trips</div><div class="mode-stat-val">${trips.length}</div></div>
+    <div class="mode-stat"><div class="mode-stat-label">Active</div><div class="mode-stat-val">${active}</div></div>
+    <div class="mode-stat"><div class="mode-stat-label">Spend</div><div class="mode-stat-val">${esc(spendLabel)}</div></div>
+  </div>`;
+
+  const cards = trips.map(trip => {
+    const members = tripMembers(trip);
+    const currency = tripCurrency(trip);
+    const expenseCount = tripExpenses(trip).length;
+    const itineraryCount = Array.isArray(trip.itinerary) ? trip.itinerary.length : 0;
+    const checklistCount = Array.isArray(trip.checklistItems) ? trip.checklistItems.length : 0;
+    const metaBits = [
+      dateRangeLabel(trip.startDateISO, trip.endDateISO),
+      `${members.length} member${members.length === 1 ? '' : 's'}`,
+      `${expenseCount} expense${expenseCount === 1 ? '' : 's'}`,
+      itineraryCount ? `${itineraryCount} itinerary` : '',
+      checklistCount ? `${checklistCount} checklist` : ''
+    ].filter(Boolean);
+    const balanceRows = members.length ? members.map(member => {
+      const share = tripMemberShare(trip, member.id);
+      const paid = tripMemberPaid(trip, member.id);
+      const balance = tripMemberBalance(trip, member.id);
+      const valClass = balance < -0.01 ? ' negative' : '';
+      return `<div class="mode-row">
+        <div>
+          <div class="mode-row-name">${esc(member.name || member.id)}</div>
+          <div class="mode-row-sub">paid ${fmtCurrencyFor(paid, currency)} · share ${fmtCurrencyFor(share, currency)}</div>
+        </div>
+        <div class="mode-row-val${valClass}">${fmtSignedCurrencyFor(balance, currency)}</div>
+      </div>`;
+    }).join('') : `<div class="mode-row"><div class="mode-row-name">No members</div><div class="mode-row-val">${fmtCurrencyFor(tripSpend(trip), currency)}</div></div>`;
+
+    const suggestions = tripSuggestedSettlements(trip).slice(0, 4);
+    const suggestionRows = suggestions.length ? `<div class="mode-section-title" style="margin-top:14px;">Suggested Settlements</div>` + suggestions.map(s => {
+      const from = tripMember(trip, s.fromMemberId);
+      const to = tripMember(trip, s.toMemberId);
+      return `<div class="mode-row">
+        <div class="mode-row-name">${esc(from.name || from.id)} → ${esc(to.name || to.id)}</div>
+        <div class="mode-row-val">${fmtCurrencyFor(s.amount, currency)}</div>
+      </div>`;
+    }).join('') : '';
+
+    return `<div class="mode-card">
+      <div class="mode-card-head">
+        <div>
+          <div class="mode-title-row">
+            <div class="mode-title">${esc(trip.name || 'Untitled Trip')}</div>
+            ${trip.isArchived ? `<span class="mode-chip">Archived</span>` : `<span class="mode-chip good">Active</span>`}
+            <span class="mode-chip">${esc(currency)}</span>
+          </div>
+          <div class="mode-meta">${esc(metaBits.join(' · '))}</div>
+        </div>
+        <div class="mode-money">${fmtCurrencyFor(tripSpend(trip), currency)}</div>
+      </div>
+      <div class="mode-body">
+        <div class="mode-section-title">Balances</div>
+        ${balanceRows}
+        ${suggestionRows}
+        ${trip.notes ? `<div class="mode-notes">${esc(trip.notes)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const shared = sharedTrips.length ? `<div class="mode-card">
+    <div class="mode-card-head">
+      <div>
+        <div class="mode-title-row"><div class="mode-title">Shared With Me</div><span class="mode-chip">${sharedTrips.length}</span></div>
+        <div class="mode-meta">Trip references accepted from other users</div>
+      </div>
+    </div>
+    <div class="mode-body">
+      ${sharedTrips.map(ref => `<div class="mode-row">
+        <div>
+          <div class="mode-row-name">${esc(ref.tripName || ref.name || ref.id || 'Shared Trip')}</div>
+          <div class="mode-row-sub">${esc(ref.ownerName || ref.ownerDisplayName || ref.ownerId || '')}</div>
+        </div>
+        <div class="mode-row-val">${esc(shortDate(ref.acceptedAt || ref.createdAt))}</div>
+      </div>`).join('')}
+    </div>
+  </div>` : '';
+
+  container.innerHTML = stats + cards + shared;
 }
 
 // ═══════════════════════════════════════════════
@@ -2021,7 +2460,12 @@ function updateTabBadge() {
       if (getBillTotal(bill.id) > 0) filled++;
     }
   });
-  document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
+  const billsBadge = document.getElementById('tab-badge-bills');
+  if (billsBadge) billsBadge.textContent = `${filled}/${S.bills.length}`;
+  const checksBadge = document.getElementById('tab-badge-checks');
+  if (checksBadge) checksBadge.textContent = checksList().length;
+  const tripsBadge = document.getElementById('tab-badge-trips');
+  if (tripsBadge) tripsBadge.textContent = tripsList().length;
 }
 
 // ═══════════════════════════════════════════════
@@ -3362,7 +3806,7 @@ async function importData(file) {
 function clearAll() {
   showConfirm('Reset ALL data for "' + _currentUser + '"? This cannot be undone.', async ok => {
     if (!ok) return;
-    await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{},requestDates:{}}) });
+    await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{},requestDates:{},checks:{checks:[]},trips:{trips:[],sharedTrips:[]},sharedBills:[]}) });
     location.reload();
   }, { okLabel:'Reset', danger:true });
 }
@@ -3453,6 +3897,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (page==='bills') renderBills();
     if (page==='summary') renderSummary();
     if (page==='sendpay') renderSendPay();
+    if (page==='checks') renderChecks();
+    if (page==='trips') renderTrips();
     if (page==='trends') renderTrends();
     if (page==='settings') renderSettings();
   });
