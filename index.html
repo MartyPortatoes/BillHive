@@ -506,6 +506,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   <div style="margin-top:8px;">
     <button class="btn btn-ghost btn-sm" data-click="addNewBill()">＋ Add Bill</button>
   </div>
+  <div id="sharedBillsOverview"></div>
 </div>
 
 <!-- ════════════════ SUMMARY ════════════════ -->
@@ -1550,6 +1551,49 @@ function fmtSignedCurrencyFor(value, currencyCode) {
   if (value < -0.005) return `-${abs}`;
   return fmtCurrencyFor(0, currencyCode);
 }
+function serverHostLabel(raw) {
+  if (!raw) return '';
+  try {
+    return new URL(raw).host;
+  } catch {
+    return raw;
+  }
+}
+
+function sharedBillsList() {
+  return Array.isArray(S.sharedBills) ? S.sharedBills : [];
+}
+function renderSharedBills() {
+  const container = document.getElementById('sharedBillsOverview');
+  if (!container) return;
+  const refs = sharedBillsList();
+  if (!refs.length) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = `<div style="margin-top:26px;">
+    <div class="mode-section-title" style="margin-bottom:10px;">Shared Bills</div>
+    ${refs.map(ref => {
+      const joined = shortDate(ref.joinedAtISO);
+      const meta = [
+        ref.personName ? `as ${ref.personName}` : '',
+        serverHostLabel(ref.serverURL),
+        joined ? `joined ${joined}` : ''
+      ].filter(Boolean).join(' · ');
+      return `<div class="mode-card">
+        <div class="mode-card-head">
+          <div>
+            <div class="mode-title-row">
+              <div class="mode-title">${esc(ref.ownerName || 'Shared Household')}</div>
+              <span class="mode-chip">Guest</span>
+            </div>
+            <div class="mode-meta">${esc(meta)}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 
 function checksList() {
   return Array.isArray(S.checks?.checks) ? S.checks.checks : [];
@@ -1870,9 +1914,13 @@ function renderTrips() {
       ${sharedTrips.map(ref => `<div class="mode-row">
         <div>
           <div class="mode-row-name">${esc(ref.tripName || ref.name || ref.id || 'Shared Trip')}</div>
-          <div class="mode-row-sub">${esc(ref.ownerName || ref.ownerDisplayName || ref.ownerId || '')}</div>
+          <div class="mode-row-sub">${esc([
+            ref.memberName ? `as ${ref.memberName}` : '',
+            serverHostLabel(ref.serverURL),
+            shortDate(ref.joinedAtISO) ? `joined ${shortDate(ref.joinedAtISO)}` : ''
+          ].filter(Boolean).join(' · '))}</div>
         </div>
-        <div class="mode-row-val">${esc(shortDate(ref.acceptedAt || ref.createdAt))}</div>
+        <div class="mode-row-val"><span class="mode-chip">Guest</span></div>
       </div>`).join('')}
     </div>
   </div>` : '';
@@ -1902,6 +1950,7 @@ function renderBills() {
       <button class="btn btn-green btn-sm" data-click="addNewBill()">＋ Add Your First Bill</button>
     </div>`;
     updateTabBadge();
+    renderSharedBills();
     return;
   }
 
@@ -1970,6 +2019,7 @@ function renderBills() {
   });
 
   document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
+  renderSharedBills();
   recalcAll();
 }
 
