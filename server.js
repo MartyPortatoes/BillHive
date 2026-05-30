@@ -1270,6 +1270,111 @@ app.get('/api/events', (req, res) => {
   });
 });
 
+// ── Trip receipt attachments ─────────────────────────────────────────────────
+// Per-expense JPEG receipt images, stored on disk alongside the SQLite database.
+// The attachment *metadata* (id, filename, mimeType) lives inside the Trip JSON
+// in user_state and syncs automatically. These endpoints sync the actual image
+// bytes so SelfHive users get receipt photos on every device.
+//
+// Storage layout: <DATA_DIR>/trip-receipts/<userId>/<expenseId>/<filename>.jpg
+// The userId tier prevents users from reading each other's receipts.
+
+// Sanitize filenames to alphanumeric + dash + dot only. Rejects path traversal
+// sequences (../, /, backslash) and any characters outside the whitelist.
+function sanitizeFilename(name) {
+  if (typeof name !== 'string') return null;
+  const cleaned = name.replace(/[^A-Za-z0-9.\-]/g, '');
+  // Must have content, must not be just dots, must end in a safe extension
+  if (!cleaned || cleaned === '.' || cleaned === '..' || cleaned.startsWith('.')) return null;
+  if (cleaned.length > 255) return null;
+  return cleaned;
+}
+
+// Sanitize path segments (tripId, expenseId) — same whitelist but no dots allowed.
+function sanitizePathSegment(seg) {
+  if (typeof seg !== 'string') return null;
+  const cleaned = seg.replace(/[^A-Za-z0-9\-]/g, '');
+  if (!cleaned) return null;
+  if (cleaned.length > 128) return null;
+  return cleaned;
+}
+
+// Resolves the receipts directory for a given user + expense, creating it lazily.
+function receiptsDir(userId, expenseId) {
+  const dir = path.join(dataDir, 'trip-receipts', userId, expenseId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// POST /api/trips/:tripId/expenses/:expenseId/attachments
+// Upload a JPEG receipt image. The attachmentId is passed via the
+// X-Attachment-Id header (the iOS client generates the UUID). The raw
+// image bytes are the request body (Content-Type: image/*).
+app.post('/api/trips/:tripId/expenses/:expenseId/attachments',
+  express.raw({ type: 'image/*', limit: '2mb' }),
+  (req, res) => {
+    const expenseId = sanitizePathSegment(req.params.expenseId);
+    if (!expenseId) return res.status(400).json({ error: 'Invalid expenseId' });
+
+    const attachmentId = sanitizePathSegment(req.headers['x-attachment-id']);
+    if (!attachmentId) return res.status(400).json({ error: 'X-Attachment-Id header required' });
+
+    if (!req.body || !req.body.length) {
+      return res.status(400).json({ error: 'Empty body — expected image data' });
+    }
+
+    const filename = `${attachmentId}.jpg`;
+    const dir = receiptsDir(req.userId, expenseId);
+    const filePath = path.join(dir, filename);
+
+    try {
+      fs.writeFileSync(filePath, req.body);
+    } catch (e) {
+      console.error('Attachment write failed:', e.message);
+      return res.status(500).json({ error: 'Failed to save attachment' });
+    }
+
+    res.json({ ok: true, attachmentId, filename });
+  }
+);
+
+// GET /api/trips/:tripId/expenses/:expenseId/attachments/:filename
+// Serve a receipt image. Returns 404 if the file doesn't exist.
+app.get('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req, res) => {
+  const expenseId = sanitizePathSegment(req.params.expenseId);
+  if (!expenseId) return res.status(400).json({ error: 'Invalid expenseId' });
+
+  const filename = sanitizeFilename(req.params.filename);
+  if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+
+  const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
+
+  res.sendFile(filePath);
+});
+
+// DELETE /api/trips/:tripId/expenses/:expenseId/attachments/:filename
+// Delete a receipt image from disk. Returns 200 even if the file was already
+// gone (idempotent delete — the client may retry after a network hiccup).
+app.delete('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req, res) => {
+  const expenseId = sanitizePathSegment(req.params.expenseId);
+  if (!expenseId) return res.status(400).json({ error: 'Invalid expenseId' });
+
+  const filename = sanitizeFilename(req.params.filename);
+  if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+
+  const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (e) {
+    console.error('Attachment delete failed:', e.message);
+    return res.status(500).json({ error: 'Failed to delete attachment' });
+  }
+
+  res.json({ ok: true });
+});
+
+
 // ── SPA fallback — serve index.html for any non-API route ────────────────────
 // BillHive is a single-page app — all client-side routing happens in the browser.
 // Any path that isn't an /api/* route or a static file gets index.html so that
