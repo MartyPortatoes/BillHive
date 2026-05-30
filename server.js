@@ -1270,11 +1270,11 @@ app.get('/api/events', (req, res) => {
   });
 });
 
-// ── Trip receipt attachments ─────────────────────────────────────────────────
-// Per-expense JPEG receipt images, stored on disk alongside the SQLite database.
-// The attachment *metadata* (id, filename, mimeType) lives inside the Trip JSON
-// in user_state and syncs automatically. These endpoints sync the actual image
-// bytes so SelfHive users get receipt photos on every device.
+// ── Trip attachments ─────────────────────────────────────────────────────────
+// Per-expense receipt images and per-itinerary files, stored on disk alongside
+// the SQLite database. The attachment *metadata* (id, filename, mimeType) lives
+// inside the Trip JSON in user_state and syncs automatically. These endpoints
+// sync the actual bytes so SelfHive users get attachments on every device.
 //
 // Storage layout: <DATA_DIR>/trip-receipts/<userId>/<expenseId>/<filename>.jpg
 // The userId tier prevents users from reading each other's receipts.
@@ -1302,6 +1302,12 @@ function sanitizePathSegment(seg) {
 // Resolves the receipts directory for a given user + expense, creating it lazily.
 function receiptsDir(userId, expenseId) {
   const dir = path.join(dataDir, 'trip-receipts', userId, expenseId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function itineraryAttachmentsDir(userId, eventId) {
+  const dir = path.join(dataDir, 'trip-itinerary-attachments', userId, eventId);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -1368,6 +1374,72 @@ app.delete('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req,
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   } catch (e) {
     console.error('Attachment delete failed:', e.message);
+    return res.status(500).json({ error: 'Failed to delete attachment' });
+  }
+
+  res.json({ ok: true });
+});
+
+// POST /api/trips/:tripId/itinerary/:eventId/attachments
+// Upload an itinerary attachment. The iOS client generates both the UUID
+// attachment id and safe storage filename; raw bytes are the request body.
+app.post('/api/trips/:tripId/itinerary/:eventId/attachments',
+  express.raw({ type: '*/*', limit: '10mb' }),
+  (req, res) => {
+    const eventId = sanitizePathSegment(req.params.eventId);
+    if (!eventId) return res.status(400).json({ error: 'Invalid eventId' });
+
+    const attachmentId = sanitizePathSegment(req.headers['x-attachment-id']);
+    if (!attachmentId) return res.status(400).json({ error: 'X-Attachment-Id header required' });
+
+    const filename = sanitizeFilename(req.headers['x-filename']);
+    if (!filename) return res.status(400).json({ error: 'X-Filename header required' });
+
+    if (!req.body || !req.body.length) {
+      return res.status(400).json({ error: 'Empty body — expected attachment data' });
+    }
+
+    const dir = itineraryAttachmentsDir(req.userId, eventId);
+    const filePath = path.join(dir, filename);
+
+    try {
+      fs.writeFileSync(filePath, req.body);
+    } catch (e) {
+      console.error('Itinerary attachment write failed:', e.message);
+      return res.status(500).json({ error: 'Failed to save attachment' });
+    }
+
+    res.json({ ok: true, attachmentId, filename });
+  }
+);
+
+// GET /api/trips/:tripId/itinerary/:eventId/attachments/:filename
+app.get('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, res) => {
+  const eventId = sanitizePathSegment(req.params.eventId);
+  if (!eventId) return res.status(400).json({ error: 'Invalid eventId' });
+
+  const filename = sanitizeFilename(req.params.filename);
+  if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+
+  const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
+
+  res.sendFile(filePath);
+});
+
+// DELETE /api/trips/:tripId/itinerary/:eventId/attachments/:filename
+app.delete('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, res) => {
+  const eventId = sanitizePathSegment(req.params.eventId);
+  if (!eventId) return res.status(400).json({ error: 'Invalid eventId' });
+
+  const filename = sanitizeFilename(req.params.filename);
+  if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+
+  const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (e) {
+    console.error('Itinerary attachment delete failed:', e.message);
     return res.status(500).json({ error: 'Failed to delete attachment' });
   }
 
