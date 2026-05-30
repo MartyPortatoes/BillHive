@@ -4,7 +4,7 @@
 
 <h1 align="center">BillHive</h1>
 
-<p align="center">Self-hosted household bill management. One person fronts every bill — BillHive tracks the splits, generates Zelle/Venmo/Cash App payment links, and sends HTML email summaries to everyone who owes money.</p>
+<p align="center">Self-hosted household bill management. One person fronts every bill — BillHive tracks the splits, generates Zelle/Venmo/Cash App/Apple Cash/PayPal payment handoffs, and sends HTML email summaries to everyone who owes money.</p>
 
 <p align="center">Runs as a <strong>single Docker container</strong> with a SQLite database. No cloud, no subscription, no external services required.</p>
 
@@ -46,7 +46,7 @@
 - **Auto-pay** flag — skip bills you've set to draft automatically from the Pay tab and checklist
 
 **Payment collection (Pay & Collect tab)**
-- **Zelle, Venmo, and Cash App** deep-links auto-generated with the exact amount pre-filled
+- **Zelle, Venmo, Cash App, Apple Cash, and PayPal** handoffs generated for collecting balances
 - Custom Zelle URLs supported for banks with their own enrollment flows
 - One-click **HTML email summaries** sent to each person with their itemized bill breakdown
 - Payment request dates and paid/unpaid status sync with the SelfHive iOS app

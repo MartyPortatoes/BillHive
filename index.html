@@ -901,6 +901,63 @@ function safeWebUrl(raw) {
   } catch { return null; }
 }
 
+const PAYMENT_LABELS = {
+  none: 'None',
+  zelle: 'Zelle',
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  applecash: 'Apple Cash',
+  paypal: 'PayPal',
+  manual: 'Manual',
+};
+
+function paymentLabel(method) {
+  return PAYMENT_LABELS[method] || 'Payment';
+}
+
+function paymentSetupHint(method) {
+  if (method === 'zelle') return 'set ID in Settings';
+  if (method === 'venmo') return 'set handle in Settings';
+  if (method === 'cashapp') return 'set $cashtag in Settings';
+  if (method === 'applecash') return 'set contact in Settings';
+  if (method === 'paypal') return 'set PayPal.Me in Settings';
+  return 'set in Settings';
+}
+
+function paypalMeUrl(payId, amount, currencyCode = getResolvedCurrency()) {
+  const raw = String(payId || '').trim();
+  if (!raw) return 'https://www.paypal.me/';
+
+  let username = raw.replace(/^@/, '');
+  try {
+    const candidate = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+    const url = new URL(candidate);
+    const host = url.hostname.toLowerCase();
+    if (host === 'paypal.me' || host === 'www.paypal.me') {
+      username = url.pathname.split('/').filter(Boolean)[0] || '';
+    }
+  } catch {}
+
+  username = username
+    .replace(/^www\.paypal\.me\//i, '')
+    .replace(/^paypal\.me\//i, '')
+    .split('/')[0];
+  if (!/^[a-z0-9]{1,20}$/i.test(username)) return 'https://www.paypal.me/';
+
+  const numericAmount = Number(amount || 0);
+  const code = String(currencyCode || 'USD').toUpperCase();
+  const formattedAmount = numericAmount.toFixed(2) + (code === 'USD' ? '' : code);
+  const amountSegment = numericAmount > 0 ? '/' + formattedAmount : '';
+  return 'https://paypal.me/' + encodeURIComponent(username) + amountSegment;
+}
+
+function appleCashSmsUrl(person, amount) {
+  const contact = String(person.payId || '').trim().replace(/\s+/g, '');
+  if (!contact) return '';
+  const body = encodeURIComponent(`Can you send ${fmtCurrency(Number(amount || 0))} for Bills with Apple Cash?`);
+  return 'sms:' + encodeURIComponent(contact) + '?body=' + body;
+}
+
 // Global state object — the single source of truth. Loaded from the API on init,
 // mutated by UI interactions, and persisted back via debounced save().
 // These defaults are used only on first launch before any server data exists.
@@ -1092,7 +1149,7 @@ function _initEvtFns() {
     addPerson, removePerson, togglePerson,
     saveEmailConfig, testEmailConfig, generateDeviceKey, copyDeviceKey,
     revokeDeviceKey, exportData, clearAll,
-    toggleReceiveCard, openZelle, openVenmo, openCashApp,
+    toggleReceiveCard, openZelle, openVenmo, openCashApp, openAppleCash, openPayPal,
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
     togglePayReceived,
     requestPayment, printBillBreakdown,
@@ -2729,12 +2786,9 @@ function renderReceiveCards() {
     const d = owes[person.id] || { total:0, bills:[] };
     const isPaid = isPaymentReceived(person.id, k);
     const reqLabel = requestDateLabel(person.id, k);
-    const payDescBase = person.payMethod === 'zelle'
-      ? 'Zelle · ' + (person.payId || 'set ID in Settings')
-      : person.payMethod === 'venmo'
-      ? 'Venmo · ' + (person.payId || 'set handle in Settings')
-      : person.payMethod === 'cashapp'
-      ? 'Cash App · ' + (person.payId || 'set $cashtag in Settings')
+    const hasPaymentApp = ['zelle', 'venmo', 'cashapp', 'applecash', 'paypal'].includes(person.payMethod);
+    const payDescBase = hasPaymentApp
+      ? paymentLabel(person.payMethod) + ' · ' + (person.payId || paymentSetupHint(person.payMethod))
       : 'Manual';
     const payDesc = reqLabel ? payDescBase + ' · requested ' + reqLabel : payDescBase;
 
@@ -2745,6 +2799,10 @@ function renderReceiveCards() {
       payBtn = `<button class="btn btn-orange btn-sm" data-click="requestPayment('${person.id}')">💸 Venmo</button>`;
     } else if (person.payMethod === 'cashapp') {
       payBtn = `<button class="btn btn-green btn-sm" data-click="requestPayment('${person.id}')">💵 Cash App</button>`;
+    } else if (person.payMethod === 'applecash') {
+      payBtn = `<button class="btn btn-blue btn-sm" data-click="requestPayment('${person.id}')">Apple Cash</button>`;
+    } else if (person.payMethod === 'paypal') {
+      payBtn = `<button class="btn btn-blue btn-sm" data-click="requestPayment('${person.id}')">PayPal</button>`;
     }
 
     const emailBtn = person.email
@@ -2788,7 +2846,7 @@ function renderReceiveCards() {
             <div class="action-row">
               <button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Open in Mail</button>
               <button class="btn btn-ghost btn-sm" data-click="copyPersonEmail('${person.id}')">📋 Copy</button>
-              ${payBtn ? `<button class="btn btn-green btn-sm" data-click="requestPayment('${person.id}')">Request via ${esc(person.payMethod === 'cashapp' ? 'Cash App' : person.payMethod === 'venmo' ? 'Venmo' : 'Zelle')}</button>` : ''}
+              ${payBtn ? `<button class="btn btn-green btn-sm" data-click="requestPayment('${person.id}')">Request via ${esc(paymentLabel(person.payMethod))}</button>` : ''}
             </div>
           </div>
         </div>
@@ -2812,6 +2870,8 @@ function buildPersonEmail(personId) {
   if (person.payMethod === 'zelle') payHint = "I'll send you a Zelle request for this amount.";
   else if (person.payMethod === 'venmo') payHint = "I'll send you a Venmo request for this amount.";
   else if (person.payMethod === 'cashapp') payHint = "I'll send you a Cash App request for this amount.";
+  else if (person.payMethod === 'applecash') payHint = "I'll send you an Apple Cash request for this amount.";
+  else if (person.payMethod === 'paypal') payHint = "I'll send you a PayPal request for this amount.";
   else payHint = "Please send your share when you get a chance.";
 
   let lines = [
@@ -2941,6 +3001,29 @@ function openCashApp(personId) {
   toast('Cash App opened — request ' + fmtCurrency(parseFloat(amt)) + ' from ' + person.name);
 }
 
+function openAppleCash(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const amt = owes[personId]?.total || 0;
+  const url = appleCashSmsUrl(person, amt);
+  if (url) {
+    window.location.href = url;
+    toast('Messages opened — request ' + fmtCurrency(amt) + ' with Apple Cash from ' + person.name);
+  } else {
+    window.open('https://www.apple.com/apple-cash/', '_blank', 'noopener');
+    toast('Add an Apple Cash phone or email for ' + person.name + ' in Settings');
+  }
+}
+
+function openPayPal(personId) {
+  const person = getPerson(personId);
+  const owes = computePersonOwes();
+  const amt = owes[personId]?.total || 0;
+  const url = paypalMeUrl(person.payId, amt, getResolvedCurrency());
+  window.open(url, '_blank', 'noopener');
+  toast('PayPal opened — request ' + fmtCurrency(amt) + ' from ' + person.name);
+}
+
 function requestPayment(personId) {
   const person = getPerson(personId);
   recordPaymentRequest(personId);
@@ -2953,6 +3036,12 @@ function requestPayment(personId) {
   } else if (person.payMethod === 'cashapp') {
     markCheck('cashapp_' + personId);
     openCashApp(personId);
+  } else if (person.payMethod === 'applecash') {
+    markCheck('applecash_' + personId);
+    openAppleCash(personId);
+  } else if (person.payMethod === 'paypal') {
+    markCheck('paypal_' + personId);
+    openPayPal(personId);
   } else {
     toast('Payment request date recorded for ' + person.name);
   }
@@ -3073,6 +3162,10 @@ function buildChecklistDefs() {
       defs.push({ id:'venmo_'+person.id, label:'Send Venmo request to '+person.name, meta:'Collect' });
     } else if (person.payMethod === 'cashapp') {
       defs.push({ id:'cashapp_'+person.id, label:'Send Cash App request to '+person.name, meta:'Collect' });
+    } else if (person.payMethod === 'applecash') {
+      defs.push({ id:'applecash_'+person.id, label:'Send Apple Cash request to '+person.name, meta:'Collect' });
+    } else if (person.payMethod === 'paypal') {
+      defs.push({ id:'paypal_'+person.id, label:'Send PayPal request to '+person.name, meta:'Collect' });
     }
     defs.push({ id:'email_'+person.id, label:'Email bill summary to '+person.name, meta:'Collect' });
   });
@@ -3705,7 +3798,7 @@ function renderPeopleConfig() {
 
   el.innerHTML = S.people.map((p, idx) => {
     const isMe = p.id === 'me';
-    const payLabel = {none:'None',zelle:'Zelle',venmo:'Venmo',cashapp:'Cash App',manual:'Manual'}[p.payMethod] ?? 'None';
+    const payLabel = paymentLabel(p.payMethod);
 
     // Conditional pay ID field(s)
     let payIdFields = '';
@@ -3733,6 +3826,20 @@ function renderPeopleConfig() {
         <div class="person-field">
           <div class="person-field-label">Cash Tag</div>
           <input type="text" value="${p.payId||''}" placeholder="$cashtag"
+                 data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
+        </div>`;
+    } else if (p.payMethod === 'applecash') {
+      payIdFields = `
+        <div class="person-field">
+          <div class="person-field-label">Apple Cash Contact</div>
+          <input type="text" value="${p.payId||''}" placeholder="phone or email"
+                 data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
+        </div>`;
+    } else if (p.payMethod === 'paypal') {
+      payIdFields = `
+        <div class="person-field">
+          <div class="person-field-label">PayPal</div>
+          <input type="text" value="${p.payId||''}" placeholder="paypal.me/yourname"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     }
@@ -3766,6 +3873,8 @@ function renderPeopleConfig() {
               <option value="zelle"   ${p.payMethod==='zelle'   ?'selected':''}>Zelle</option>
               <option value="venmo"   ${p.payMethod==='venmo'   ?'selected':''}>Venmo</option>
               <option value="cashapp" ${p.payMethod==='cashapp' ?'selected':''}>Cash App</option>
+              <option value="applecash" ${p.payMethod==='applecash' ?'selected':''}>Apple Cash</option>
+              <option value="paypal"  ${p.payMethod==='paypal'  ?'selected':''}>PayPal</option>
               <option value="manual"  ${p.payMethod==='manual'  ?'selected':''}>Manual</option>
             </select>
           </div>

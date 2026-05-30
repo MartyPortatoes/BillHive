@@ -8,8 +8,8 @@
  * @param {string} opts.monthLabel    — e.g. "March 2026"
  * @param {Array}  opts.bills         — [{ name, amount }]
  * @param {number} opts.total         — total owed
- * @param {string} opts.payMethod     — 'zelle' | 'venmo' | 'cashapp' | 'manual' | 'none'
- * @param {string} opts.payId         — zelle phone/email or venmo @handle
+ * @param {string} opts.payMethod     — 'zelle' | 'venmo' | 'cashapp' | 'applecash' | 'paypal' | 'manual' | 'none'
+ * @param {string} opts.payId         — payment identifier for the selected method
  * @param {string} opts.zelleUrl      — custom Zelle URL (overrides default enroll.zellepay.com link)
  * @param {string} opts.fromName      — sender display name
  * @param {string} opts.currencyCode  — ISO 4217 currency code (default 'USD')
@@ -33,6 +33,33 @@ function safeUrl(url) {
       .replace(/[\u0000-\u001F\u007F]+/g, '');
     return normalized;
   } catch { return ''; }
+}
+
+function paypalMeUrl(payId, total, currencyCode = 'USD') {
+  const raw = String(payId || '').trim();
+  if (!raw) return '';
+
+  let username = raw.replace(/^@/, '');
+  try {
+    const candidate = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+    const parsed = new URL(candidate);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'paypal.me' || host === 'www.paypal.me') {
+      username = parsed.pathname.split('/').filter(Boolean)[0] || '';
+    }
+  } catch {}
+
+  username = username
+    .replace(/^www\.paypal\.me\//i, '')
+    .replace(/^paypal\.me\//i, '')
+    .split('/')[0];
+  if (!/^[a-z0-9]{1,20}$/i.test(username)) return '';
+
+  const amount = Number(total || 0);
+  const code = String(currencyCode || 'USD').toUpperCase();
+  const formattedAmount = amount.toFixed(2) + (code === 'USD' ? '' : code);
+  const amountSegment = amount > 0 ? '/' + formattedAmount : '';
+  return `https://paypal.me/${encodeURIComponent(username)}${amountSegment}`;
 }
 
 // Inline SVG hex logo mark — matches the iOS HexLogoMark
@@ -112,6 +139,29 @@ function buildEmailHtml(opts) {
     <tr><td align="center" style="padding:0 0 4px;">
       <span style="${subStyle}">Cash App $${escapeHtml(payId.replace('$', ''))}</span>
     </td></tr>`;
+  } else if (payMethod === 'applecash' && payId) {
+    payButtonHtml = `
+    <tr><td align="center" style="padding:24px 0 6px;">
+      <div style="display:inline-block;background:${accentBg};border:1px solid ${accentBorder};
+        color:${accentColor};font-family:'Courier New',Courier,monospace;font-weight:700;
+        font-size:14px;padding:13px 32px;border-radius:8px;letter-spacing:.04em;">
+        ${fmt.format(total)} due via Apple Cash
+      </div>
+    </td></tr>
+    <tr><td align="center" style="padding:0 0 4px;">
+      <span style="${subStyle}">Message ${escapeHtml(payId)} with Apple Cash</span>
+    </td></tr>`;
+  } else if (payMethod === 'paypal' && payId) {
+    const url = paypalMeUrl(payId, total, currencyCode);
+    if (url) {
+      payButtonHtml = `
+      <tr><td align="center" style="padding:24px 0 6px;">
+        <a href="${url}" style="${btnStyle}">Pay via PayPal — ${fmt.format(total)}</a>
+      </td></tr>
+      <tr><td align="center" style="padding:0 0 4px;">
+        <span style="${subStyle}">PayPal ${escapeHtml(payId)}</span>
+      </td></tr>`;
+    }
   } else {
     payButtonHtml = `
     <tr><td align="center" style="padding:24px 0 6px;">
@@ -292,6 +342,8 @@ function buildEmailHtml(opts) {
     payMethod === 'zelle'   && payId ? `Please pay via Zelle to ${payId}.` :
     payMethod === 'venmo'   && payId ? `Please pay via Venmo @${payId.replace('@','')}.` :
     payMethod === 'cashapp' && payId ? `Please pay via Cash App $${payId.replace('$','')}.` :
+    payMethod === 'applecash' && payId ? `Please pay via Apple Cash to ${payId}.` :
+    payMethod === 'paypal' && payId ? `Please pay via PayPal at ${paypalMeUrl(payId, total, currencyCode) || payId}.` :
     'Please send your share when you get a chance.',
     '',
     `Thanks, ${fromName}`,
