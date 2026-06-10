@@ -396,8 +396,10 @@ function pickAuthHeader(headers) {
     v = v.trim();
     // Whitelist: alphanum, dot, dash, underscore, @ — covers usernames and emails.
     // Rejects newlines, control chars, spaces, NULs, quotes — anything that
-    // could break log lines or SQL.
-    if (v && /^[A-Za-z0-9._@-]{1,128}$/.test(v)) return v;
+    // could break log lines or SQL. Also reject all-dot values ('.', '..', …):
+    // userId is a directory tier in the attachment paths, so '..' would escape
+    // the per-user receipts dir. No legitimate username/email is all dots.
+    if (v && /^[A-Za-z0-9._@-]{1,128}$/.test(v) && !/^\.+$/.test(v)) return v;
   }
   return null;
 }
