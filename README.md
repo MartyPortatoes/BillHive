@@ -56,7 +56,7 @@
 **Tracking & history**
 - Summary tab shows each person's total owed with a full bill-by-bill breakdown
 - Full Bill Breakdown can be printed or saved as a PDF from the Summary tab
-- Editable **Checks** and **Trips** surfaces support restaurant checks, travel expenses, balances, suggested settlements, itinerary/checklist planning, and synced SelfHive state; Shared Bills references remain read-only guest records
+- Editable **Checks** and **Trips** surfaces support restaurant checks, anonymous check claim links, travel expenses, per-member trip invite links, receipt/itinerary attachments, balances, suggested settlements, itinerary/checklist planning, and synced SelfHive state; Shared Bills references remain read-only guest records
 - **Trend charts** — per-person and per-bill views with line charts, donut breakdowns, and stacked bar charts powered by Chart.js
 - **Monthly checklist** auto-generated from your people and bills — tracks what's been emailed, paid, and collected
 

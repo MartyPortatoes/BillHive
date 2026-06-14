@@ -1188,6 +1188,8 @@ function _initEvtFns() {
     addAllCheckHousehold, addCheckParticipantByName, removeCheckParticipant,
     toggleCheckParticipantPaidWeb, markCheckPaymentRequested,
     setCheckCompleted, deleteCheck, renderChecks,
+    createCheckShareWeb, refreshCheckShareWeb, revokeCheckShareWeb,
+    copyCheckShareURL, openCheckShareURL, pullCheckClaims,
     addTrip, updateTripField, updateTripDate,
     addTripMemberFromSelect, addTripMemberFromPerson,
     addAllTripHousehold, addTripMemberByName, removeTripMember,
@@ -1195,6 +1197,10 @@ function _initEvtFns() {
     updateTripExpenseDate, setTripExpensePayer, removeTripExpense,
     setTripExpenseEveryone, toggleTripExpenseSplitter,
     archiveTripWeb, deleteTripWeb,
+    loadTripInvitesWeb, createTripInviteWeb, revokeTripInviteWeb,
+    copyTripInviteURL, openTripInviteURL,
+    uploadTripExpenseAttachment, openTripExpenseAttachment, deleteTripExpenseAttachment,
+    uploadItineraryAttachment, openItineraryAttachment, deleteItineraryAttachment,
     recordTripSettlementWeb, removeTripSettlement,
     addTripChecklistItem, updateTripChecklistItem, removeTripChecklistItem,
     addItineraryEvent, updateItineraryEvent, removeItineraryEvent,
@@ -1687,6 +1693,43 @@ function personSelectOptions(selectedId, excludeLinkedIds = new Set()) {
     .map(p => `<option value="${esc(p.id)}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name || p.id)}</option>`)
     .join('');
 }
+const checkShareCache = {};
+const tripInviteCache = {};
+function formatEpochSeconds(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return shortDate(n);
+}
+function currentServerBaseURL() {
+  if (location.origin && /^https?:\/\//i.test(location.origin)) return location.origin;
+  return '';
+}
+function tripInviteURL(token) {
+  const server = currentServerBaseURL();
+  if (!server || !token) return '';
+  return 'billhive://join-trip?token=' + encodeURIComponent(token) + '&server=' + encodeURIComponent(server);
+}
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); }
+  finally { ta.remove(); }
+}
+async function copyText(text, label = 'Link') {
+  if (!text) return;
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    else fallbackCopyText(text);
+    toast(label + ' copied');
+  } catch {
+    fallbackCopyText(text);
+    toast(label + ' copied');
+  }
+}
 function serverHostLabel(raw) {
   if (!raw) return '';
   try {
@@ -1962,6 +2005,164 @@ function deleteCheck(checkId) {
     save();
   }, { okLabel:'Delete', danger:true });
 }
+function latestClaimsByName(claims) {
+  const byName = new Map();
+  asList(claims).forEach(claim => {
+    const name = String(claim.claimerName || '').trim();
+    if (!name) return;
+    const existing = byName.get(name.toLowerCase());
+    if (!existing || String(claim.claimedAt || '') > String(existing.claimedAt || '')) {
+      byName.set(name.toLowerCase(), claim);
+    }
+  });
+  return [...byName.values()].sort((a, b) => String(a.claimerName).localeCompare(String(b.claimerName)));
+}
+function applyCheckShareInfo(checkId, info) {
+  const check = findCheck(checkId);
+  if (!check || !info) return;
+  check.shareToken = info.token || '';
+  check.shareURL = info.url || '';
+  check.shareBackend = 'server';
+  checkShareCache[checkId] = info;
+}
+async function createCheckShareWeb(checkId, rotate = false) {
+  try {
+    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}${rotate ? '?rotate=1' : ''}`, { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    const info = await res.json();
+    applyCheckShareInfo(checkId, info);
+    renderChecks();
+    save();
+    toast(rotate ? 'Share link rotated' : 'Share link ready');
+  } catch (e) {
+    toast('Share failed: ' + e.message);
+  }
+}
+async function refreshCheckShareWeb(checkId) {
+  try {
+    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}`);
+    if (res.status === 404) {
+      delete checkShareCache[checkId];
+      const check = findCheck(checkId);
+      if (check) {
+        check.shareToken = '';
+        check.shareURL = '';
+        check.shareBackend = '';
+      }
+      renderChecks();
+      save();
+      toast('No active share link');
+      return;
+    }
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    const info = await res.json();
+    applyCheckShareInfo(checkId, info);
+    renderChecks();
+    save();
+    toast('Claims refreshed');
+  } catch (e) {
+    toast('Refresh failed: ' + e.message);
+  }
+}
+async function revokeCheckShareWeb(checkId) {
+  try {
+    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    delete checkShareCache[checkId];
+    const check = findCheck(checkId);
+    if (check) {
+      check.shareToken = '';
+      check.shareURL = '';
+      check.shareBackend = '';
+    }
+    renderChecks();
+    save();
+    toast('Share link revoked');
+  } catch (e) {
+    toast('Revoke failed: ' + e.message);
+  }
+}
+function copyCheckShareURL(checkId) {
+  const check = findCheck(checkId);
+  copyText(check?.shareURL || checkShareCache[checkId]?.url || '', 'Share link');
+}
+function openCheckShareURL(checkId) {
+  const check = findCheck(checkId);
+  const url = check?.shareURL || checkShareCache[checkId]?.url || '';
+  if (url) window.open(url, '_blank', 'noopener');
+}
+function pullCheckClaims(checkId) {
+  const check = findCheck(checkId);
+  const claims = latestClaimsByName(checkShareCache[checkId]?.claims || []);
+  if (!check || !claims.length) return;
+  let added = 0;
+  claims.forEach(claim => {
+    const normalized = String(claim.claimerName || '').trim().toLowerCase();
+    if (!normalized) return;
+    let participant = checkParticipants(check).find(p => String(p.name || '').trim().toLowerCase() === normalized);
+    if (!participant) {
+      participant = { id: uid('cp'), name: String(claim.claimerName).trim(), linkedPersonId: null };
+      check.participants.push(participant);
+      added += 1;
+    }
+    asList(claim.itemIds).forEach(itemId => {
+      const item = checkItems(check).find(i => i.id === itemId);
+      if (!item) return;
+      const current = asList(item.sharedByParticipantIds);
+      if (!current.includes(participant.id)) current.push(participant.id);
+      item.sharedByParticipantIds = current;
+    });
+  });
+  renderChecks();
+  save();
+  toast(added ? `Claims pulled (${added} new participant${added === 1 ? '' : 's'})` : 'Claims pulled');
+}
+function renderCheckShareSection(check) {
+  const info = checkShareCache[check.id];
+  const claims = latestClaimsByName(info?.claims || []);
+  const shareURL = check.shareURL || info?.url || '';
+  const claimRows = claims.length ? `
+    <div class="mode-section-title" style="margin-top:10px;">Claims</div>
+    ${claims.map(claim => `<div class="mode-row">
+      <div>
+        <div class="mode-row-name">${esc(claim.claimerName)}</div>
+        <div class="mode-row-sub">${asList(claim.itemIds).length || 'Joined'} ${asList(claim.itemIds).length === 1 ? 'item' : 'items'}${claim.claimedAt ? ' · ' + esc(shortDate(claim.claimedAt)) : ''}</div>
+      </div>
+      <div class="mode-row-val">${asList(claim.itemIds).length || ''}</div>
+    </div>`).join('')}
+  ` : '';
+
+  if (!shareURL) {
+    return `<div class="mode-edit-section">
+      <div class="mode-section-title">Share Link</div>
+      <div class="mode-toolbar-copy">Create a no-account claim link so guests can choose the items they had. Pull claims back into this check when they are done.</div>
+      <div class="mode-actions" style="margin-top:8px;">
+        <button class="btn btn-ghost btn-xs" data-click="refreshCheckShareWeb('${check.id}')">Refresh</button>
+        <button class="btn btn-green btn-xs" data-click="createCheckShareWeb('${check.id}')">Generate Share Link</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="mode-edit-section">
+    <div class="mode-section-title">Share Link</div>
+    <div class="mode-row">
+      <div>
+        <div class="mode-row-name">Active claim link</div>
+        <div class="mode-row-sub">${esc(shareURL)}${info?.createdAt ? ' · created ' + esc(formatEpochSeconds(info.createdAt)) : ''}</div>
+      </div>
+      <span class="mode-chip good">${claims.length ? `${claims.length} claim${claims.length === 1 ? '' : 's'}` : 'Active'}</span>
+    </div>
+    <div class="mode-actions" style="margin-top:10px;">
+      <button class="btn btn-ghost btn-xs" data-click="copyCheckShareURL('${check.id}')">Copy</button>
+      <button class="btn btn-ghost btn-xs" data-click="openCheckShareURL('${check.id}')">Open</button>
+      <button class="btn btn-ghost btn-xs" data-click="refreshCheckShareWeb('${check.id}')">Refresh Claims</button>
+      <button class="btn btn-green btn-xs" ${claims.length ? '' : 'disabled'} data-click="pullCheckClaims('${check.id}')">Pull Claims</button>
+      <button class="btn btn-ghost btn-xs" data-click="createCheckShareWeb('${check.id}',true)">Rotate</button>
+      <button class="btn btn-danger btn-xs" data-click="revokeCheckShareWeb('${check.id}')">Revoke</button>
+    </div>
+    ${claimRows}
+  </div>`;
+}
 function renderCheckAssigneeChips(check, item) {
   const explicit = asList(item.sharedByParticipantIds);
   const allSelected = !explicit.length;
@@ -2036,6 +2237,7 @@ function renderCheckEditor(check) {
         <textarea placeholder="Optional notes" data-input="updateCheckField('${check.id}','notes',this.value)" data-change="save()">${esc(check.notes || '')}</textarea>
       </div>
     </div>
+    ${renderCheckShareSection(check)}
     <div class="mode-edit-section">
       <div class="mode-section-title">Participants</div>
       ${participantRows}
@@ -2474,6 +2676,277 @@ function deleteTripWeb(tripId) {
     save();
   }, { okLabel:'Delete', danger:true });
 }
+function upsertTripInvite(tripId, invite) {
+  const current = Array.isArray(tripInviteCache[tripId]) ? tripInviteCache[tripId] : [];
+  tripInviteCache[tripId] = [
+    ...current.filter(i => i.memberId !== invite.memberId),
+    invite,
+  ];
+}
+async function loadTripInvitesWeb(tripId) {
+  try {
+    const res = await fetch(`${API}/trips/${encodeURIComponent(tripId)}/invites`);
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    tripInviteCache[tripId] = await res.json();
+    renderTrips();
+    toast('Invites refreshed');
+  } catch (e) {
+    toast('Invite refresh failed: ' + e.message);
+  }
+}
+async function createTripInviteWeb(tripId, memberId, rotate = false) {
+  if (!memberId) return;
+  try {
+    const res = await fetch(`${API}/trips/${encodeURIComponent(tripId)}/invite${rotate ? '?rotate=1' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId }),
+    });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    const invite = await res.json();
+    upsertTripInvite(tripId, invite);
+    renderTrips();
+    const url = tripInviteURL(invite.token);
+    if (url) copyText(url, 'Trip invite');
+    else toast('Invite ready');
+  } catch (e) {
+    toast('Invite failed: ' + e.message);
+  }
+}
+async function revokeTripInviteWeb(tripId, memberId) {
+  try {
+    const res = await fetch(`${API}/trips/${encodeURIComponent(tripId)}/invite/${encodeURIComponent(memberId)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    tripInviteCache[tripId] = (tripInviteCache[tripId] || []).filter(i => i.memberId !== memberId);
+    renderTrips();
+    toast('Invite revoked');
+  } catch (e) {
+    toast('Revoke failed: ' + e.message);
+  }
+}
+function inviteForMember(tripId, memberId) {
+  return (tripInviteCache[tripId] || []).find(i => i.memberId === memberId);
+}
+function copyTripInviteURL(tripId, memberId) {
+  const invite = inviteForMember(tripId, memberId);
+  copyText(tripInviteURL(invite?.token), 'Trip invite');
+}
+function openTripInviteURL(tripId, memberId) {
+  const invite = inviteForMember(tripId, memberId);
+  const url = tripInviteURL(invite?.token);
+  if (url) window.open(url, '_blank', 'noopener');
+}
+function renderTripInviteSection(trip) {
+  const invites = tripInviteCache[trip.id] || [];
+  const loaded = Object.prototype.hasOwnProperty.call(tripInviteCache, trip.id);
+  const serverBase = currentServerBaseURL();
+  const rows = tripMembers(trip).length ? tripMembers(trip).map(member => {
+    const invite = invites.find(i => i.memberId === member.id);
+    const status = invite
+      ? (invite.joined ? '<span class="mode-chip good">Joined</span>' : '<span class="mode-chip warn">Pending</span>')
+      : '<span class="mode-chip">Not invited</span>';
+    return `<div class="mode-person-row">
+      <div>
+        <div class="mode-row-name">${esc(member.name || member.id)} ${status}</div>
+        <div class="mode-row-sub">${invite?.createdAt ? 'created ' + esc(formatEpochSeconds(invite.createdAt)) : (serverBase ? 'Create a SelfHive deep link for this member' : 'Serve the app over http(s) to build copyable deep links')}</div>
+      </div>
+      <div class="mode-row-actions">
+        ${invite ? `
+          <button class="btn btn-ghost btn-xs" ${serverBase ? '' : 'disabled'} data-click="copyTripInviteURL('${trip.id}','${member.id}')">Copy</button>
+          <button class="btn btn-ghost btn-xs" ${serverBase ? '' : 'disabled'} data-click="openTripInviteURL('${trip.id}','${member.id}')">Open</button>
+          <button class="btn btn-ghost btn-xs" data-click="createTripInviteWeb('${trip.id}','${member.id}',true)">Rotate</button>
+          <button class="btn btn-danger btn-xs" data-click="revokeTripInviteWeb('${trip.id}','${member.id}')">Revoke</button>
+        ` : `<button class="btn btn-green btn-xs" data-click="createTripInviteWeb('${trip.id}','${member.id}')">Create Invite</button>`}
+      </div>
+      <span></span>
+    </div>`;
+  }).join('') : `<div class="mode-empty-inline">Add trip members before creating invite links.</div>`;
+
+  return `<div class="mode-edit-section">
+    <div class="mode-section-title">Invite Links</div>
+    <div class="mode-toolbar-copy">Create per-member SelfHive invite links. The invite token lets that member join and sync shared trip expenses from their iOS app.</div>
+    <div class="mode-actions" style="margin-top:8px;margin-bottom:8px;">
+      <button class="btn btn-ghost btn-xs" data-click="loadTripInvitesWeb('${trip.id}')">${loaded ? 'Refresh Invites' : 'Load Invites'}</button>
+    </div>
+    ${rows}
+  </div>`;
+}
+function safeAttachmentFilename(name, fallback = 'attachment') {
+  const raw = String(name || fallback).split(/[\\/]/).pop();
+  let cleaned = raw.replace(/[^A-Za-z0-9.\-]/g, '');
+  if (!cleaned || cleaned === '.' || cleaned === '..' || cleaned.startsWith('.')) cleaned = fallback;
+  if (cleaned.length > 180) cleaned = cleaned.slice(cleaned.length - 180);
+  return cleaned || fallback;
+}
+function attachmentName(attachment) {
+  return attachment?.displayName || attachment?.filename || 'Attachment';
+}
+function attachmentDate(attachment) {
+  return attachment?.createdAtISO ? shortDate(attachment.createdAtISO) : '';
+}
+function attachmentId() {
+  return uid('att').replace(/[^A-Za-z0-9-]/g, '');
+}
+function tripExpenseAttachmentsURL(tripId, expenseId) {
+  return `${API}/trips/${encodeURIComponent(tripId)}/expenses/${encodeURIComponent(expenseId)}/attachments`;
+}
+function tripExpenseAttachmentURL(tripId, expenseId, filename) {
+  return `${tripExpenseAttachmentsURL(tripId, expenseId)}/${encodeURIComponent(filename)}`;
+}
+function itineraryAttachmentsURL(tripId, eventId) {
+  return `${API}/trips/${encodeURIComponent(tripId)}/itinerary/${encodeURIComponent(eventId)}/attachments`;
+}
+function itineraryAttachmentURL(tripId, eventId, filename) {
+  return `${itineraryAttachmentsURL(tripId, eventId)}/${encodeURIComponent(filename)}`;
+}
+function openTripExpenseAttachment(tripId, expenseId, filename) {
+  if (filename) window.open(tripExpenseAttachmentURL(tripId, expenseId, filename), '_blank', 'noopener');
+}
+function openItineraryAttachment(tripId, eventId, filename) {
+  if (filename) window.open(itineraryAttachmentURL(tripId, eventId, filename), '_blank', 'noopener');
+}
+async function uploadTripExpenseAttachment(tripId, expenseId, input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    if (file.type && file.type !== 'image/jpeg') throw new Error('Choose a JPEG receipt');
+    if (!file.type && !/\.jpe?g$/i.test(file.name || '')) throw new Error('Choose a JPEG receipt');
+    const trip = findTrip(tripId);
+    const expense = tripExpenses(trip).find(e => e.id === expenseId);
+    if (!trip || !expense) throw new Error('Expense not found');
+    const id = attachmentId();
+    const filename = `${id}.jpg`;
+    const res = await fetch(tripExpenseAttachmentsURL(tripId, expenseId), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'X-Attachment-Id': id,
+      },
+      body: file,
+    });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    if (!Array.isArray(expense.attachments)) expense.attachments = [];
+    expense.attachments.push({
+      id,
+      filename,
+      mimeType: 'image/jpeg',
+      createdAtISO: new Date().toISOString(),
+      displayName: file.name || 'Receipt',
+    });
+    renderTrips();
+    save();
+    toast('Receipt attached');
+  } catch (e) {
+    toast('Attach failed: ' + e.message);
+  } finally {
+    if (input) input.value = '';
+  }
+}
+async function uploadItineraryAttachment(tripId, eventId, input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    const trip = findTrip(tripId);
+    const event = (trip?.itinerary || []).find(e => e.id === eventId);
+    if (!trip || !event) throw new Error('Event not found');
+    const id = attachmentId();
+    const safeName = safeAttachmentFilename(file.name || 'file');
+    const filename = safeAttachmentFilename(`${id}-${safeName}`);
+    const res = await fetch(itineraryAttachmentsURL(tripId, eventId), {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Attachment-Id': id,
+        'X-Filename': filename,
+      },
+      body: file,
+    });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    if (!Array.isArray(event.attachments)) event.attachments = [];
+    event.attachments.push({
+      id,
+      filename,
+      mimeType: file.type || 'application/octet-stream',
+      createdAtISO: new Date().toISOString(),
+      displayName: file.name || 'File',
+    });
+    renderTrips();
+    save();
+    toast('File attached');
+  } catch (e) {
+    toast('Attach failed: ' + e.message);
+  } finally {
+    if (input) input.value = '';
+  }
+}
+async function deleteTripExpenseAttachment(tripId, expenseId, filename) {
+  try {
+    const trip = findTrip(tripId);
+    const expense = tripExpenses(trip).find(e => e.id === expenseId);
+    if (!trip || !expense) throw new Error('Expense not found');
+    const res = await fetch(tripExpenseAttachmentURL(tripId, expenseId, filename), { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    expense.attachments = (Array.isArray(expense.attachments) ? expense.attachments : []).filter(a => a.filename !== filename);
+    renderTrips();
+    save();
+    toast('Receipt removed');
+  } catch (e) {
+    toast('Remove failed: ' + e.message);
+  }
+}
+async function deleteItineraryAttachment(tripId, eventId, filename) {
+  try {
+    const trip = findTrip(tripId);
+    const event = (trip?.itinerary || []).find(e => e.id === eventId);
+    if (!trip || !event) throw new Error('Event not found');
+    const res = await fetch(itineraryAttachmentURL(tripId, eventId, filename), { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+    event.attachments = (Array.isArray(event.attachments) ? event.attachments : []).filter(a => a.filename !== filename);
+    renderTrips();
+    save();
+    toast('File removed');
+  } catch (e) {
+    toast('Remove failed: ' + e.message);
+  }
+}
+function renderTripExpenseAttachments(trip, expense) {
+  const attachments = Array.isArray(expense.attachments) ? expense.attachments : [];
+  const rows = attachments.length ? attachments.map(att => `<div class="mode-person-row">
+    <div>
+      <div class="mode-row-name">${esc(attachmentName(att))}</div>
+      <div class="mode-row-sub">${esc(att.mimeType || 'image/jpeg')}${attachmentDate(att) ? ' · ' + esc(attachmentDate(att)) : ''}</div>
+    </div>
+    <div class="mode-row-actions">
+      <button class="btn btn-ghost btn-xs" data-click="openTripExpenseAttachment('${trip.id}','${expense.id}','${att.filename}')">Open</button>
+      <button class="btn btn-danger btn-xs" data-click="deleteTripExpenseAttachment('${trip.id}','${expense.id}','${att.filename}')">Remove</button>
+    </div>
+    <span></span>
+  </div>`).join('') : `<div class="mode-empty-inline">No receipts attached.</div>`;
+  return `<div class="mode-field" style="margin-bottom:8px;">
+    <div class="mode-section-title" style="margin-top:6px;">Receipts</div>
+    ${rows}
+    <input type="file" accept="image/jpeg,.jpg,.jpeg" data-change="uploadTripExpenseAttachment('${trip.id}','${expense.id}',this)">
+  </div>`;
+}
+function renderItineraryAttachments(trip, event) {
+  const attachments = Array.isArray(event.attachments) ? event.attachments : [];
+  const rows = attachments.length ? attachments.map(att => `<div class="mode-person-row">
+    <div>
+      <div class="mode-row-name">${esc(attachmentName(att))}</div>
+      <div class="mode-row-sub">${esc(att.mimeType || 'application/octet-stream')}${attachmentDate(att) ? ' · ' + esc(attachmentDate(att)) : ''}</div>
+    </div>
+    <div class="mode-row-actions">
+      <button class="btn btn-ghost btn-xs" data-click="openItineraryAttachment('${trip.id}','${event.id}','${att.filename}')">Open</button>
+      <button class="btn btn-danger btn-xs" data-click="deleteItineraryAttachment('${trip.id}','${event.id}','${att.filename}')">Remove</button>
+    </div>
+    <span></span>
+  </div>`).join('') : `<div class="mode-empty-inline">No files attached.</div>`;
+  return `<div class="mode-field" style="margin-bottom:8px;">
+    <div class="mode-section-title" style="margin-top:6px;">Files</div>
+    ${rows}
+    <input type="file" data-change="uploadItineraryAttachment('${trip.id}','${event.id}',this)">
+  </div>`;
+}
 function recordTripSettlementWeb(tripId, fromMemberId, toMemberId, amount) {
   const trip = findTrip(tripId);
   if (!trip || !fromMemberId || !toMemberId || asNumber(amount) <= 0) return;
@@ -2595,7 +3068,8 @@ function renderTripEditor(trip) {
     </div>
     <div class="mode-field" style="margin-bottom:8px;">
       <textarea placeholder="Expense notes" data-input="updateTripExpenseField('${trip.id}','${expense.id}','notes',this.value)" data-change="save()">${esc(expense.notes || '')}</textarea>
-    </div>`;
+    </div>
+    ${renderTripExpenseAttachments(trip, expense)}`;
   }).join('') : `<div class="mode-empty-inline">Add expenses as you spend. Each expense can be split with everyone or selected members.</div>`;
 
   const suggestions = tripSuggestedSettlements(trip);
@@ -2649,6 +3123,7 @@ function renderTripEditor(trip) {
              data-input="updateItineraryEvent('${trip.id}','${event.id}','notes',this.value)" data-change="save()">
       <button class="remove-line" data-click="removeItineraryEvent('${trip.id}','${event.id}')">✕</button>
     </div>
+    ${renderItineraryAttachments(trip, event)}
   `).join('') : `<div class="mode-empty-inline">No itinerary events.</div>`;
 
   return `<div class="mode-body">
@@ -2680,6 +3155,7 @@ function renderTripEditor(trip) {
         </div>
       </div>
     </div>
+    ${renderTripInviteSection(trip)}
     <div class="mode-edit-section">
       <div class="mode-section-title">Expenses</div>
       ${expenseRows}
