@@ -147,6 +147,20 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_trip_invites_owner ON trip_invites(owner_user_id, trip_id);
   CREATE INDEX IF NOT EXISTS idx_trip_invites_member ON trip_invites(owner_user_id, trip_id, member_id);
+
+  -- Per-person invite links for household bills sharing. The token grants a
+  -- read-only view of one person's bill summary, computed from the owner's
+  -- current state each time the guest fetches it.
+  CREATE TABLE IF NOT EXISTS bills_invites (
+    token           TEXT    PRIMARY KEY,
+    owner_user_id   TEXT    NOT NULL,
+    person_id       TEXT    NOT NULL,
+    joined_at       INTEGER,
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch()),
+    revoked_at      INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_bills_invites_owner ON bills_invites(owner_user_id);
+  CREATE INDEX IF NOT EXISTS idx_bills_invites_person ON bills_invites(owner_user_id, person_id);
 `);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
@@ -189,6 +203,14 @@ const stmts = {
   markTripInviteJoined:       db.prepare('UPDATE trip_invites SET joined_at = unixepoch() WHERE token = ? AND revoked_at IS NULL'),
   revokeTripInvite:           db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND trip_id = ? AND member_id = ? AND revoked_at IS NULL'),
   revokeAllTripInvites:       db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND trip_id = ? AND revoked_at IS NULL'),
+
+  // Bills invites
+  findBillsInviteByToken:      db.prepare('SELECT * FROM bills_invites WHERE token = ?'),
+  findActiveBillsInviteForPerson: db.prepare('SELECT * FROM bills_invites WHERE owner_user_id = ? AND person_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1'),
+  listBillsInvitesForOwner:    db.prepare('SELECT * FROM bills_invites WHERE owner_user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC'),
+  insertBillsInvite:           db.prepare('INSERT INTO bills_invites (token, owner_user_id, person_id) VALUES (?, ?, ?)'),
+  markBillsInviteJoined:       db.prepare('UPDATE bills_invites SET joined_at = unixepoch() WHERE token = ? AND revoked_at IS NULL'),
+  revokeBillsInvite:           db.prepare('UPDATE bills_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND person_id = ? AND revoked_at IS NULL'),
 };
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
@@ -661,6 +683,219 @@ function publicTripShape(trip) {
   };
 }
 
+// ── Bills invite helpers ────────────────────────────────────────────────────
+// SelfHive keeps the canonical bills state on this server, so invite links can
+// compute the guest's current read-only snapshot instead of storing a stale copy.
+
+function parseJSONValue(value, fallback) {
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function getStateJSON(userId, key, fallback) {
+  const row = stmts.getState.get(userId, key);
+  return row ? parseJSONValue(row.value, fallback) : fallback;
+}
+
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getMonthJSON(userId, key) {
+  const row = stmts.getMonth.get(userId, key);
+  return row ? parseJSONValue(row.data, { totals: {}, amounts: {} }) : { totals: {}, amounts: {} };
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function billLines(bill) {
+  return Array.isArray(bill?.lines) ? bill.lines : [];
+}
+
+function evenCentAmounts(lines, totalCents) {
+  if (!lines.length) return {};
+  const baseCents = Math.floor(totalCents / lines.length);
+  const remainder = totalCents % lines.length;
+  const extraStart = lines.length - remainder;
+  const amounts = {};
+  lines.forEach((line, index) => {
+    const cents = baseCents + (index >= extraStart ? 1 : 0);
+    amounts[line.id] = cents / 100;
+  });
+  return amounts;
+}
+
+function isAutoEvenPctDistribution(lines) {
+  const count = lines.length;
+  if (!count) return false;
+  const exactShare = 100 / count;
+  if (lines.every(line => Math.abs(finiteNumber(line.value) - exactShare) < 0.000001)) {
+    return true;
+  }
+  const roundedShare = Math.round(exactShare * 100) / 100;
+  const lastShare = 100 - (roundedShare * (count - 1));
+  return lines.every((line, index) => {
+    const expected = index === count - 1 ? lastShare : roundedShare;
+    return Math.abs(finiteNumber(line.value) - expected) < 0.005001;
+  });
+}
+
+function pctLineAmounts(bill, total) {
+  const lines = billLines(bill);
+  const totalCents = Math.max(0, Math.round(finiteNumber(total) * 100));
+  if (!lines.length) return {};
+  if (isAutoEvenPctDistribution(lines)) return evenCentAmounts(lines, totalCents);
+
+  const amounts = {};
+  let allocatedCents = 0;
+  lines.slice(0, -1).forEach(line => {
+    const cents = Math.max(0, Math.round(totalCents * finiteNumber(line.value) / 100));
+    amounts[line.id] = cents / 100;
+    allocatedCents += cents;
+  });
+  const last = lines[lines.length - 1];
+  amounts[last.id] = Math.max(0, totalCents - allocatedCents) / 100;
+  return amounts;
+}
+
+function billLineShares(bill, monthData) {
+  const lines = billLines(bill);
+  const amountMap = monthData?.amounts?.[bill.id] || {};
+  const nonRemainderTotal = lines.reduce((total, line) => (
+    line.id === bill.remainderLineId ? total : total + finiteNumber(amountMap[line.id])
+  ), 0);
+  const totals = monthData?.totals || {};
+  const hasTotal = Object.prototype.hasOwnProperty.call(totals, bill.id);
+  const billTotal = hasTotal ? finiteNumber(totals[bill.id]) : nonRemainderTotal;
+  const pctAmounts = bill.splitType === 'pct' ? pctLineAmounts(bill, billTotal) : {};
+
+  return lines.map(line => {
+    let amount = 0;
+    if (bill.splitType === 'pct') {
+      amount = pctAmounts[line.id] || 0;
+    } else if (line.id === bill.remainderLineId) {
+      amount = Math.max(0, billTotal - nonRemainderTotal);
+    } else {
+      amount = finiteNumber(amountMap[line.id]);
+    }
+    return {
+      line,
+      payerId: line.coveredById || line.personId,
+      amount,
+    };
+  });
+}
+
+function computeBillsPersonOwes(people, bills, monthData) {
+  const byPerson = {};
+  for (const bill of Array.isArray(bills) ? bills : []) {
+    const billPayer = bill.paidById || 'me';
+    for (const share of billLineShares(bill, monthData)) {
+      const { line, payerId, amount } = share;
+      if (amount <= 0) continue;
+
+      if (billPayer === 'me') {
+        if (payerId === 'me') continue;
+        if (!byPerson[payerId]) byPerson[payerId] = { total: 0, bills: [] };
+        let billName = bill.name || '';
+        if (line.coveredById && line.coveredById !== line.personId) {
+          const covered = people.find(person => person.id === line.personId);
+          if (covered) billName += ` (covers ${covered.name})`;
+        }
+        byPerson[payerId].total += amount;
+        byPerson[payerId].bills.push({ billId: bill.id, billName, amount });
+      } else if (payerId === 'me') {
+        if (!byPerson[billPayer]) byPerson[billPayer] = { total: 0, bills: [] };
+        byPerson[billPayer].total -= amount;
+        byPerson[billPayer].bills.push({ billId: bill.id, billName: bill.name || '', amount: -amount });
+      }
+    }
+  }
+
+  Object.values(byPerson).forEach(entry => {
+    const consolidated = new Map();
+    entry.bills.forEach(item => {
+      const existing = consolidated.get(item.billId);
+      if (existing) {
+        existing.amount += item.amount;
+      } else {
+        consolidated.set(item.billId, { ...item });
+      }
+    });
+    entry.bills = Array.from(consolidated.values()).sort((a, b) => a.billName.localeCompare(b.billName));
+  });
+  return byPerson;
+}
+
+function buildBillsInvitePayload(ownerUserId, personId) {
+  const rawPeople = getStateJSON(ownerUserId, 'people', []);
+  const people = Array.isArray(rawPeople) ? rawPeople : [];
+  const bills = getStateJSON(ownerUserId, 'bills', []);
+  const person = people.find(p => p.id === personId);
+  if (!person) return null;
+
+  const monthKey = currentMonthKey();
+  const monthData = getMonthJSON(ownerUserId, monthKey);
+  const ownerName = (people.find(p => p.id === 'me') || {}).name || 'Host';
+  const owes = computeBillsPersonOwes(people, bills, monthData);
+  const personOwes = owes[personId] || { total: 0, bills: [] };
+
+  return {
+    ownerName,
+    personId,
+    personName: person.name || '',
+    monthKey,
+    totalOwed: finiteNumber(personOwes.total),
+    bills: personOwes.bills.map(item => ({
+      name: item.billName,
+      amount: finiteNumber(item.amount),
+    })),
+    payMethod: person.payMethod || 'none',
+    payId: person.payId || '',
+    zelleUrl: person.zelleUrl || null,
+  };
+}
+
+function billsInviteInfoResponse(invite) {
+  return {
+    token: invite.token,
+    personId: invite.person_id,
+    joined: !!invite.joined_at,
+    createdAt: invite.created_at,
+  };
+}
+
+function billsInvitePreviewResponse(invite, payload) {
+  return {
+    ownerName: payload.ownerName,
+    personId: payload.personId,
+    personName: payload.personName,
+    joined: !!invite.joined_at,
+    createdAt: invite.created_at,
+    monthSummary: {
+      monthKey: payload.monthKey,
+      totalOwed: payload.totalOwed,
+      bills: payload.bills,
+    },
+  };
+}
+
+function sharedBillsDataResponse(payload) {
+  return {
+    ownerName: payload.ownerName,
+    personName: payload.personName,
+    monthKey: payload.monthKey,
+    totalOwed: payload.totalOwed,
+    bills: payload.bills,
+    payMethod: payload.payMethod,
+    payId: payload.payId,
+    zelleUrl: payload.zelleUrl,
+  };
+}
+
 // GET /public/trip/invite/:token — preview the trip before joining.
 // Returns the trip data (stripped of host-only info) + invite metadata.
 app.get('/public/trip/invite/:token', publicLimiter, (req, res) => {
@@ -819,6 +1054,54 @@ app.post('/public/trip/invite/:token/settlement', publicLimiter, (req, res) => {
   stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
   broadcastChange(invite.owner_user_id);
   res.json({ ok: true });
+});
+
+// ── Bills invite public routes ───────────────────────────────────────────────
+// Public-facing endpoints for household bills invites. The token identifies
+// one invited person and authorizes read-only access to that person's snapshot.
+
+// GET /public/bills/invite/:token — preview the invite before joining.
+app.get('/public/bills/invite/:token', publicLimiter, (req, res) => {
+  const invite = stmts.findBillsInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+
+  const payload = buildBillsInvitePayload(invite.owner_user_id, invite.person_id);
+  if (!payload) return res.status(404).json({ error: 'Person not found' });
+  res.json(billsInvitePreviewResponse(invite, payload));
+});
+
+// POST /public/bills/invite/:token/join — claim the invite. Idempotent.
+app.post('/public/bills/invite/:token/join', publicLimiter, (req, res) => {
+  const invite = stmts.findBillsInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+
+  if (!invite.joined_at) {
+    stmts.markBillsInviteJoined.run(req.params.token);
+  }
+
+  const updatedInvite = stmts.findBillsInviteByToken.get(req.params.token) || invite;
+  const payload = buildBillsInvitePayload(updatedInvite.owner_user_id, updatedInvite.person_id);
+  if (!payload) return res.status(404).json({ error: 'Person not found' });
+  broadcastChange(updatedInvite.owner_user_id);
+  res.json({
+    ok: true,
+    personId: payload.personId,
+    personName: payload.personName,
+    ownerName: payload.ownerName,
+  });
+});
+
+// GET /public/bills/invite/:token/data — read the joined person's bill snapshot.
+app.get('/public/bills/invite/:token/data', publicLimiter, (req, res) => {
+  const invite = stmts.findBillsInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+
+  const payload = buildBillsInvitePayload(invite.owner_user_id, invite.person_id);
+  if (!payload) return res.status(404).json({ error: 'Person not found' });
+  res.json(sharedBillsDataResponse(payload));
 });
 
 // GET /share/:token — serves the static claim page. Has to be registered
@@ -1082,6 +1365,46 @@ app.delete('/api/trips/:tripId/invite/:memberId', (req, res) => {
 // DELETE /api/trips/:tripId/invites — revoke ALL invites for a trip.
 app.delete('/api/trips/:tripId/invites', (req, res) => {
   stmts.revokeAllTripInvites.run(req.userId, req.params.tripId);
+  res.json({ ok: true });
+});
+
+
+// ── Bills invite links (AUTH) ────────────────────────────────────────────────
+// Host-side endpoints for managing per-person household bills invites.
+
+// POST /api/bills/invite — create a per-person invite link.
+// Body: { personId }. Idempotent if an active invite already exists for
+// this person. Pass ?rotate=1 to revoke any prior invite and mint a fresh one.
+app.post('/api/bills/invite', (req, res) => {
+  const { personId } = req.body || {};
+  if (!personId) return res.status(400).json({ error: 'personId is required' });
+
+  const payload = buildBillsInvitePayload(req.userId, personId);
+  if (!payload) return res.status(404).json({ error: 'Person not found' });
+
+  const rotate = req.query.rotate === '1' || req.query.rotate === 'true';
+  if (!rotate) {
+    const existing = stmts.findActiveBillsInviteForPerson.get(req.userId, personId);
+    if (existing) return res.json(billsInviteInfoResponse(existing));
+  } else {
+    stmts.revokeBillsInvite.run(req.userId, personId);
+  }
+
+  const token = crypto.randomBytes(24).toString('base64url');
+  stmts.insertBillsInvite.run(token, req.userId, personId);
+  const invite = stmts.findBillsInviteByToken.get(token);
+  res.json(billsInviteInfoResponse(invite));
+});
+
+// GET /api/bills/invites — list all active household bills invites.
+app.get('/api/bills/invites', (req, res) => {
+  const invites = stmts.listBillsInvitesForOwner.all(req.userId);
+  res.json(invites.map(billsInviteInfoResponse));
+});
+
+// DELETE /api/bills/invite/:personId — revoke an invite for one person.
+app.delete('/api/bills/invite/:personId', (req, res) => {
+  stmts.revokeBillsInvite.run(req.userId, req.params.personId);
   res.json({ ok: true });
 });
 

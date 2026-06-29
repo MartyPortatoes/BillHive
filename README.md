@@ -188,6 +188,12 @@ Auth: every `/api/*` request must authenticate via one of: `Authorization: Beare
 | GET | `/api/months/:key` | Single month (`YYYY-MM`) |
 | PUT | `/api/months/:key` | Save month data |
 | DELETE | `/api/months/:key` | Delete a month |
+| POST | `/api/bills/invite` | Create or return a household bills invite for one person |
+| GET | `/api/bills/invites` | List active household bills invites |
+| DELETE | `/api/bills/invite/:personId` | Revoke one household bills invite |
+| GET | `/public/bills/invite/:token` | Preview a household bills invite *(public)* |
+| POST | `/public/bills/invite/:token/join` | Join a household bills invite *(public)* |
+| GET | `/public/bills/invite/:token/data` | Read the joined person's bills snapshot *(public)* |
 | GET | `/api/export` | Download full JSON backup |
 | POST | `/api/import` | Restore from JSON backup |
 | GET | `/api/email/config` | Get email config (secrets masked) |
