@@ -2,7 +2,7 @@
  * BillHive email dispatch module
  * Supports: Mailgun, SendGrid, Resend, SMTP (nodemailer)
  *
- * Config shape (stored encrypted in DB under key 'emailConfig'):
+ * Config shape (stored server-side in the email_config SQLite table):
  * {
  *   provider: 'mailgun' | 'sendgrid' | 'resend' | 'smtp',
  *   fromName:  string,
@@ -38,7 +38,13 @@ const EMAIL_SANITIZE_OPTS = {
     'img', 'style', 'svg', 'polygon', 'rect', 'head', 'title', 'meta', 'html',
     'body', 'thead', 'tbody', 'tfoot', 'th', 'center',
   ]),
-  allowedAttributes: false,           // allow all attributes (inline styles are critical for email)
+  allowedAttributes: {
+    '*': ['style','class','align','valign','width','height','bgcolor','role','aria-label'],
+    a: ['href','name','target','rel'], img: ['src','alt'],
+    table: ['border','cellpadding','cellspacing'], td: ['colspan','rowspan'], th: ['colspan','rowspan'],
+    svg: ['xmlns','viewBox','viewbox','fill'], polygon: ['points','fill'], rect: ['x','y','rx','ry','fill'],
+    meta: ['charset','name','content'],
+  },
   allowedSchemes: ['https', 'mailto', 'data'],
   allowVulnerableTags: true,          // allow <style> for email client compatibility
 };
@@ -121,7 +127,10 @@ async function sendViaSmtp(cfg, to, subject, html, text) {
       user: cfg.smtpUser,
       pass: cfg.smtpPass,
     },
-    tls: { rejectUnauthorized: false }, // allow self-signed for self-hosted
+    requireTLS: true,
+    tls: { rejectUnauthorized: true },
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
   await transporter.sendMail({
     from:    `"${cfg.fromName}" <${cfg.fromEmail}>`,

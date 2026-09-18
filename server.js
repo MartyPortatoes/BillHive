@@ -13,7 +13,7 @@
 //   - Falls back to user "local" when no proxy header is present
 //   - SSE broadcasts a `data-changed` event to all of a user's open tabs on write
 //   - Email relay supports SMTP, Mailgun, SendGrid, and Resend via nodemailer
-//   - Runs in Docker on node:20-alpine; data stored at /data/billhive.db
+//   - Runs in Docker on node:24-alpine; data stored at /data/billhive.db
 //
 // Data model:
 //   user_state   — key/value JSON blobs per user (settings, people, bills, checklist)
@@ -32,8 +32,12 @@ const crypto = require('crypto');
 const { sendEmail, maskConfig } = require('./email.js');
 const { buildEmailHtml } = require('./emailTemplate.js');
 
+const Data = require('./public/data-contract.js');
 const app = express();
 const PORT = process.env.PORT || 8080;
+const HOST = process.env.HOST || '0.0.0.0';
+const AUTH_ADMIN_USERS = new Set((process.env.AUTH_ADMIN_USERS ?? 'local').split(',').map(value => value.trim()).filter(Boolean));
+const INDEX_PATH = fs.existsSync(path.join(__dirname, 'index.html')) ? path.join(__dirname, 'index.html') : path.join(__dirname, 'public', 'index.html');
 const DB_PATH = process.env.DB_PATH || '/data/billhive.db';  // Docker volume mount point
 
 // TRUST_PROXY tells Express how many reverse-proxy hops to trust for X-Forwarded-*.
@@ -278,7 +282,10 @@ function verifyCookie(token) {
     // timingSafeEqual requires equal-length buffers
     if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (typeof payload.exp === 'number' && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (payload.v !== 2 || typeof payload.uid !== 'string' || !/^[A-Za-z0-9._@-]{1,128}$/.test(payload.uid) || /^\.+$/.test(payload.uid)) return null;
+    if (!Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (payload.source === 'key' && !db.prepare('SELECT id FROM api_keys WHERE id = ? AND user_id = ?').get(payload.keyId, payload.uid)) return null;
+    if (getRequireDeviceKeys() && payload.source === 'local') return null;
     return payload;
   } catch { return null; }
 }
@@ -295,10 +302,10 @@ function parseCookie(header, name) {
 }
 
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
-function setSessionCookie(req, res, userId) {
+function setSessionCookie(req, res, userId, source = req.authMethod === 'fallback' ? 'local' : req.authMethod, keyId = req.apiKeyId) {
   const now = Math.floor(Date.now() / 1000);
-  const token = signCookie({ uid: userId, iat: now, exp: now + COOKIE_MAX_AGE_SECONDS });
-  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  const token = signCookie({ v: 2, uid: userId, source, keyId, iat: now, exp: now + COOKIE_MAX_AGE_SECONDS });
+  const secure = req.secure;
   res.setHeader('Set-Cookie',
     `bh_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE_SECONDS}` +
     (secure ? '; Secure' : '')
@@ -325,19 +332,23 @@ function broadcastChange(userId) {
 
 // ── Security headers (helmet) ────────────────────────────────────────────────
 // CSP is tuned to what index.html actually loads:
-//   - Google Fonts (CSS at fonts.googleapis.com, font files at fonts.gstatic.com)
 //   - Chart.js from cdnjs.cloudflare.com (loaded with SRI integrity)
-//   - Inline <script> and inline style="..." (the entire SPA is one inline script,
-//     and email-style inline CSS is everywhere). 'unsafe-inline' is required.
+//   - Exact SHA-256 hashes authorize the shipped inline scripts.
+//   - Inline styles remain supported for the existing data-driven templates.
 //   - data: URIs for SVG background patterns in CSS
 // connect-src includes 'self' for fetch + EventSource (SSE).
 // frame-ancestors 'none' replaces X-Frame-Options to prevent clickjacking.
+const scriptHashes = [INDEX_PATH, path.join(__dirname, 'public', 'share.html')].flatMap(file => {
+  const html = fs.readFileSync(file, 'utf8');
+  return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+    .filter(match => match[1].trim()).map(match => "'sha256-" + crypto.createHash('sha256').update(match[1]).digest('base64') + "'");
+});
 app.use(helmet({
   contentSecurityPolicy: {
     useDefaults: true,
     directives: {
       'default-src':     ["'self'"],
-      'script-src':      ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+      'script-src':      ["'self'", ...scriptHashes, 'https://cdnjs.cloudflare.com'],
       'style-src':       ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       'font-src':        ["'self'", 'https://fonts.gstatic.com', 'data:'],
       'img-src':         ["'self'", 'data:'],
@@ -352,7 +363,7 @@ app.use(helmet({
   // HSTS only meaningful over HTTPS; harmless otherwise. 1 year.
   strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
   referrerPolicy: { policy: 'no-referrer' },
-  crossOriginEmbedderPolicy: false,        // Google Fonts doesn't send CORP headers
+  crossOriginEmbedderPolicy: false,        // Public share pages use remote fonts
   crossOriginResourcePolicy: { policy: 'same-site' },
 }));
 
@@ -404,7 +415,7 @@ app.use(express.json({ limit: '2mb' }));
 // directly without a proxy, anyone can spoof Remote-User and impersonate any
 // user. Set TRUSTED_AUTH_HEADERS to restrict which header(s) are honored —
 // e.g. TRUSTED_AUTH_HEADERS=remote-user for Authelia-only.
-const TRUSTED_AUTH_HEADERS = (process.env.TRUSTED_AUTH_HEADERS ||
+const TRUSTED_AUTH_HEADERS = (process.env.TRUSTED_AUTH_HEADERS ??
   'remote-user,x-authentik-username,x-forwarded-user,x-remote-user'
 ).toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
 
@@ -440,21 +451,28 @@ function resolveAuth(req, res, next) {
       if (row) {
         req.userId = row.user_id;
         req.authMethod = 'bearer';
+        req.apiKeyId = row.id;
         try { stmts.touchApiKey.run(Date.now(), row.id); } catch {}
         return next();
       }
       // Bearer was provided but didn't match any stored key.
       return res.status(401).json({ error: 'Invalid API key' });
     }
+    return res.status(401).json({ error: 'Invalid API key' });
   }
+
+  // Current proxy identity wins over a cookie left by a different account.
+  const currentProxyUser = pickAuthHeader(req.headers);
+  if (currentProxyUser) { req.userId = currentProxyUser; req.authMethod = 'proxy'; return next(); }
 
   // 2. Session cookie — for browser sessions
   const cookieToken = parseCookie(req.headers.cookie, 'bh_session');
   if (cookieToken) {
     const payload = verifyCookie(cookieToken);
-    if (payload && payload.uid) {
+    if (payload && payload.uid && payload.source !== 'proxy') {
       req.userId = payload.uid;
       req.authMethod = 'cookie';
+      req.sessionPayload = payload;
       return next();
     }
     // Invalid/expired cookie — fall through, let other signals try.
@@ -490,14 +508,32 @@ function requireAuth(req, res, next) {
 
 app.use(resolveAuth);
 
-// Attach a fresh bh_session cookie to any GET that wants HTML — i.e. browser
-// SPA loads. API calls (Accept: application/json) and asset fetches don't
-// trigger it. Each visit refreshes the 30-day expiry.
+// Never cache private data or issue a host session to a public-link visitor.
 app.use((req, res, next) => {
-  if (req.method === 'GET' && typeof req.headers.accept === 'string' && req.headers.accept.includes('text/html')) {
-    setSessionCookie(req, res, req.userId);
+  if (req.path.startsWith('/api/') || req.path.startsWith('/public/') || req.path.startsWith('/share/') || req.path === '/' || req.path === '/index.html') {
+    res.setHeader('Cache-Control', 'no-store');
+    res.vary('Cookie');
   }
   next();
+});
+// Browser write requests must originate from this origin. Native clients have
+// no Origin/Fetch Metadata headers and continue to use bearer authentication.
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const site = req.get('Sec-Fetch-Site');
+  if (site && !['same-origin', 'none'].includes(site)) return res.status(403).json({ error: 'Cross-origin request rejected' });
+  const expectedUser = req.get('X-BillHive-User');
+  if (expectedUser && expectedUser !== req.userId) return res.status(409).json({ error: 'The signed-in account changed. Reload before saving.' });
+  const origin = req.get('Origin');
+  if (origin && origin !== `${req.protocol}://${req.get('host')}`) return res.status(403).json({ error: 'Cross-origin request rejected' });
+  next();
+});
+// Exchange a device key for an HttpOnly browser session. The key stays out of
+// browser storage; revoking the device key also invalidates its browser session.
+app.post('/api/session', (req, res) => {
+  if (req.authMethod !== 'bearer') return res.status(401).json({ error: 'A valid device key is required' });
+  setSessionCookie(req, res, req.userId, 'key');
+  res.json({ ok: true });
 });
 
 // Request logger (skip noisy static asset requests)
@@ -510,9 +546,12 @@ app.use((req, _res, next) => {
 
 // ── Static frontend ───────────────────────────────────────────────────────────
 // Serves index.html (and any future assets) from the /public directory
+app.get(['/', '/index.html'], serveShell);
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
   maxAge: '1h',
+  index: false,
+  setHeaders(res, file) { if (file.endsWith('.html')) res.setHeader('Cache-Control', 'no-store'); },
 }));
 
 // ── Health check ──────────────────────────────────────────────────────────────
@@ -961,6 +1000,7 @@ app.post('/public/trip/invite/:token/expense', publicLimiter, (req, res) => {
   if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
   if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
 
+  try { Data.tree(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
   const expense = req.body;
   if (!expense || !expense.id || typeof expense.name !== 'string') {
     return res.status(400).json({ error: 'Invalid expense payload' });
@@ -1125,13 +1165,13 @@ app.use('/api', requireAuth);
 app.get('/api/state', (req, res) => {
   const rows = stmts.getAllState.all(req.userId);
   const state = {};
-  rows.forEach(r => { try { state[r.key] = JSON.parse(r.value); } catch { state[r.key] = r.value; } });
+  rows.forEach(r => { state[r.key] = JSON.parse(r.value); });
   res.json(state);
 });
 
 app.put('/api/state', (req, res) => {
   const body = req.body;
-  if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Invalid body' });
+  try { Data.state(body); } catch (error) { return res.status(400).json({ error: error.message }); }
 
   // Wrap in a transaction so all keys are written atomically — prevents
   // partial state if the server crashes mid-write.
@@ -1148,6 +1188,7 @@ app.put('/api/state', (req, res) => {
 });
 
 app.patch('/api/state/:key', (req, res) => {
+  try { Data.state({ [req.params.key]: req.body }); } catch (error) { return res.status(400).json({ error: error.message }); }
   stmts.setState.run(req.userId, req.params.key, JSON.stringify(req.body));
   res.json({ ok: true });
   broadcastChange(req.userId);
@@ -1161,20 +1202,21 @@ app.patch('/api/state/:key', (req, res) => {
 app.get('/api/months', (req, res) => {
   const rows = stmts.getAllMonths.all(req.userId);
   const months = {};
-  rows.forEach(r => { try { months[r.month_key] = JSON.parse(r.data); } catch {} });
+  rows.forEach(r => { months[r.month_key] = JSON.parse(r.data); });
   res.json(months);
 });
 
 app.get('/api/months/:key', (req, res) => {
   const row = stmts.getMonth.get(req.userId, req.params.key);
   if (!row) return res.json({});
-  try { res.json(JSON.parse(row.data)); } catch { res.json({}); }
+  res.json(JSON.parse(row.data));
 });
 
 app.put('/api/months/:key', (req, res) => {
   const key = req.params.key;
   // Validate format to prevent arbitrary keys from polluting the table
-  if (!/^\d{4}-\d{2}$/.test(key)) return res.status(400).json({ error: 'Invalid month key (expected YYYY-MM)' });
+  if (!Data.monthKey(key)) return res.status(400).json({ error: 'Invalid month key (expected YYYY-MM)' });
+  try { Data.month(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
   stmts.setMonth.run(req.userId, key, JSON.stringify(req.body));
   res.json({ ok: true });
   broadcastChange(req.userId);
@@ -1194,18 +1236,19 @@ app.delete('/api/months/:key', (req, res) => {
 //                    aren't in the backup.
 app.get('/api/export', (req, res) => {
   const state = {};
-  stmts.getAllState.all(req.userId).forEach(r => { try { state[r.key] = JSON.parse(r.value); } catch {} });
+  stmts.getAllState.all(req.userId).forEach(r => { state[r.key] = JSON.parse(r.value); });
   const monthly = {};
-  stmts.getAllMonths.all(req.userId).forEach(r => { try { monthly[r.month_key] = JSON.parse(r.data); } catch {} });
+  stmts.getAllMonths.all(req.userId).forEach(r => { monthly[r.month_key] = JSON.parse(r.data); });
   res.setHeader('Content-Disposition', `attachment; filename="billhive-backup-${req.userId}-${Date.now()}.json"`);
   res.json({ user: req.userId, exportedAt: new Date().toISOString(), state, monthly });
 });
 
 app.post('/api/import', (req, res) => {
-  const { state, monthly } = req.body || {};
+  try { Data.backup(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
+  const { state, monthly } = req.body;
   // Whitelist state keys we manage; reject anything else so a crafted backup
   // can't pollute user_state with arbitrary rows.
-  const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist', 'requestDates', 'checks', 'trips']);
+  const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist', 'requestDates', 'checks', 'trips', 'sharedBills', 'currentMode', 'hasSeenModeHint', 'webPreferences']);
   const importAll = db.transaction((userId, s, m) => {
     if (s && typeof s === 'object') {
       for (const [k, v] of Object.entries(s)) {
@@ -1223,6 +1266,20 @@ app.post('/api/import', (req, res) => {
   importAll(req.userId, state, monthly);
   res.json({ ok: true });
   broadcastChange(req.userId);
+});
+
+// Clear editable setup and revoke links together; history/files/relay settings
+// deliberately remain. The web confirmation describes that exact scope.
+app.post('/api/reset-setup', (req, res) => {
+  db.transaction(() => {
+    db.prepare('DELETE FROM user_state WHERE user_id = ?').run(req.userId);
+    stmts.setState.run(req.userId, 'people', '[]');
+    stmts.setState.run(req.userId, 'bills', '[]');
+    db.prepare('UPDATE share_checks SET revoked_at = unixepoch() WHERE user_id = ? AND revoked_at IS NULL').run(req.userId);
+    db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND revoked_at IS NULL').run(req.userId);
+    db.prepare('UPDATE bills_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND revoked_at IS NULL').run(req.userId);
+  })();
+  res.json({ ok: true }); broadcastChange(req.userId);
 });
 
 // ── Check share links (AUTH) ─────────────────────────────────────────────────
@@ -1547,6 +1604,7 @@ app.get('/api/auth/settings', (req, res) => {
   const row = stmts.countApiKeysForUser.get(req.userId);
   res.json({
     requireDeviceKeys: getRequireDeviceKeys(),
+    canManage: AUTH_ADMIN_USERS.has(req.userId) && req.authMethod !== 'bearer' && req.sessionPayload?.source !== 'key',
     deviceKeyCount:    row ? row.c : 0,
   });
 });
@@ -1555,10 +1613,14 @@ app.put('/api/auth/settings', (req, res) => {
   if (!req.body || typeof req.body.requireDeviceKeys !== 'boolean') {
     return res.status(400).json({ error: 'requireDeviceKeys (boolean) required' });
   }
+  if (!AUTH_ADMIN_USERS.has(req.userId) || req.authMethod === 'bearer' || req.sessionPayload?.source === 'key') return res.status(403).json({ error: 'Use a trusted browser administrator session to change authentication settings' });
+  if (req.body.requireDeviceKeys && !stmts.countApiKeysForUser.get(req.userId).c) return res.status(400).json({ error: 'Create and save a device key before requiring authentication' });
   setRequireDeviceKeys(req.body.requireDeviceKeys);
+  if (req.authMethod !== 'proxy') setSessionCookie(req, res, req.userId, 'setup');
   const row = stmts.countApiKeysForUser.get(req.userId);
   res.json({
     requireDeviceKeys: getRequireDeviceKeys(),
+    canManage: AUTH_ADMIN_USERS.has(req.userId) && req.authMethod !== 'bearer' && req.sessionPayload?.source !== 'key',
     deviceKeyCount:    row ? row.c : 0,
   });
   broadcastChange(req.userId);
@@ -1608,7 +1670,8 @@ app.get('/api/events', (req, res) => {
 // sequences (../, /, backslash) and any characters outside the whitelist.
 function sanitizeFilename(name) {
   if (typeof name !== 'string') return null;
-  const cleaned = name.replace(/[^A-Za-z0-9.\-]/g, '');
+  if (!/^[A-Za-z0-9][A-Za-z0-9.\-]*$/.test(name)) return null;
+  const cleaned = name;
   // Must have content, must not be just dots, must end in a safe extension
   if (!cleaned || cleaned === '.' || cleaned === '..' || cleaned.startsWith('.')) return null;
   if (cleaned.length > 255) return null;
@@ -1618,7 +1681,8 @@ function sanitizeFilename(name) {
 // Sanitize path segments (tripId, expenseId) — same whitelist but no dots allowed.
 function sanitizePathSegment(seg) {
   if (typeof seg !== 'string') return null;
-  const cleaned = seg.replace(/[^A-Za-z0-9\-]/g, '');
+  if (!/^[A-Za-z0-9\-]+$/.test(seg)) return null;
+  const cleaned = seg;
   if (!cleaned) return null;
   if (cleaned.length > 128) return null;
   return cleaned;
@@ -1650,7 +1714,7 @@ app.post('/api/trips/:tripId/expenses/:expenseId/attachments',
     const attachmentId = sanitizePathSegment(req.headers['x-attachment-id']);
     if (!attachmentId) return res.status(400).json({ error: 'X-Attachment-Id header required' });
 
-    if (!req.body || !req.body.length) {
+    if (!Buffer.isBuffer(req.body) || !req.body.length) {
       return res.status(400).json({ error: 'Empty body — expected image data' });
     }
 
@@ -1681,6 +1745,9 @@ app.get('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req, re
   const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
 
+  res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
+  res.attachment(filename);
+  res.setHeader('Content-Type', 'application/octet-stream');
   res.sendFile(filePath);
 });
 
@@ -1720,7 +1787,7 @@ app.post('/api/trips/:tripId/itinerary/:eventId/attachments',
     const filename = sanitizeFilename(req.headers['x-filename']);
     if (!filename) return res.status(400).json({ error: 'X-Filename header required' });
 
-    if (!req.body || !req.body.length) {
+    if (!Buffer.isBuffer(req.body) || !req.body.length) {
       return res.status(400).json({ error: 'Empty body — expected attachment data' });
     }
 
@@ -1749,6 +1816,9 @@ app.get('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, res
   const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
 
+  res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
+  res.attachment(filename);
+  res.setHeader('Content-Type', 'application/octet-stream');
   res.sendFile(filePath);
 });
 
@@ -1776,12 +1846,20 @@ app.delete('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, 
 // BillHive is a single-page app — all client-side routing happens in the browser.
 // Any path that isn't an /api/* route or a static file gets index.html so that
 // deep links and browser refreshes work correctly.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.use(['/api', '/public'], (_req, res) => res.status(404).json({ error: 'Not found' }));
+function serveShell(req, res) {
+  if (req.authMethod === 'proxy' || (!getRequireDeviceKeys() && req.authMethod === 'fallback')) setSessionCookie(req, res, req.userId);
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(INDEX_PATH);
+}
+app.get('*', serveShell);
+app.use((error, _req, res, _next) => {
+  const status = error.status === 413 ? 413 : error.status === 400 ? 400 : 500;
+  res.status(status).json({ error: status === 500 ? 'Stored data could not be read or the operation failed. Existing data has been preserved.' : 'Invalid or oversized request body' });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, HOST, () => {
   console.log(`BillHive running on :${PORT}`);
   console.log(`DB: ${DB_PATH}`);
   console.log(`Auth: Remote-User / X-Authentik-Username / X-Forwarded-User (fallback: "local")`);

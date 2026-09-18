@@ -1,17 +1,18 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Native build deps for better-sqlite3, plus su-exec for safe privilege drop
 RUN apk add --no-cache python3 make g++ su-exec
 
 WORKDIR /app
 
-COPY package.json .
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY server.js .
 COPY email.js .
 COPY emailTemplate.js .
 COPY index.html ./public/
+COPY public/ ./public/
 
 # /data is the SQLite volume mount. Initial ownership is set here so a fresh
 # named volume inherits it; the entrypoint re-applies chown on each start to

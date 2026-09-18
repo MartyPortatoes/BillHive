@@ -2,7 +2,7 @@
   <img src="screenshots/logo.png" width="100" alt="BillHive" />
 </p>
 
-<h1 align="center">BillHive</h1>
+<h1 align="center">SelfHive Web</h1>
 
 <p align="center">Self-hosted household bill management. One person fronts every bill — BillHive tracks the splits, generates Zelle/Venmo/Cash App/Apple Cash/PayPal payment handoffs, and sends HTML email summaries to everyone who owes money.</p>
 
@@ -66,10 +66,10 @@
 
 **Infrastructure**
 - Single Docker container — Node.js serves both the frontend and REST API
-- Single-file vanilla-JS frontend — no build step, no framework, no bundler
+- Vanilla-JS frontend — no build step, no framework, no bundler
 - SQLite database in a named Docker volume — no external database required
 - **Multi-user safe** — deploy behind Authelia or Authentik; BillHive reads the `Remote-User` / `X-Authentik-Username` header and scopes all data per user
-- **Browser sessions are HMAC-signed**; per-device API keys for the iOS companion app
+- **Browser sessions are HMAC-signed and HttpOnly**; per-device API keys for the iOS companion app
 - Hardened defaults: Helmet headers, rate limiting, non-root container, sanitized email HTML
 - Full JSON **export/import** backup via the Settings tab
 
@@ -119,7 +119,7 @@ Point your proxy at port `8080`. BillHive reads the following headers for user i
 | `X-Forwarded-User` | Generic proxies |
 | `X-Remote-User` | Generic proxies |
 
-Without a proxy, all data is stored under user ID `local` (single-user mode).
+Without a proxy, all data is stored under user ID `local` (single-user mode). This compatibility mode is unauthenticated until you enable required device keys. Keep the container on a trusted private network. Restrict ingress to your authentication proxy and have it strip and overwrite identity headers; Express `TRUST_PROXY` alone does not authenticate those headers. Set `TRUSTED_AUTH_HEADERS=""` to disable header identity entirely.
 
 You can override the trusted header list with the `TRUSTED_AUTH_HEADERS` env var if your proxy uses a different name, or to lock things down.
 
@@ -167,6 +167,8 @@ docker exec billhive sqlite3 /data/billhive.db .dump > backup.sql
 
 | Variable | Default | Description |
 |---|---|---|
+| `HOST` | `0.0.0.0` | Bind address; use `127.0.0.1` for local-only development |
+| `AUTH_ADMIN_USERS` | `local` | Comma-separated exact usernames allowed to change server-wide authentication policy; configure this for proxy users |
 | `PORT` | `8080` | Port the server listens on |
 | `DB_PATH` | `/data/billhive.db` | SQLite database path |
 | `TRUST_PROXY` | `1` | Express trust-proxy hop count. Set `0` to disable, higher for chained proxies |
@@ -176,7 +178,7 @@ docker exec billhive sqlite3 /data/billhive.db .dump > backup.sql
 
 ## API
 
-Auth: every `/api/*` request must authenticate via one of: `Authorization: Bearer <key>` (iOS device key), the `bh_session` cookie (issued by the SPA on page load), or a trusted reverse-proxy header. `/api/health` is always public so iOS can probe reachability.
+Auth: every `/api/*` request must authenticate via one of: `Authorization: Bearer <key>` (iOS device key), the `bh_session` cookie (issued only after an allowed local bootstrap, trusted proxy identity, or device-key exchange), or a trusted reverse-proxy header. `/api/health` is always public so iOS can probe reachability.
 
 | Method | Path | Description |
 |---|---|---|
@@ -205,6 +207,8 @@ Auth: every `/api/*` request must authenticate via one of: `Authorization: Beare
 | DELETE | `/api/keys/:id` | Revoke a device key |
 | GET | `/api/auth/settings` | Whether iOS device keys are required + count |
 | PUT | `/api/auth/settings` | Toggle the require-device-keys mode |
+| POST | `/api/session` | Exchange a device key for an HttpOnly session; revoking the key also revokes that session |
+| POST | `/api/reset-setup` | Clear editable setup and revoke share links atomically; retain history, attachments, and email settings |
 | GET | `/api/events` | Server-Sent Events stream (real-time multi-tab sync) |
 
 ---
@@ -225,7 +229,7 @@ A native iOS app called **SelfHive** is available on the App Store: [SelfHive �
 
 A standalone version of the app — simply called **BillHive** — uses local JSON storage with optional iCloud sync, for anyone not interested in self-hosting. Both targets ship from the same Xcode project.
 
-### Securing iOS connections (optional)
+### Securing connections
 
 If your server is reachable on a network where you don't fully trust every device — or you just want defense-in-depth — you can require iOS apps to authenticate with a per-device API key.
 
@@ -234,11 +238,11 @@ In the BillHive web app, go to **Settings → Connected Devices**:
 1. Click **+ Generate Device Key**, name the device (e.g. "Marty's iPhone")
 2. The key is shown **once** in plaintext — copy it now (we hash before storing)
 3. In SelfHive, go to **Settings → Server → API Key** and paste it
-4. Optionally flip **Require API key for iOS apps** to ON — any iOS app without a valid key will be rejected
+4. Optionally flip **Require authenticated access** to ON — any iOS app without a valid key will be rejected
 
 To revoke: open **Connected Devices**, click **Revoke** next to the device. The key stops working immediately.
 
-The web app keeps working with no key — browser sessions authenticate via a signed cookie issued on page load.
+The browser that enables required keys receives an administrator setup session. Other browsers must use the authentication proxy or enter a saved device key over HTTPS (loopback development is allowed). Device-key sessions cannot change the server-wide authentication requirement. Proxy cookies require a current trusted proxy identity; logging out at the proxy removes that access. The key-entry form clears the key immediately and never stores it in localStorage. Pre-upgrade cookies are intentionally invalidated.
 
 ---
 
@@ -247,3 +251,30 @@ The web app keeps working with no key — browser sessions authenticate via a si
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Beer" height="60" />
   </a>
 </p>
+
+## Local development and validation
+
+Use **Node 24 LTS**. The lockfile pins the dependency tree used by `npm ci` and Docker.
+
+```sh
+npm ci
+HOST=127.0.0.1 PORT=8080 DB_PATH=/tmp/selfhive-dev/billhive.db TRUST_PROXY=0 npm start
+npm test
+npm audit --omit=dev
+```
+
+The root `index.html` and `public/` assets are served directly in development. Restart the server after editing inline scripts: CSP hashes are calculated at startup. The Docker image copies both the page and `public/`, including the guest claim page.
+
+### Security and upgrade notes
+
+- Proxy deployments must set `AUTH_ADMIN_USERS` to the intended administrator usernames. Other accounts and device-key sessions cannot change the server-wide authentication policy.
+- The image now uses Node 24, better-sqlite3 13, Nodemailer 10 and patched sanitize-html. Back up the complete data volume before deployment. No schema-destructive database migration is introduced.
+- SMTP now requires TLS and verifies certificates. For a private certificate authority, mount its CA certificate and set `NODE_EXTRA_CA_CERTS`; do not disable verification. Test your relay after rollout.
+- HTML responses, APIs, guest-link responses and downloads are not cached. Uploaded attachments are delivered as downloads with `nosniff` and a restrictive sandbox CSP.
+- Cookie-authenticated browser writes must originate from this origin. Configure the proxy to preserve the public Host and supply the correct forwarded protocol. Native SelfHive requests without browser Origin/Fetch Metadata headers continue to work.
+- JSON backups contain records, not attachment bytes, relay credentials or device keys. Back up the server data volume to preserve those files and settings. Imports merge valid records and history, and reject embedded mobile attachment backups rather than silently discarding bytes.
+- **Clear Bill Setup** clears editable configuration and revokes host sharing links. History, files, email settings and device credentials remain. It is not a full server-data erasure operation.
+- Failed browser writes remain pending in memory, show **Not saved**, and can be retried. Keep the tab open until **Saved** appears. No offline financial data or credentials are persisted in browser storage.
+- Browser appearance is stored in `webPreferences`, separately from mobile settings, so native saves do not erase it.
+
+See [the parity review and screenshots](docs/parity/REVIEW.md) for implemented changes, verification, and remaining deployment checks.

@@ -1,0 +1,23 @@
+✔ authentication cannot be bypassed by requesting HTML, including public pages (212.863625ms)
+✔ current proxy account overrides stale cookie; public requests do not receive host sessions (2.083667ms)
+✔ cross-origin browser writes are rejected, same-origin and native writes work (2.062375ms)
+✔ malformed imports fail atomically; native references and unknown state fields survive (4.1005ms)
+✔ uploads cannot execute in the app origin, alias traversal paths, or leak across users (2.44275ms)
+✔ CSP only authorizes known inline scripts; private responses are not cached (0.925208ms)
+✔ shared contract rejects unsafe keys, malformed nested state, and allows payment addresses (0.256709ms)
+✔ serial writer preserves immutable snapshots and keeps failed writes dirty for retry (0.35725ms)
+✔ email sanitization preserves layout but strips active attributes; SMTP verifies TLS (21.7005ms)
+✔ a browser with unsaved edits cannot write into a switched proxy account (1.748625ms)
+✔ bill editor escapes synchronized names and descriptions in HTML attributes (1.262917ms)
+✔ clear setup revokes shares atomically and preserves the advertised history and other users (6.852ms)
+✔ corrupt persisted records fail closed instead of exporting a partial backup (3.626542ms)
+✔ web appearance preferences survive native state writes (1.255417ms)
+✔ other proxy accounts cannot change server-wide authentication policy (0.7725ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 309.739291

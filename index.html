@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BillHive</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Outfit:wght@300;400;500;600&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>SelfHive</title>
 <style>
 /* Default = dark theme. Mirrors iOS bhDynamic dark values. */
 :root {
   --bg:       #221810;
-  --surface:  #2d1f14;
+  --surface:  #332618;
   --surface2: #332618;
-  --surface3: #3d2e1e;
-  --border:   #5a4832;
-  --border2:  #7a6442;
+  --surface3: #332618;
+  --border:   #7a6442;
+  --border2:  #8a7450;
   --text:     #f0e6d0;
-  --muted:    #a08e6e;
+  --muted:    #c6b390;
   --muted2:   #786750;
-  --green:    #7eb8d6;
+  --green:    #edba70;
   --blue:     #8fc4dd;
   --orange:   #d18570;
   --pink:     #b58496;
@@ -27,9 +27,9 @@
   --paid:     #8aa468;
   --hover:    rgba(240,230,208,.03);
   --hex-stroke-opacity: 0.04;
-  --accent-subtle: rgba(126,184,214,.05);
-  --accent-tint:   rgba(126,184,214,.12);
-  --green-hover:   #96cade;
+  --accent-subtle: rgba(237,186,112,.05);
+  --accent-tint:   rgba(237,186,112,.12);
+  --green-hover:   #f3d6a4;
 }
 /* Explicit light-theme override (mirrors iOS bhDynamic light values). */
 :root[data-theme="light"] {
@@ -40,7 +40,7 @@
   --border:   #d8c8a4;
   --border2:  #b8a578;
   --text:     #2b1d11;
-  --muted:    #7a6a52;
+  --muted:    #6b5b43;
   --muted2:   #a08e72;
   --green:    #d8923e;
   --blue:     #6fa5c4;
@@ -66,7 +66,7 @@
     --border:   #d8c8a4;
     --border2:  #b8a578;
     --text:     #2b1d11;
-    --muted:    #7a6a52;
+    --muted:    #6b5b43;
     --muted2:   #a08e72;
     --green:    #d8923e;
     --blue:     #6fa5c4;
@@ -85,7 +85,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%237eb8d6' stroke-opacity='0.04' stroke-width='0.5'/%3E%3C/svg%3E");color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;min-height:100vh;line-height:1.5;transition:background-color .2s,color .2s;}
+body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%237eb8d6' stroke-opacity='0.04' stroke-width='0.5'/%3E%3C/svg%3E");color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;line-height:1.5;transition:background-color .2s,color .2s;}
 :root[data-theme="light"] body,
 :root[data-theme="system"] body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%23d8923e' stroke-opacity='0.07' stroke-width='0.5'/%3E%3C/svg%3E");}
 
@@ -100,12 +100,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 2
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
 .logo-mark{flex-shrink:0;display:block;color:var(--green);}
 .logo-wordmark{display:flex;flex-direction:column;gap:0px;}
-.logo-name{font-family:'Syncopate',sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.5px;line-height:1;color:var(--text);}
+.logo-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.5px;line-height:1;color:var(--text);}
 .logo-name span{color:var(--green);}
-.logo-sub{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);line-height:1;margin-top:2px;}
+.logo-sub{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);line-height:1;margin-top:2px;}
 .header-right{display:flex;align-items:center;gap:12px;}
 .month-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
-.month-pill select,.month-pill input{background:transparent;border:none;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;cursor:pointer;}
+.month-pill select,.month-pill input{background:transparent;border:none;color:var(--text);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;outline:none;cursor:pointer;}
 .month-pill input{width:52px;}
 
 /* ── TABS ── */
@@ -122,7 +122,7 @@ main{overflow-y:auto;padding:24px 28px;}
 @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
 /* ── TYPOGRAPHY ── */
-.page-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:18px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;}
+.page-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:18px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;}
 .page-sub{color:var(--muted);font-size:11px;margin-bottom:24px;}
 
 /* ── CARDS ── */
@@ -135,7 +135,7 @@ main{overflow-y:auto;padding:24px 28px;}
 /* ── INPUTS ── */
 input[type=text],input[type=number],input[type=email],input[type=url],input[type=password],input[type=date],input[type=time],select,textarea{
   background:var(--surface2);border:1px solid var(--border);color:var(--text);
-  padding:8px 10px;font-family:'DM Mono',monospace;font-size:12px;border-radius:8px;
+  padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;border-radius:8px;
   outline:none;width:100%;transition:border-color .15s;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--green);}
@@ -149,7 +149,7 @@ select option{background:var(--surface2);}
 input[type=range]{accent-color:var(--green);width:100%;margin:0;}
 
 /* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;text-decoration:none;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;text-decoration:none;}
 .btn-green{background:var(--green);color:#0c0d0f;}
 .btn-green:hover{background:var(--green-hover);}
 .btn-blue{background:var(--blue);color:#0c0d0f;}
@@ -185,9 +185,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .bill-header:hover{background:var(--hover);}
 .bill-name-wrap{display:flex;align-items:center;gap:10px;}
 .bill-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.bill-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;letter-spacing:.01em;color:var(--text);}
+.bill-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:14px;letter-spacing:.01em;color:var(--text);}
 .bill-sub{font-size:10px;color:var(--muted);margin-top:1px;}
-.bill-total-display{font-family:'DM Mono',monospace;font-weight:500;font-size:18px;color:var(--text);text-align:right;}
+.bill-total-display{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:500;font-size:18px;color:var(--text);text-align:right;}
 .bill-total-display.has-val{color:var(--green);}
 .bill-my-share{font-size:11px;color:var(--muted);text-align:right;}
 .bill-expand-btn{width:28px;height:28px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .15s;flex-shrink:0;}
@@ -202,7 +202,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .person-card.expanded{border-color:var(--border2);}
 .person-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;}
 .person-header:hover{background:var(--hover);}
-.person-header-name{font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;letter-spacing:.01em;color:var(--text);}
+.person-header-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;font-weight:600;letter-spacing:.01em;color:var(--text);}
 .person-header-meta{font-size:10px;color:var(--muted);margin-left:auto;}
 .person-expand-btn{width:24px;height:24px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s;flex-shrink:0;}
 .person-expand-btn:hover{border-color:var(--border2);color:var(--text);}
@@ -228,10 +228,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .split-config{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;}
 .split-config label{font-size:11px;color:var(--muted);}
 .split-type-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.split-type-toggle button{padding:5px 12px;background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;border-radius:5px;}
+.split-type-toggle button{padding:5px 12px;background:transparent;border:none;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;cursor:pointer;transition:all .15s;border-radius:5px;}
 .split-type-toggle button.active{background:var(--surface3);color:var(--green);}
 .preserve-row{display:flex;align-items:center;gap:8px;padding:10px 0 2px;border-top:1px solid var(--border);margin-top:12px;}
-.preserve-row-label{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;cursor:pointer;user-select:none;}
+.preserve-row-label{font-size:11px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;cursor:pointer;user-select:none;}
 .tog{position:relative;width:30px;height:17px;flex-shrink:0;}
 .tog input{opacity:0;width:0;height:0;position:absolute;}
 .tog-slider{position:absolute;inset:0;background:var(--border2);border-radius:17px;border:1px solid transparent;transition:.2s;cursor:pointer;}
@@ -245,10 +245,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .modal-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;letter-spacing:-.01em;}
 .modal-body{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.55;}
 .modal-footer{display:flex;gap:8px;justify-content:flex-end;}
-.key-display{font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid color-mix(in srgb,var(--green) 40%,transparent);padding:12px;border-radius:6px;color:var(--green);word-break:break-all;margin-bottom:8px;line-height:1.4;}
+.key-display{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;background:var(--surface2);border:1px solid color-mix(in srgb,var(--green) 40%,transparent);padding:12px;border-radius:6px;color:var(--green);word-break:break-all;margin-bottom:8px;line-height:1.4;}
 .device-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
 .device-row-name{font-size:13px;color:var(--text);font-weight:500;}
-.device-row-meta{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px;letter-spacing:.02em;}
+.device-row-meta{font-size:10px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;margin-top:3px;letter-spacing:.02em;}
 
 /* bill total input */
 .total-input-wrap{display:flex;align-items:center;gap:8px;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;}
@@ -260,7 +260,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .sum-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
 .sum-row:last-child{border-bottom:none;}
 .sum-label{color:var(--muted);font-size:12px;}
-.sum-val{font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);}
+.sum-val{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:16px;color:var(--green);}
 .sum-val.big{font-size:22px;}
 .sum-val.orange{color:var(--orange);}
 .sum-val.blue{color:var(--blue);}
@@ -269,8 +269,8 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── PERSON CARDS in summary (left-edge stripe, mirrors iOS PersonSummaryCard) ── */
 .person-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 16px 16px 20px;position:relative;overflow:hidden;}
 .person-summary-card::before{content:'';position:absolute;top:0;bottom:0;left:0;width:4px;background:var(--pc, var(--green));}
-.ps-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;margin-bottom:2px;letter-spacing:.01em;}
-.ps-amount{font-family:'DM Mono',monospace;font-weight:700;font-size:28px;line-height:1;margin:8px 0;font-variant-numeric:tabular-nums;}
+.ps-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:15px;margin-bottom:2px;letter-spacing:.01em;}
+.ps-amount{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:28px;line-height:1;margin:8px 0;font-variant-numeric:tabular-nums;}
 .ps-bills{font-size:10px;color:var(--muted);line-height:1.45;}
 
 /* ── CHECKLIST ── */
@@ -289,7 +289,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── TREND ── */
 .chart-wrap{position:relative;height:200px;}
 .trend-toggle{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px;gap:3px;}
-.trend-toggle-btn{background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.trend-toggle-btn{background:transparent;border:none;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;padding:5px 14px;border-radius:4px;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .trend-toggle-btn.active{background:var(--surface3);color:var(--text);}
 .trend-toggle-btn:hover:not(.active){color:var(--text);}
 
@@ -316,7 +316,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── MODAL ── */
 #modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:none;align-items:center;justify-content:center;}
 #modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:28px 24px 20px;width:340px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.5);}
-#modal-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:16px;color:var(--text);margin-bottom:16px;line-height:1.4;letter-spacing:.01em;}
+#modal-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:16px;color:var(--text);margin-bottom:16px;line-height:1.4;letter-spacing:.01em;}
 #modal-input{width:100%;margin-bottom:16px;display:none;}
 #modal-footer{display:flex;justify-content:flex-end;gap:8px;padding-top:4px;}
 
@@ -325,7 +325,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .sr-section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0;}
 .sr-section-icon.receive{background:color-mix(in srgb,var(--blue) 15%,transparent);color:var(--blue);border:1px solid color-mix(in srgb,var(--blue) 25%,transparent);}
 .sr-section-icon.send{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 25%,transparent);}
-.sr-section-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:16px;letter-spacing:.01em;color:var(--text);}
+.sr-section-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:16px;letter-spacing:.01em;color:var(--text);}
 .sr-section-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 
 /* person receive card */
@@ -334,9 +334,9 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .receive-card-head:hover{background:var(--hover);}
 .receive-person{display:flex;align-items:center;gap:10px;}
 .receive-person-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-.receive-person-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;letter-spacing:.01em;}
+.receive-person-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:15px;letter-spacing:.01em;}
 .receive-person-method{font-size:10px;color:var(--muted);margin-top:1px;}
-.receive-amount{font-family:'DM Mono',monospace;font-weight:700;font-size:22px;}
+.receive-amount{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:22px;}
 .receive-actions{display:flex;align-items:center;gap:8px;}
 .receive-body{display:none;border-top:1px solid var(--border);padding:16px 18px;background:var(--surface2);}
 .receive-card.open .receive-body{display:block;}
@@ -349,10 +349,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .send-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px;}
 .send-card-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
 .send-bill-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-.send-bill-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;letter-spacing:.01em;}
+.send-bill-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:14px;letter-spacing:.01em;}
 .send-bill-amount{font-size:12px;color:var(--muted);margin-top:1px;}
 .send-card-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.send-url-input{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 8px;font-family:'DM Mono',monospace;font-size:10px;border-radius:5px;width:180px;outline:none;transition:border-color .15s,color .15s;}
+.send-url-input{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 8px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;border-radius:5px;width:180px;outline:none;transition:border-color .15s,color .15s;}
 .send-url-input:focus{border-color:var(--green);color:var(--text);}
 .send-url-input.has-url{color:var(--text);}
 .covered-by-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:3px;font-size:9px;letter-spacing:.06em;background:var(--accent-tint);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 20%,transparent);}
@@ -362,7 +362,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .status-err{color:var(--red)!important;}
 
 /* ── DUE DATE URGENCY ── */
-.due-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:500;letter-spacing:.04em;white-space:nowrap;}
+.due-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:9px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:500;letter-spacing:.04em;white-space:nowrap;}
 .due-overdue{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);}
 .due-paid{background:color-mix(in srgb,var(--paid) 15%,transparent);color:var(--paid);border:1px solid color-mix(in srgb,var(--paid) 25%,transparent);}
 .due-soon{background:color-mix(in srgb,var(--orange) 15%,transparent);color:var(--orange);border:1px solid color-mix(in srgb,var(--orange) 25%,transparent);}
@@ -372,8 +372,8 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .pay-progress{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;}
 .pay-progress-bar{flex:1;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;}
 .pay-progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s;}
-.pay-progress-text{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;}
-.paid-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-family:'DM Mono',monospace;background:var(--accent-tint);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 30%,transparent);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.pay-progress-text{font-size:11px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap;}
+.paid-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--accent-tint);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 30%,transparent);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .paid-badge:hover{background:color-mix(in srgb,var(--green) 20%,transparent);}
 .paid-badge.unpaid{background:transparent;color:var(--muted);border-color:var(--border);}
 
@@ -381,22 +381,22 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .mode-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px;}
 .mode-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;}
 .mode-stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;}
-.mode-stat-val{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;}
+.mode-stat-val{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:20px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;}
 .mode-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden;}
 .mode-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);}
 .mode-title-row{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap;}
-.mode-title{font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.01em;}
+.mode-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:15px;color:var(--text);letter-spacing:.01em;}
 .mode-meta{font-size:10px;color:var(--muted);margin-top:3px;}
-.mode-money{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+.mode-money{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:22px;font-weight:700;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
 .mode-body{padding:12px 18px 16px;background:var(--surface2);}
 .mode-section-title{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:4px 0 8px;}
 .mode-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
 .mode-row:last-child{border-bottom:none;}
 .mode-row-name{font-size:12px;color:var(--text);font-weight:500;}
 .mode-row-sub{font-size:10px;color:var(--muted);margin-top:2px;}
-.mode-row-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--green);font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.mode-row-val{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;color:var(--green);font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .mode-row-val.negative{color:var(--orange);}
-.mode-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface3);color:var(--muted);border-radius:4px;padding:1px 6px;font-size:9px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em;}
+.mode-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--surface3);color:var(--muted);border-radius:4px;padding:1px 6px;font-size:9px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;text-transform:uppercase;letter-spacing:.06em;}
 .mode-chip.good{color:var(--paid);border-color:color-mix(in srgb,var(--paid) 35%,transparent);background:color-mix(in srgb,var(--paid) 12%,transparent);}
 .mode-chip.warn{color:var(--orange);border-color:color-mix(in srgb,var(--orange) 35%,transparent);background:color-mix(in srgb,var(--orange) 12%,transparent);}
 .mode-notes{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
@@ -419,7 +419,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .mode-detail-row:last-child{border-bottom:none;}
 .mode-detail-row.expense{grid-template-columns:minmax(150px,1fr) 110px 120px 130px minmax(150px,1fr) auto;}
 .mode-chip-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-.mode-select-chip{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:16px;padding:3px 8px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
+.mode-select-chip{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:16px;padding:3px 8px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;cursor:pointer;transition:all .15s;}
 .mode-select-chip:hover{border-color:var(--border2);color:var(--text);}
 .mode-select-chip.active{background:var(--accent-tint);border-color:color-mix(in srgb,var(--green) 35%,transparent);color:var(--green);}
 .mode-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;}
@@ -432,7 +432,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── EMPTY STATE (rich, mirrors iOS EmptyStateView) ── */
 .empty-state{padding:48px 24px;text-align:center;}
 .empty-state-icon{display:inline-flex;align-items:center;justify-content:center;width:88px;height:88px;border-radius:50%;background:color-mix(in srgb,var(--green) 10%,transparent);color:var(--green);font-size:38px;margin-bottom:16px;}
-.empty-state-title{font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.empty-state-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;}
 .empty-state-sub{font-size:12px;color:var(--muted);max-width:340px;margin:0 auto 18px;line-height:1.55;}
 .empty-state .btn{margin-top:2px;}
 
@@ -444,20 +444,20 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .setting-group.collapsed .sg-body{display:none;}
 .setting-group-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green);font-size:16px;flex-shrink:0;}
 .setting-group-heading{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;}
-.setting-group-name{font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em;}
+.setting-group-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em;}
 .setting-group-desc{font-size:11px;color:var(--muted);line-height:1.4;}
 .sg-sub-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 14px 12px;margin-bottom:12px;}
 .sg-sub-card:last-child{margin-bottom:0;}
-.sg-sub-title{font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;letter-spacing:.02em;}
+.sg-sub-title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;letter-spacing:.02em;}
 
 /* ── APPEARANCE SEGMENTED PICKER ── */
 .appearance-row{display:flex;align-items:center;gap:12px;}
 .appearance-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green);font-size:16px;flex-shrink:0;}
 .appearance-label{flex:1;}
-.appearance-name{font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;color:var(--text);}
+.appearance-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:600;color:var(--text);}
 .appearance-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .appearance-seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px;flex-shrink:0;}
-.appearance-seg button{background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.04em;padding:6px 14px;border-radius:5px;cursor:pointer;transition:background .15s,color .15s;text-transform:uppercase;}
+.appearance-seg button{background:transparent;border:none;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;letter-spacing:.04em;padding:6px 14px;border-radius:5px;cursor:pointer;transition:background .15s,color .15s;text-transform:uppercase;}
 .appearance-seg button.active{background:var(--surface3);color:var(--text);}
 .appearance-seg button:hover:not(.active){color:var(--text);}
 
@@ -475,9 +475,92 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
   .mode-edit-grid,.mode-edit-grid.trip,.mode-mini-grid,.mode-detail-row,.mode-detail-row.expense,.mode-person-row{grid-template-columns:1fr;}
   .mode-row-actions{justify-content:flex-start;}
 }
+
+[hidden]{display:none!important;}
+.split-scroll-hint{display:none;}
+.remove-line,.person-expand-btn,.split-type-toggle button{min-width:44px;min-height:44px;}
+.tog:focus-within{outline:3px solid var(--green);outline-offset:4px;}
+/* Honey Glass parity: semantic mobile colors, 24px cards, pill edges. */
+:root { color-scheme: dark; --glass: color-mix(in srgb, var(--surface) 88%, transparent); --edge: rgba(255,255,255,.20); }
+:root[data-theme="light"] { color-scheme: light; --edge: rgba(255,255,255,.80); }
+@media(prefers-color-scheme:light){ :root[data-theme="system"] { color-scheme:light; --edge:rgba(255,255,255,.80); } }
+body{font-size:15px;}
+#app{grid-template-rows:auto auto minmax(0,1fr);height:100dvh;}
+header{min-height:76px;padding:14px 28px;gap:16px;background:var(--glass);}
+.logo-name{font-size:23px;letter-spacing:-.7px;text-transform:none;}
+.logo-sub{letter-spacing:.12em;font-size:10px;margin-top:4px;}
+.header-right{flex-wrap:wrap;justify-content:flex-end;}
+.month-pill{border-radius:24px;padding:4px 10px;border-color:var(--edge);box-shadow:0 2px 8px #2b1d110a;}
+.month-pill select{width:auto;min-width:112px;}
+.month-pill input{min-width:78px;}
+nav{gap:6px;padding-top:8px;padding-bottom:8px;background:var(--glass);overflow-x:auto;}
+.tab{font-family:inherit;font-size:13px;letter-spacing:0;text-transform:none;height:44px;border:1px solid transparent;border-radius:24px;background:transparent;padding:0 16px;}
+.tab.active{background:var(--accent-tint);color:var(--text);border-color:var(--edge);box-shadow:0 3px 12px #2b1d1110;}
+main{padding-top:28px;padding-bottom:max(32px,env(safe-area-inset-bottom));}
+.page-title{font-size:26px;letter-spacing:-.6px;text-transform:none;font-weight:600;}
+.page-sub{font-size:14px;line-height:1.6;color:var(--muted);}
+.card,.bill-card,.mode-card,.person-summary-card,.receive-card,.send-card{border-radius:24px;border-color:var(--border);background:var(--glass);box-shadow:inset 0 1px 0 var(--edge),0 6px 20px #2b1d1108;}
+.bill-header{padding:18px;min-height:84px;}
+.bill-icon{width:44px;height:44px;border-radius:14px;}
+.bill-name{font-size:16px;}
+.bill-body{padding:0 18px 18px;}
+.btn,.btn-sm,.icon-btn,.bill-expand-btn{min-height:44px;min-width:44px;border-radius:22px;font-size:13px;}
+.btn-green{color:#0c0d0f;box-shadow:inset 0 1px 0 rgba(255,255,255,.45);}
+input:not([type="checkbox"]):not([type="color"]),select,textarea{min-height:44px;font-size:14px;border-radius:12px;}
+input[type="checkbox"]{width:20px;height:20px;accent-color:var(--green);}
+input,select,textarea{max-width:100%;}
+.appearance-seg,.trend-toggle{border-radius:24px;border-color:var(--edge);}
+.appearance-seg button.active,.trend-toggle-btn.active{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--edge);}
+.appearance-seg button,.trend-toggle-btn{min-height:44px;border-radius:22px;text-transform:none;font-family:inherit;font-size:13px;}
+.setting-group-header{min-height:56px;}
+.setting-group-name,.appearance-name{font-size:15px;}
+.setting-group-desc,.appearance-sub,.empty-state-sub{font-size:13px;}
+.setting-group-icon,.appearance-icon{width:44px;height:44px;}
+.modal-box,#modal-box{border-radius:24px;background:var(--surface);max-height:85dvh;overflow-y:auto;}
+:focus-visible{outline:3px solid var(--green);outline-offset:3px;}
+button,a,input,select,textarea{touch-action:manipulation;}
+button{min-width:44px;min-height:44px;}
+.auth-panel{max-width:460px;margin:12vh auto;padding:28px;}
+.auth-panel h1{font-size:26px;margin-bottom:12px;}
+.auth-panel p{margin-bottom:16px;color:var(--muted);}
+.auth-panel label{display:block;margin-bottom:8px;}
+.auth-panel input{width:100%;margin-bottom:16px;}
+#sync-status{font-size:12px;color:var(--muted);}
+#retry-save{display:none;}
+@supports(backdrop-filter:blur(16px)){header,nav,.card,.bill-card,.mode-card{backdrop-filter:blur(16px);}}
+@media(max-width:680px){
+  header{padding:12px 16px;flex-wrap:wrap;}
+  .header-right{width:100%;justify-content:space-between;gap:8px;}
+  nav{padding-left:12px;padding-right:12px;}
+  main{padding:20px 14px 32px;}
+  .page-title{font-size:24px;}
+  .bill-header{grid-template-columns:minmax(0,1fr) auto 44px;padding:14px;gap:10px;}
+  .bill-info,.bill-meta{min-width:0;}
+  .bill-name{overflow-wrap:anywhere;}
+  .bill-body{overflow-x:auto;padding:0 14px 16px;}
+  .line-items-head,.line-item{min-width:720px;}
+  .split-scroll-hint{display:block;font-size:12px;color:var(--muted);margin-top:12px;}
+  .appearance-row{flex-wrap:wrap;}
+  .appearance-seg{width:100%;display:flex;}
+  .appearance-seg button{flex:1;padding:6px 10px;}
+  .modal-box,#modal-box{width:calc(100vw - 24px);padding:20px;}
+  .page-sub{margin-bottom:20px;}
+  .auth-panel{margin:8vh 14px;}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important;}}
+@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
+  :root{--glass:var(--surface);--muted:var(--text);--muted2:var(--text);--edge:var(--border2);}
+  header,nav,.card,.bill-card,.mode-card{backdrop-filter:none;box-shadow:none;}
+}
+@media(forced-colors:active){.tab.active,.btn,.card,.bill-card{border:1px solid ButtonText;}.tab.active{outline:2px solid Highlight;}}
+
 </style>
 </head>
 <body>
+<section id="connection-panel" class="card auth-panel" hidden>
+<h1>Connect to SelfHive</h1><p id="connection-message" role="alert"></p>
+<form id="session-form" hidden><label for="session-key">Device API key</label><input id="session-key" type="password" autocomplete="off" spellcheck="false" placeholder="bh_live_…"><button class="btn btn-green" type="submit">Connect securely</button></form>
+<button id="retry-load" class="btn btn-ghost" type="button">Retry connection</button></section>
 <div id="app">
 
 <header>
@@ -489,17 +572,17 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
       <polygon points="72.9,64 65.5,76.8 50.7,76.8 43.3,64 50.7,51.2 65.5,51.2" fill="currentColor"/>
     </svg>
     <div class="logo-wordmark">
-      <div class="logo-name">Bill<span>Hive</span></div>
-      <div class="logo-sub">household manager</div>
+      <div class="logo-name">Self<span>Hive</span></div>
+      <div class="logo-sub">bills · checks · trips</div>
     </div>
   </div>
-  <div class="header-right">
+  <div class="header-right"><span id="sync-status" role="status" aria-live="polite">Loading…</span><button type="button" id="retry-save" class="btn btn-ghost btn-sm">Retry save</button>
     <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--muted);">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 10c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       <span id="currentUser">local</span>
     </div>
     <div class="month-pill">
-      <select id="monthSel">
+      <select id="monthSel" aria-label="Month">
         <option value="0">January</option><option value="1">February</option>
         <option value="2">March</option><option value="3">April</option>
         <option value="4">May</option><option value="5">June</option>
@@ -507,19 +590,19 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <option value="8">September</option><option value="9">October</option>
         <option value="10">November</option><option value="11">December</option>
       </select>
-      <input type="number" id="yearSel" value="2025" min="2020" max="2035">
+      <input type="number" id="yearSel" aria-label="Year" value="2025" min="2020" max="2035">
     </div>
   </div>
 </header>
 
-<nav>
-  <div class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></div>
-  <div class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="2.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="4.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="13.3" x2="15" y2="13.3"/></svg> Summary</div>
-  <div class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Pay &amp; Collect</div>
-  <div class="tab" data-page="checks"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg> Checks <span class="badge" id="tab-badge-checks">0</span></div>
-  <div class="tab" data-page="trips"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg> Trips <span class="badge" id="tab-badge-trips">0</span></div>
-  <div class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</div>
-  <div class="tab" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="14.5" y2="4"/><line x1="1.5" y1="8" x2="14.5" y2="8"/><line x1="1.5" y1="12" x2="14.5" y2="12"/><circle cx="10" cy="4" r="1.75"/><circle cx="5" cy="8" r="1.75"/><circle cx="11" cy="12" r="1.75"/></svg> Settings</div>
+<nav aria-label="Main navigation">
+  <button type="button" class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></button>
+  <button type="button" class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="2.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="4.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="13.3" x2="15" y2="13.3"/></svg> Summary</button>
+  <button type="button" class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Pay &amp; Collect</button>
+  <button type="button" class="tab" data-page="checks"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg> Checks <span class="badge" id="tab-badge-checks">0</span></button>
+  <button type="button" class="tab" data-page="trips"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg> Trips <span class="badge" id="tab-badge-trips">0</span></button>
+  <button type="button" class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</button>
+  <button type="button" class="tab" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="14.5" y2="4"/><line x1="1.5" y1="8" x2="14.5" y2="8"/><line x1="1.5" y1="12" x2="14.5" y2="12"/><circle cx="10" cy="4" r="1.75"/><circle cx="5" cy="8" r="1.75"/><circle cx="11" cy="12" r="1.75"/></svg> Settings</button>
 </nav>
 
 <main>
@@ -730,7 +813,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <div class="appearance-name">Currency</div>
         <div class="appearance-sub" id="currencySubtitle">Auto</div>
       </div>
-      <select id="currencySelect" style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;max-width:200px;cursor:pointer;" data-change="onCurrencyChange(this.value)">
+      <select id="currencySelect" style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;max-width:200px;cursor:pointer;" data-change="onCurrencyChange(this.value)">
       </select>
     </div>
   </div>
@@ -802,7 +885,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;color:var(--text);font-weight:500;">Require API key for iOS apps</div>
+              <div style="font-size:13px;color:var(--text);font-weight:500;">Require authenticated access</div>
               <div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45;">When on, SelfHive can't connect without a valid key. Browser access here is unaffected.</div>
             </div>
             <label class="tog">
@@ -839,7 +922,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <div class="sg-sub-card">
           <div class="sg-sub-title">💾 Backup</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
-            Download a JSON backup of all bills, people, and monthly data from your server, or restore from a previous backup.
+            Export bills, checks, trips and monthly records as JSON. Receipt and itinerary file bytes require a separate backup of the server data volume. Imports merge records and history; they do not restore files.
           </div>
           <div class="action-row">
             <button class="btn btn-ghost btn-sm" data-click="exportData()">Export Backup</button>
@@ -854,10 +937,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
         <div class="sg-sub-card" style="border-color:color-mix(in srgb,var(--red) 30%,transparent);">
           <div class="sg-sub-title" style="color:var(--red);">⚠️ Danger Zone</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
-            Permanently remove all bills, people, and monthly data. This cannot be undone.
+            Clear bills, people, checks and trips, and revoke their share links. Monthly history, server attachments and email settings are retained. Export a backup first.
           </div>
           <div class="action-row">
-            <button class="btn btn-danger btn-sm" data-click="clearAll()">Clear All Data</button>
+            <button class="btn btn-danger btn-sm" data-click="clearAll()">Clear Bill Setup</button>
           </div>
         </div>
 
@@ -869,8 +952,10 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 </main>
 </div><!-- #app -->
 
-<div id="toast"><div class="toast-dot"></div><span id="toastMsg"></span></div>
+<div id="toast" role="status" aria-live="polite"><div class="toast-dot"></div><span id="toastMsg"></span></div>
 
+<script src="/data-contract.js"></script>
+<script src="/persistence.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
         integrity="sha512-SIMGYRUjwY8+gKg7nn9EItdD8LCADSDfJNutF9TPrvEo86sQmFMh6MyralfIyhADlajSxqc7G0gs7+MwWF/ogQ=="
         crossorigin="anonymous"></script>
@@ -922,7 +1007,7 @@ function safeWebUrl(raw) {
   if (!s) return null;
   try {
     const u = new URL(s);
-    if (u.protocol !== 'https:') return null;
+    if (u.protocol !== 'https:' || u.username || u.password) return null;
     return u.toString();
   } catch { return null; }
 }
@@ -987,81 +1072,26 @@ function appleCashSmsUrl(person, amount) {
 // Global state object — the single source of truth. Loaded from the API on init,
 // mutated by UI interactions, and persisted back via debounced save().
 // These defaults are used only on first launch before any server data exists.
-let S = {
-  settings: { myEmail: '', themePref: 'system', currencyCode: '' },
-  people: [
-    { id:'me',   name:'Me',   color:'#d8923e', payMethod:'none',   payId:'', email:'' },
-    { id:'wife', name:'Wife', color:'#6fa5c4', payMethod:'zelle',  payId:'', email:'' },
-    { id:'dad',  name:'Dad',  color:'#b8654a', payMethod:'venmo',  payId:'', email:'' },
-    { id:'mom',  name:'Mom',  color:'#8b5a6f', payMethod:'manual', payId:'', email:'' },
-  ],
-  bills: [
-    {
-      id:'electric', name:'Electric', icon:'⚡', color:'#c87a2e',
-      splitType:'pct',  // 'pct' | 'fixed'
-      lines:[
-        { id:'l1', desc:'Electric', personId:'me',   value:50 },
-        { id:'l2', desc:'Electric', personId:'wife', value:50 },
-      ]
-    },
-    {
-      id:'gas', name:'Gas / Heating', icon:'🔥', color:'#c4933a',
-      splitType:'pct',
-      lines:[
-        { id:'l1', desc:'Gas', personId:'me',   value:50 },
-        { id:'l2', desc:'Gas', personId:'wife', value:50 },
-      ]
-    },
-    {
-      id:'internet', name:'Internet', icon:'📶', color:'#6fa5c4',
-      splitType:'pct',
-      lines:[
-        { id:'l1', desc:'Internet', personId:'me',   value:50 },
-        { id:'l2', desc:'Internet', personId:'wife', value:50 },
-      ]
-    },
-    {
-      id:'mortgage', name:'Mortgage', icon:'🏠', color:'#d8923e',
-      splitType:'fixed', remainderLineId:'l1',
-      lines:[
-        { id:'l1', desc:'Mortgage', personId:'me', value:0 },
-      ]
-    },
-    {
-      id:'verizon', name:'Verizon', icon:'📱', color:'#8b5a6f',
-      splitType:'fixed', remainderLineId:'l1',
-      lines:[
-        { id:'l1', desc:'Your line',  personId:'me',   value:0, coveredById:null },
-        { id:'l2', desc:'Wife line',  personId:'wife', value:0, coveredById:'me'  },
-        { id:'l3', desc:'Dad line',   personId:'dad',  value:0, coveredById:null  },
-        { id:'l4', desc:'Mom line',   personId:'mom',  value:0, coveredById:'dad' },
-      ]
-    },
-  ],
-  monthly: {},   // key: "YYYY-MM" → { totals:{billId:number}, amounts:{billId:{lineId:number}} }
-  checklist: {}, // key: "YYYY-MM" → { itemId: bool }
-  requestDates: {}, // key: "YYYY-MM" → { personId: ISO date string }
-  checks: { checks: [] },
-  trips: { trips: [], sharedTrips: [] },
-  sharedBills: [],
-};
+const emptyState = () => ({ settings:{myEmail:'', themePref:'system', currencyCode:''}, people:[], bills:[], monthly:{}, checklist:{}, requestDates:{}, checks:{checks:[]}, trips:{trips:[],sharedTrips:[]}, sharedBills:[] });
+let S = emptyState();
 
 // ═══════════════════════════════════════════════
 //  THEME (system | light | dark) — mirrors iOS @AppStorage("colorSchemePref")
 // ═══════════════════════════════════════════════
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function applyTheme() {
-  const pref = (S.settings && S.settings.themePref) || 'system';
+  const pref = S.webPreferences?.themePref || S.settings?.themePref || 'system';
   document.documentElement.setAttribute('data-theme', pref);
   document.querySelectorAll('#themeSeg button').forEach(b => {
     b.classList.toggle('active', b.dataset.themePref === pref);
+    b.setAttribute('aria-pressed', String(b.dataset.themePref === pref));
   });
   if (document.querySelector('.page[data-page="trends"].active')) renderTrends();
 }
 function setThemePref(pref) {
   if (!['system','light','dark'].includes(pref)) return;
   if (!S.settings) S.settings = {};
-  S.settings.themePref = pref;
+  S.webPreferences = {...S.webPreferences, themePref:pref};
   applyTheme();
   save();
 }
@@ -1266,45 +1296,51 @@ let _currentUser = 'local';  // Display name from /api/health — shown in heade
 // Debounced save — batches rapid keystrokes into one API call.
 // The 600ms delay is intentional: it prevents hammering the API on every
 // keystroke while still feeling responsive. Don't reduce it.
+let _loaded = false;
+let _editVersion = 0;
+let _stateDirty = false;
+const writer = new SnapshotWriter(async (path, body) => {
+  const response = await fetch(`${API}${path}`, {method:'PUT',headers:{'Content-Type':'application/json','X-BillHive-User':_currentUser},body});
+  if (!response.ok) throw new Error(`Save failed (${response.status}). Your edits are still in this tab.`);
+}, updateSyncStatus);
+function updateSyncStatus() {
+  const status = document.getElementById('sync-status');
+  if (status) status.textContent = writer.error ? 'Not saved' : (_stateDirty || writer.dirty ? 'Saving…' : 'Saved');
+  document.getElementById('retry-save').style.display = writer.error ? 'inline-flex' : 'none';
+  if (writer.error) showBanner(writer.error.message, 'warning');
+  else if (!_stateDirty && !writer.dirty) {
+    hideBanner();
+    if (_pendingReload) { _pendingReload = false; queueMicrotask(_reloadFromServer); }
+  }
+}
 function save() {
+  if (!_loaded) return;
+  _editVersion++; _stateDirty = true; updateSyncStatus();
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => _flushState(), 600);
+  _saveTimer = setTimeout(() => _flushState().catch(() => {}), 600);
 }
-
-async function _flushState() {
-  // Clear the timer reference so _reloadFromServer() knows there are no
-  // pending local changes and it's safe to reload from the server.
-  _saveTimer = null;
-  try {
-    await fetch(`${API}/state`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        settings: S.settings,
-        people:   S.people,
-        bills:    S.bills,
-        checklist: S.checklist,
-        requestDates: S.requestDates,
-        checks: S.checks,
-        trips: S.trips,
-        sharedBills: S.sharedBills,
-      })
-    });
-  } catch(e) { console.warn('State save failed:', e); }
+function _flushState() {
+  clearTimeout(_saveTimer); _saveTimer = null;
+  if (!_loaded) return Promise.reject(new Error('Load your data before saving'));
+  const { monthly, ...state } = S;
+  BHData.state(state);
+  _stateDirty = false;
+  return writer.enqueue('/state', state);
 }
-
-// Immediate (non-debounced) save for monthly numeric data. Unlike save(), this
-// fires right away because month totals must persist before a tab switch or
-// page unload. Called by saveMonthSnapshot() after computing derived values.
-async function saveMonthNow(key, data) {
-  try {
-    await fetch(`${API}/months/${key}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch(e) { console.warn('Month save failed:', e); }
+function saveMonthNow(key, data) {
+  if (!_loaded || _reloading) return;
+  _editVersion++;
+  try { BHData.month(data); writer.enqueue(`/months/${key}`, data).catch(() => {}); }
+  catch(error) { showBanner(error.message, 'warning'); }
 }
+async function flushPending() {
+  if (_stateDirty) await _flushState();
+  await writer.flush();
+}
+document.getElementById('retry-save').addEventListener('click', () => flushPending().catch(() => {}));
+window.addEventListener('beforeunload', event => {
+  if (_stateDirty || writer.dirty) { event.preventDefault(); event.returnValue = ''; }
+});
 
 function normalizeState() {
   // Guarantee exactly one person with id 'me' exists.
@@ -1360,37 +1396,27 @@ function normalizePaymentTrackingState() {
 }
 
 async function load() {
-  try {
-    // Load config state
-    const stateRes = await fetch(`${API}/state`);
-    if (stateRes.ok) {
-      const parsed = await stateRes.json();
-      if (parsed.settings)  { Object.assign(S.settings, parsed.settings); _currFmt = null; }
-      if (parsed.people)    S.people   = parsed.people;
-      if (parsed.bills)     S.bills    = parsed.bills;
-      if (parsed.checklist) S.checklist = parsed.checklist;
-      if (parsed.requestDates) S.requestDates = parsed.requestDates;
-      if (parsed.checks && typeof parsed.checks === 'object') S.checks = parsed.checks;
-      if (parsed.trips && typeof parsed.trips === 'object') S.trips = parsed.trips;
-      if (Array.isArray(parsed.sharedBills)) S.sharedBills = parsed.sharedBills;
-    }
-    // Load all months for trend data
-    const monthsRes = await fetch(`${API}/months`);
-    if (monthsRes.ok) {
-      S.monthly = await monthsRes.json();
-    }
-    // Identify current user
-    const healthRes = await fetch(`${API}/health`);
-    if (healthRes.ok) {
-      const h = await healthRes.json();
-      _currentUser = h.user;
-      const userEl = document.getElementById('currentUser');
-      if (userEl) userEl.textContent = _currentUser;
-    }
-  } catch(e) {
-    console.warn('Load failed (API unreachable?):', e);
-    showBanner('⚠ Cannot reach API — running in offline mode', 'warning');
+  const version = _editVersion;
+  const [stateRes, monthsRes, healthRes] = await Promise.all([fetch(`${API}/state`), fetch(`${API}/months`), fetch(`${API}/health`)]);
+  for (const response of [stateRes, monthsRes, healthRes]) if (!response.ok) {
+    const error = new Error(response.status === 401 ? 'Authentication required. Sign in through your proxy or use a device key.' : `Could not load data (${response.status}). Existing data has not been replaced.`);
+    error.status = response.status; throw error;
   }
+  const parsed = BHData.state(await stateRes.json());
+  const months = BHData.months(await monthsRes.json());
+  const health = await healthRes.json();
+  if (_loaded && health.user !== _currentUser) {
+    _loaded = false;
+    document.getElementById('app').hidden = true;
+    throw new Error('The signed-in account changed. Reload the page to continue.');
+  }
+  if (version !== _editVersion || _stateDirty || writer.dirty) return false;
+  if (_loaded && isEditing()) { _pendingReload = true; return false; }
+  S = {...emptyState(), ...parsed, monthly:months};
+  S.settings = {...emptyState().settings, ...parsed.settings};
+  _currFmt = null; _currentUser = health.user; _loaded = true;
+  document.getElementById('currentUser').textContent = _currentUser;
+  return true;
 }
 
 // ═══════════════════════════════════════════════
@@ -1433,7 +1459,7 @@ function connectSSE() {
 document.addEventListener('focusout', () => {
   if (_pendingReload) {
     _pendingReload = false;
-    _reloadFromServer();
+    queueMicrotask(_reloadFromServer);
   }
 });
 
@@ -1441,20 +1467,28 @@ document.addEventListener('focusout', () => {
 // reload → saveMonthNow → broadcastChange → SSE data-changed → reload ...
 // SSE alone is sufficient for cross-device sync.
 
+function isEditing() {
+  return ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) || document.getElementById('app').inert;
+}
 async function _reloadFromServer() {
   if (_reloading) return;
-  if (_saveTimer) return; // Pending local changes — skip reload to avoid overwriting unsaved state
+  if (isEditing()) { _pendingReload = true; return; }
+  if (_stateDirty || writer.dirty) { _pendingReload = true; return; }
   _reloading = true;
   try {
-    await load();
+    if (!await load()) return;
     normalizeState();
+    applyTheme();
     // renderBills() → recalcAll() → saveMonthSnapshot() but saveMonthSnapshot
     // checks _reloading and skips writes, so no broadcast → no loop.
     renderBills();
     renderChecks();
     renderTrips();
     renderSettings();
-  } finally {
+    renderSummary();
+    renderSendPay();
+    if (document.getElementById('page-trends').classList.contains('active')) renderTrends();
+  } catch(error) { showBanner(error.message, 'warning'); } finally {
     _reloading = false;
   }
 }
@@ -1488,6 +1522,7 @@ function monthLabelLong(key) {
 function getMonthData() {
   const k = monthKey();
   if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
+  S.monthly[k].totals ||= {}; S.monthly[k].amounts ||= {};
   return S.monthly[k];
 }
 function getBillTotal(billId) { return getMonthData().totals[billId] || 0; }
@@ -2194,7 +2229,7 @@ function renderCheckEditor(check) {
         <button class="btn btn-ghost btn-xs" data-click="markCheckPaymentRequested('${check.id}','${participant.id}')">Requested</button>
         <button class="btn ${isPaid ? 'btn-green' : 'btn-ghost'} btn-xs" data-click="toggleCheckParticipantPaidWeb('${check.id}','${participant.id}')">${isPaid ? 'Paid' : 'Mark Paid'}</button>
       </div>
-      <button class="remove-line" data-click="removeCheckParticipant('${check.id}','${participant.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove participant" data-click="removeCheckParticipant('${check.id}','${participant.id}')">✕</button>
     </div>`;
   }).join('') : `<div class="mode-empty-inline">Add participants before assigning items.</div>`;
 
@@ -2205,7 +2240,7 @@ function renderCheckEditor(check) {
       <input type="number" min="0" step="0.01" value="${asNumber(item.price ?? item.amount) || ''}" placeholder="0.00"
              data-input="updateCheckItemField('${check.id}','${item.id}','price',this.value)" data-change="renderChecks();save()">
       ${renderCheckAssigneeChips(check, item)}
-      <button class="remove-line" data-click="removeCheckItem('${check.id}','${item.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove item" data-click="removeCheckItem('${check.id}','${item.id}')">✕</button>
     </div>
   `).join('') : `<div class="mode-empty-inline">Add receipt items, then choose who split each one.</div>`;
 
@@ -2214,27 +2249,27 @@ function renderCheckEditor(check) {
       <div class="mode-edit-grid">
         <div class="mode-field">
           <label>Icon</label>
-          <input type="text" maxlength="2" value="${esc(check.icon || '🍽️')}" data-input="updateCheckField('${check.id}','icon',this.value)" data-change="renderChecks();save()">
+          <input aria-label="Icon" type="text" maxlength="2" value="${esc(check.icon || '🍽️')}" data-input="updateCheckField('${check.id}','icon',this.value)" data-change="renderChecks();save()">
         </div>
         <div class="mode-field">
           <label>Name</label>
-          <input type="text" value="${esc(check.name || '')}" placeholder="Dinner, lunch, coffee run"
+          <input aria-label="Name" type="text" value="${esc(check.name || '')}" placeholder="Dinner, lunch, coffee run"
                  data-input="updateCheckField('${check.id}','name',this.value)" data-change="renderChecks();save()">
         </div>
         <div class="mode-field">
           <label>Date</label>
-          <input type="date" value="${dateInputValue(check.dateISO)}" data-change="updateCheckDate('${check.id}',this.value);renderChecks();save()">
+          <input aria-label="Date" type="date" value="${dateInputValue(check.dateISO)}" data-change="updateCheckDate('${check.id}',this.value);renderChecks();save()">
         </div>
       </div>
       <div class="mode-mini-grid">
-        <div class="mode-field"><label>Tax</label><input type="number" min="0" step="0.01" value="${asNumber(check.taxAmount) || ''}" data-input="updateCheckNumberField('${check.id}','taxAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Tip</label><input type="number" min="0" step="0.01" value="${asNumber(check.tipAmount) || ''}" data-input="updateCheckNumberField('${check.id}','tipAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Discount</label><input type="number" min="0" step="0.01" value="${asNumber(check.discountAmount) || ''}" data-input="updateCheckNumberField('${check.id}','discountAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Service Fee</label><input type="number" min="0" step="0.01" value="${asNumber(check.serviceFeeAmount) || ''}" data-input="updateCheckNumberField('${check.id}','serviceFeeAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Tax</label><input aria-label="Tax" type="number" min="0" step="0.01" value="${asNumber(check.taxAmount) || ''}" data-input="updateCheckNumberField('${check.id}','taxAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Tip</label><input aria-label="Tip" type="number" min="0" step="0.01" value="${asNumber(check.tipAmount) || ''}" data-input="updateCheckNumberField('${check.id}','tipAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Discount</label><input aria-label="Discount" type="number" min="0" step="0.01" value="${asNumber(check.discountAmount) || ''}" data-input="updateCheckNumberField('${check.id}','discountAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Service Fee</label><input aria-label="Service Fee" type="number" min="0" step="0.01" value="${asNumber(check.serviceFeeAmount) || ''}" data-input="updateCheckNumberField('${check.id}','serviceFeeAmount',this.value)" data-change="renderChecks();save()"></div>
       </div>
       <div class="mode-field">
         <label>Notes</label>
-        <textarea placeholder="Optional notes" data-input="updateCheckField('${check.id}','notes',this.value)" data-change="save()">${esc(check.notes || '')}</textarea>
+        <textarea aria-label="Notes" placeholder="Optional notes" data-input="updateCheckField('${check.id}','notes',this.value)" data-change="save()">${esc(check.notes || '')}</textarea>
       </div>
     </div>
     ${renderCheckShareSection(check)}
@@ -2272,7 +2307,7 @@ function renderChecks() {
   updateTabBadge();
 
   const toolbar = `<div class="mode-toolbar">
-    <div class="mode-toolbar-copy">Checks created here use the same SelfHive state shape as iOS, including participants, split items, adjustments, and payment status.</div>
+    <div class="mode-toolbar-copy">Add people and receipt items, split the cost, and track who has paid.</div>
     <button class="btn btn-green btn-sm" data-click="addCheck()">+ Add Check</button>
   </div>`;
 
@@ -2764,7 +2799,7 @@ function renderTripInviteSection(trip) {
 
   return `<div class="mode-edit-section">
     <div class="mode-section-title">Invite Links</div>
-    <div class="mode-toolbar-copy">Create per-member SelfHive invite links. The invite token lets that member join and sync shared trip expenses from their iOS app.</div>
+    <div class="mode-toolbar-copy">Invite each member to view and update this trip in SelfHive. Anyone with their link can join; revoke it when access is no longer needed.</div>
     <div class="mode-actions" style="margin-top:8px;margin-bottom:8px;">
       <button class="btn btn-ghost btn-xs" data-click="loadTripInvitesWeb('${trip.id}')">${loaded ? 'Refresh Invites' : 'Load Invites'}</button>
     </div>
@@ -3046,7 +3081,7 @@ function renderTripEditor(trip) {
         <div class="mode-row-sub">${member.linkedPersonId ? 'Household member' : 'Guest'} · balance ${fmtSignedCurrencyFor(tripMemberBalance(trip, member.id), currency)}</div>
       </div>
       <span class="mode-chip" style="border-color:${personColor(member.linkedPersonId)}66;color:${personColor(member.linkedPersonId)}">${esc(member.linkedPersonId || 'guest')}</span>
-      <button class="remove-line" data-click="removeTripMember('${trip.id}','${member.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove member" data-click="removeTripMember('${trip.id}','${member.id}')">✕</button>
     </div>
   `).join('') : `<div class="mode-empty-inline">Add members before logging expenses.</div>`;
 
@@ -3064,7 +3099,7 @@ function renderTripEditor(trip) {
         ${renderTripSplitChips(trip, expense)}
         <select style="margin-top:6px;" data-change="updateTripExpenseField('${trip.id}','${expense.id}','category',this.value);renderTrips();save()">${expenseCategoryOptions(expense.category)}</select>
       </div>
-      <button class="remove-line" data-click="removeTripExpense('${trip.id}','${expense.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove expense" data-click="removeTripExpense('${trip.id}','${expense.id}')">✕</button>
     </div>
     <div class="mode-field" style="margin-bottom:8px;">
       <textarea placeholder="Expense notes" data-input="updateTripExpenseField('${trip.id}','${expense.id}','notes',this.value)" data-change="save()">${esc(expense.notes || '')}</textarea>
@@ -3095,7 +3130,7 @@ function renderTripEditor(trip) {
         <div class="mode-row-sub">${esc(shortDate(s.settledAtISO))}</div>
       </div>
       <div class="mode-row-val">${fmtCurrencyFor(s.amount, currency)}</div>
-      <button class="remove-line" data-click="removeTripSettlement('${trip.id}','${s.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove settlement" data-click="removeTripSettlement('${trip.id}','${s.id}')">✕</button>
     </div>`;
   }).join('') : '';
 
@@ -3107,7 +3142,7 @@ function renderTripEditor(trip) {
                data-input="updateTripChecklistItem('${trip.id}','${item.id}','label',this.value)" data-change="save()">
       </label>
       <span></span>
-      <button class="remove-line" data-click="removeTripChecklistItem('${trip.id}','${item.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove checklist item" data-click="removeTripChecklistItem('${trip.id}','${item.id}')">✕</button>
     </div>
   `).join('') : `<div class="mode-empty-inline">No checklist items.</div>`;
 
@@ -3121,7 +3156,7 @@ function renderTripEditor(trip) {
              data-input="updateItineraryEvent('${trip.id}','${event.id}','location',this.value)" data-change="save()">
       <input type="text" value="${esc(event.notes || '')}" placeholder="Notes"
              data-input="updateItineraryEvent('${trip.id}','${event.id}','notes',this.value)" data-change="save()">
-      <button class="remove-line" data-click="removeItineraryEvent('${trip.id}','${event.id}')">✕</button>
+      <button class="remove-line" aria-label="Remove itinerary event" data-click="removeItineraryEvent('${trip.id}','${event.id}')">✕</button>
     </div>
     ${renderItineraryAttachments(trip, event)}
   `).join('') : `<div class="mode-empty-inline">No itinerary events.</div>`;
@@ -3129,15 +3164,15 @@ function renderTripEditor(trip) {
   return `<div class="mode-body">
     <div class="mode-edit-section">
       <div class="mode-edit-grid trip">
-        <div class="mode-field"><label>Icon</label><input type="text" maxlength="2" value="${esc(trip.icon || '✈️')}" data-input="updateTripField('${trip.id}','icon',this.value)" data-change="renderTrips();save()"></div>
-        <div class="mode-field"><label>Name</label><input type="text" value="${esc(trip.name || '')}" placeholder="Trip name" data-input="updateTripField('${trip.id}','name',this.value)" data-change="renderTrips();save()"></div>
-        <div class="mode-field"><label>Start</label><input type="date" value="${dateInputValue(trip.startDateISO)}" data-change="updateTripDate('${trip.id}','startDateISO',this.value);renderTrips();save()"></div>
-        <div class="mode-field"><label>End</label><input type="date" value="${dateInputValue(trip.endDateISO)}" data-change="updateTripDate('${trip.id}','endDateISO',this.value);renderTrips();save()"></div>
-        <div class="mode-field"><label>Currency</label><input type="text" maxlength="3" value="${esc(currency)}" data-input="updateTripField('${trip.id}','currency',this.value)" data-change="renderTrips();save()"></div>
+        <div class="mode-field"><label>Icon</label><input aria-label="Icon" type="text" maxlength="2" value="${esc(trip.icon || '✈️')}" data-input="updateTripField('${trip.id}','icon',this.value)" data-change="renderTrips();save()"></div>
+        <div class="mode-field"><label>Name</label><input aria-label="Name" type="text" value="${esc(trip.name || '')}" placeholder="Trip name" data-input="updateTripField('${trip.id}','name',this.value)" data-change="renderTrips();save()"></div>
+        <div class="mode-field"><label>Start</label><input aria-label="Start" type="date" value="${dateInputValue(trip.startDateISO)}" data-change="updateTripDate('${trip.id}','startDateISO',this.value);renderTrips();save()"></div>
+        <div class="mode-field"><label>End</label><input aria-label="End" type="date" value="${dateInputValue(trip.endDateISO)}" data-change="updateTripDate('${trip.id}','endDateISO',this.value);renderTrips();save()"></div>
+        <div class="mode-field"><label>Currency</label><input aria-label="Currency" type="text" maxlength="3" value="${esc(currency)}" data-input="updateTripField('${trip.id}','currency',this.value)" data-change="renderTrips();save()"></div>
       </div>
       <div class="mode-field">
         <label>Notes</label>
-        <textarea placeholder="Optional trip notes" data-input="updateTripField('${trip.id}','notes',this.value)" data-change="save()">${esc(trip.notes || '')}</textarea>
+        <textarea aria-label="Notes" placeholder="Optional trip notes" data-input="updateTripField('${trip.id}','notes',this.value)" data-change="save()">${esc(trip.notes || '')}</textarea>
       </div>
     </div>
     <div class="mode-edit-section">
@@ -3193,7 +3228,7 @@ function renderTrips() {
   updateTabBadge();
 
   const toolbar = `<div class="mode-toolbar">
-    <div class="mode-toolbar-copy">Trips created here sync with SelfHive iOS, including members, expenses, split rules, settlements, itinerary, and checklist items.</div>
+    <div class="mode-toolbar-copy">Keep travel expenses, balances, plans and checklists together. Changes sync with SelfHive on your devices.</div>
     <button class="btn btn-green btn-sm" data-click="addTrip()">+ Add Trip</button>
   </div>`;
 
@@ -3380,9 +3415,9 @@ function renderBills() {
         </div>
         ${totalDisplay}
         ${myShareDisplay}
-        <button type="button" class="bill-expand-btn" data-click="event.stopPropagation();toggleBill('${bill.id}')">▾</button>
+        <button type="button" class="bill-expand-btn" aria-label="Toggle ${esc(bill.name)} details" aria-expanded="false" data-click="event.stopPropagation();toggleBill('${bill.id}')">▾</button>
       </div>
-      <div class="bill-body">
+      <div class="bill-body" tabindex="0" aria-label="${esc(bill.name)} split editor">
         ${renderBillBody(bill)}
       </div>
     `;
@@ -3392,7 +3427,7 @@ function renderBills() {
   // Restore expanded state
   wasExpanded.forEach(id => {
     const card = document.getElementById(id);
-    if (card) card.classList.add('expanded');
+    if (card) { card.classList.add('expanded'); card.querySelector('.bill-expand-btn').setAttribute('aria-expanded','true'); }
   });
 
   document.getElementById('tab-badge-bills').textContent = `${filled}/${S.bills.length}`;
@@ -3404,11 +3439,11 @@ function renderBillBody(bill) {
   const identityRow = `
     <div style="display:grid;grid-template-columns:44px 1fr 50px;gap:8px;
          align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
-      <input type="text" value="${bill.icon}" maxlength="2"
+      <input type="text" aria-label="Bill icon" value="${esc(bill.icon)}" maxlength="2"
              data-input="updateBillIcon('${bill.id}',this.value)"
              style="text-align:center;font-size:18px;padding:4px;width:44px;height:34px;
                     background:${bill.color}22;border:1px solid var(--border);border-radius:6px;color:var(--text);">
-      <input type="text" value="${bill.name}" placeholder="Bill name"
+      <input type="text" aria-label="Bill name" value="${esc(bill.name)}" placeholder="Bill name"
              data-input="updateBillName('${bill.id}',this.value)"
              style="font-size:12px;font-family:var(--mono);padding:6px 8px;
                     background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);">
@@ -3440,7 +3475,7 @@ function renderBillBody(bill) {
     bodyContent = `
       <div class="total-input-wrap" style="margin-top:12px;">
         <label>Total Bill (${getCurrSymbol()})</label>
-        <input type="number" placeholder="0.00" step="0.01" value="${total||''}"
+        <input aria-label="Total bill amount" type="number" placeholder="0.00" step="0.01" value="${total||''}"
                data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown"></div>
       </div>
@@ -3454,23 +3489,23 @@ function renderBillBody(bill) {
         const coverer = isCovered ? getPerson(coveredBy) : null;
         return `
           <div class="line-item" style="grid-template-columns:160px 1fr 90px 90px 130px 28px;${isCovered?'background:var(--accent-subtle);':''}">
-            <input type="text" value="${line.desc}" placeholder="Description"
+            <input type="text" aria-label="Line description" value="${esc(line.desc)}" placeholder="Description"
                    data-input="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
-            <select data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
-              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
+            <select aria-label="Responsible person" data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${esc(p.name)}</option>`).join('')}
             </select>
-            <input type="number" value="${+line.value.toFixed(2)}" min="0" max="100" step="0.1"
+            <input aria-label="Share percentage" type="number" value="${+line.value.toFixed(2)}" min="0" max="100" step="0.1"
                    data-input="updateLinePct('${bill.id}','${line.id}',this.value)"
                    style="text-align:right;font-size:12px;">
             <div class="line-item-owed ${line.personId==='me'?'is-mine':''}" style="text-align:right;">
               ${total ? fmtCurrency(lineAmt) : '—'}
             </div>
-            <select data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+            <select aria-label="Covered by" data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
                     style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
               <option value="">— none —</option>
-              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${esc(p.id===line.personId?p.name+' (self)':p.name)}</option>`).join('')}
             </select>
-            <button class="remove-line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
+            <button class="remove-line" aria-label="Remove ${esc(line.desc)} line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
           </div>`;
       }).join('')}
       <div class="add-line-row">
@@ -3489,10 +3524,10 @@ function renderBillBody(bill) {
     bodyContent = `
       <div class="total-input-wrap" style="margin-top:12px;">
         <label>Total Bill (${getCurrSymbol()})</label>
-        <input type="number" placeholder="0.00" step="0.01" value="${fixedTotal||''}"
+        <input aria-label="Total bill amount" type="number" placeholder="0.00" step="0.01" value="${fixedTotal||''}"
                data-input="onTotalInput('${bill.id}',this.value)" style="max-width:140px;">
         <div class="total-breakdown" style="font-size:11px;color:var(--muted);">
-          ${fixedTotal > 0 ? 'Remainder → <span style="color:'+remainderPerson.color+'">'+remainderPerson.name+'</span>' : 'Enter total, then adjust lines below'}
+          ${fixedTotal > 0 ? 'Remainder → <span style="color:'+remainderPerson.color+'">'+esc(remainderPerson.name)+'</span>' : 'Enter total, then adjust lines below'}
         </div>
       </div>
       <div class="line-items-head" style="grid-template-columns:24px 150px 1fr 120px 130px 28px;">
@@ -3516,10 +3551,10 @@ function renderBillBody(bill) {
                 style="width:20px;height:20px;border-radius:50%;border:2px solid ${rColor};background:${rBg};
                        cursor:pointer;font-size:9px;color:${rTxt};font-family:DM Mono,monospace;font-weight:500;">R</button>
             </div>
-            <input type="text" value="${line.desc}" placeholder="Description"
+            <input type="text" aria-label="Line description" value="${esc(line.desc)}" placeholder="Description"
                    data-input="updateLineDesc('${bill.id}','${line.id}',this.value)" style="font-size:11px;">
-            <select data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
-              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${p.name}</option>`).join('')}
+            <select aria-label="Responsible person" data-change="updateLinePersonId('${bill.id}','${line.id}',this.value)">
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===line.personId?'selected':''}>${esc(p.name)}</option>`).join('')}
             </select>
             ${isRemainder
               ? `<div id="remainder-display-${bill.id}"
@@ -3530,12 +3565,12 @@ function renderBillBody(bill) {
                         data-input="onFixedLineInput('${bill.id}','${line.id}',this.value)"
                         style="text-align:right;font-size:12px;" id="fixed-line-input-${bill.id}-${line.id}">`
             }
-            <select data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
+            <select aria-label="Covered by" data-change="updateLineCoveredBy('${bill.id}','${line.id}',this.value)"
                     style="font-size:11px;${isCovered?'border-color:var(--green);color:var(--green)':''}">
               <option value="">— none —</option>
-              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${p.id===line.personId?p.name+' (self)':p.name}</option>`).join('')}
+              ${S.people.map(p=>`<option value="${p.id}" ${p.id===coveredBy?'selected':''}>${esc(p.id===line.personId?p.name+' (self)':p.name)}</option>`).join('')}
             </select>
-            <button class="remove-line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
+            <button class="remove-line" aria-label="Remove ${esc(line.desc)} line" data-click="removeLine('${bill.id}','${line.id}')">✕</button>
           </div>`;
       }).join('')}
       <div class="add-line-row" style="display:flex;align-items:center;gap:12px;">
@@ -3570,12 +3605,13 @@ function renderBillBody(bill) {
     </div>
   `;
 
-  return identityRow + splitTypeToggle + bodyContent + preserveToggle;
+  return identityRow + splitTypeToggle + '<p class="split-scroll-hint">Scroll sideways to see all split columns.</p>' + bodyContent + preserveToggle;
 }
 
 function toggleBill(id) {
   const card = document.getElementById(`bill-card-${id}`);
   card.classList.toggle('expanded');
+  card.querySelector('.bill-expand-btn').setAttribute('aria-expanded', String(card.classList.contains('expanded')));
 }
 
 function togglePerson(id) {
@@ -3715,7 +3751,7 @@ function updateBillComputedDisplays(billId) {
     const remainLine = bill.lines.find(l=>l.id===remainId) || bill.lines[0] || {};
     const remPerson = getPerson(remainLine.personId || 'me');
     if (hint) hint.innerHTML = fixedTotal > 0
-      ? 'Remainder → <span style="color:'+remPerson.color+'">'+remPerson.name+'</span>'
+      ? 'Remainder → <span style="color:'+remPerson.color+'">'+esc(remPerson.name)+'</span>'
       : 'Enter total, then adjust lines below';
   }
 }
@@ -3817,7 +3853,7 @@ function addNewBill() {
     // Expand new bill
     const last = S.bills[S.bills.length-1];
     const card = document.getElementById(`bill-card-${last.id}`);
-    if (card) card.classList.add('expanded');
+    if (card) { card.classList.add('expanded'); card.querySelector('.bill-expand-btn').setAttribute('aria-expanded','true'); }
     save();
     toast('Bill added — configure it below!');
   });
@@ -3863,6 +3899,7 @@ function recalcAll() {
 function saveMonthSnapshot() {
   const k = monthKey();
   if (!S.monthly[k]) S.monthly[k] = { totals:{}, amounts:{} };
+  S.monthly[k].totals ||= {}; S.monthly[k].amounts ||= {};
   S.monthly[k]._myTotal = computeMyTotal();
   const owes = computePersonOwes();
   S.monthly[k]._owes = {};
@@ -3950,7 +3987,7 @@ function renderSummary() {
     card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
         <div class="ps-name" style="color:${person.color}">${esc(person.name)}</div>
-        ${isPaid ? `<span style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;">✓ paid</span>` : ''}
+        ${isPaid ? `<span style="font-size:10px;color:var(--green);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;">✓ paid</span>` : ''}
       </div>
       <div class="ps-amount" style="color:${isPaid ? 'var(--muted)' : person.color};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
       <div class="ps-bills">${billList || 'No bills assigned'}</div>
@@ -3990,7 +4027,7 @@ function renderSummary() {
       const billTotal = getBillTotal(bill.id);
       if (billTotal === 0) return;
       html += `<div style="margin-bottom:16px;">
-        <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${esc(bill.icon)} ${esc(bill.name)} — ${fmtCurrency(billTotal)} total</div>`;
+        <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${esc(bill.icon)} ${esc(bill.name)} — ${fmtCurrency(billTotal)} total</div>`;
       S.people.forEach(p => {
         const amt = split[p.id] || 0;
         if (!amt) return;
@@ -4418,7 +4455,7 @@ function renderSendCards() {
         <div class="send-card-right">
           <input type="url" class="send-url-input ${hasUrl ? 'has-url' : ''}"
                  placeholder="https://your-bank.com/pay"
-                 value="${url}"
+                 value="${esc(url)}"
                  data-input="updateBillPayUrl('${bill.id}',this.value)"
                  title="Payment portal URL for this bill">
           ${payBtn}
@@ -4629,14 +4666,14 @@ function renderTrendsPersonView() {
       const d = S.monthly[k];
       const owesStr = Object.entries(d._owes||{}).filter(([,v])=>v>0).map(([pid,v])=>{
         const p = getPerson(pid);
-        return `<span style="color:${p.color}">${p.name}: ${fmtCurrency(v)}</span>`;
+        return `<span style="color:${p.color}">${esc(p.name)}: ${fmtCurrency(v)}</span>`;
       }).join(' · ');
       return `<div class="sum-row" style="padding:8px 0;">
         <div>
           <div style="font-size:12px;">${monthLabel(k)}</div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px;">${owesStr||'—'}</div>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-weight:700;color:var(--green)">${fmtCurrency((d._myTotal||0))}</div>
+        <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;color:var(--green)">${fmtCurrency((d._myTotal||0))}</div>
       </div>`;
     }).join('');
   }
@@ -4728,12 +4765,12 @@ function renderTrendsBillView() {
           <div style="width:8px;height:8px;border-radius:50%;background:${bill.color};flex-shrink:0;"></div>
           <div style="font-size:12px;">${esc(bill.name)}</div>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-weight:700;color:${bill.color};">${fmtCurrency(total)}</div>
+        <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;color:${bill.color};">${fmtCurrency(total)}</div>
       </div>`;
     }).filter(Boolean).join('') +
     `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Grand Total</div>
-      <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:var(--green);">${fmtCurrency(grandTotal)}</div>
+      <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:16px;color:var(--green);">${fmtCurrency(grandTotal)}</div>
     </div>`;
   }
 }
@@ -4746,6 +4783,7 @@ function toggleSettingsGroup(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.toggle('collapsed');
+  el.querySelector('.setting-group-header').setAttribute('aria-expanded', String(!el.classList.contains('collapsed')));
 }
 
 function renderSettings() {
@@ -4772,7 +4810,11 @@ async function loadDevices() {
     const keys     = await keysRes.json();
     const settings = await settingsRes.json();
     const toggle = document.getElementById('requireDeviceKeysToggle');
-    if (toggle) toggle.checked = !!settings.requireDeviceKeys;
+    if (toggle) {
+      toggle.checked = !!settings.requireDeviceKeys;
+      toggle.disabled = !settings.canManage;
+      toggle.title = settings.canManage ? '' : 'Only a configured server administrator can change this policy.';
+    }
     renderDevicesList(keys);
   } catch (e) {
     console.warn('Could not load devices:', e);
@@ -4841,7 +4883,7 @@ function showKeyRevealModal(data) {
       Paste it into SelfHive: <strong>Settings → Server → API Key</strong>.
     </div>
     <div class="key-display" id="bhKeyDisplay">${esc(data.key)}</div>
-    <div style="font-size:10px;color:var(--muted);margin-bottom:14px;font-family:'DM Mono',monospace;">
+    <div style="font-size:10px;color:var(--muted);margin-bottom:14px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;">
       ${esc(data.name)}  ·  ${esc(data.id)}
     </div>
     <div class="modal-footer">
@@ -4931,15 +4973,16 @@ function showModal(innerHtml) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'bhModal';
-  overlay.innerHTML = `<div class="modal-box">${innerHtml}</div>`;
+  overlay.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true" aria-label="SelfHive dialog">${innerHtml}</div>`;
   overlay.addEventListener('click', e => { if (e.target === overlay) closeBhModal(); });
   document.body.appendChild(overlay);
+  activateDialog(overlay);
   // Esc closes
   document.addEventListener('keydown', _bhModalEsc);
 }
 function closeBhModal() {
   const m = document.getElementById('bhModal');
-  if (m) m.remove();
+  if (m) { m.remove(); restoreDialogFocus(); }
   document.removeEventListener('keydown', _bhModalEsc);
 }
 function _bhModalEsc(e) { if (e.key === 'Escape') closeBhModal(); }
@@ -4969,10 +5012,10 @@ function renderEmailProviderFields(cfg) {
   if (!provider) { el.innerHTML = ''; return; }
 
   const v = (key, placeholder) =>
-    `<input type="text" id="em-${key}" placeholder="${placeholder}" value="${cfg&&cfg[key]||''}"
+    `<input type="text" id="em-${key}" placeholder="${placeholder}" value="${esc(cfg&&cfg[key]||'')}"
             style="font-size:12px;" autocomplete="off">`;
   const pw = (key, placeholder) =>
-    `<input type="password" id="em-${key}" placeholder="${placeholder}" value="${cfg&&cfg[key]||''}"
+    `<input type="password" id="em-${key}" placeholder="${placeholder}" value="${esc(cfg&&cfg[key]||'')}"
             style="font-size:12px;" autocomplete="new-password">`;
 
   const fields = {
@@ -5089,11 +5132,11 @@ function renderGreetingConfig() {
     return `
       <div class="setting-row">
         <div class="setting-label" style="color:${p.color}">
-          ${p.name}
+          ${esc(p.name)}
           <div class="setting-hint">Opening line in their email</div>
         </div>
-        <input type="text" value="${p.greeting||''}"
-               placeholder="Hi ${p.name},"
+        <input type="text" value="${esc(p.greeting||'')}"
+               placeholder="Hi ${esc(p.name)},"
                data-input="updatePersonField(${idx},'greeting',this.value)" data-change="save()"
                style="font-size:12px;">
       </div>`;
@@ -5126,40 +5169,40 @@ function renderPeopleConfig() {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Phone / Email</div>
-          <input type="text" value="${p.payId||''}" placeholder="phone or email"
+          <input type="text" value="${esc(p.payId||'')}" placeholder="phone or email"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>
         <div class="person-field">
           <div class="person-field-label">Zelle URL</div>
-          <input type="url" value="${p.zelleUrl||''}" placeholder="Custom URL (optional)"
+          <input type="url" value="${esc(p.zelleUrl||'')}" placeholder="Custom URL (optional)"
                  data-input="updatePersonField(${idx},'zelleUrl',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'venmo') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Venmo Handle</div>
-          <input type="text" value="${p.payId||''}" placeholder="@handle"
+          <input type="text" value="${esc(p.payId||'')}" placeholder="@handle"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'cashapp') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Cash Tag</div>
-          <input type="text" value="${p.payId||''}" placeholder="$cashtag"
+          <input type="text" value="${esc(p.payId||'')}" placeholder="$cashtag"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'applecash') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">Apple Cash Contact</div>
-          <input type="text" value="${p.payId||''}" placeholder="phone or email"
+          <input type="text" value="${esc(p.payId||'')}" placeholder="phone or email"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     } else if (p.payMethod === 'paypal') {
       payIdFields = `
         <div class="person-field">
           <div class="person-field-label">PayPal</div>
-          <input type="text" value="${p.payId||''}" placeholder="paypal.me/yourname"
+          <input type="text" value="${esc(p.payId||'')}" placeholder="paypal.me/yourname"
                  data-input="updatePersonField(${idx},'payId',this.value)" data-change="save()">
         </div>`;
     }
@@ -5182,7 +5225,7 @@ function renderPeopleConfig() {
                      style="width:34px;height:34px;padding:2px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;flex-shrink:0;"
                      data-input="updatePersonField(${idx},'color',this.value)"
                      data-change="updatePersonFieldAndSave(${idx},'color',this.value)">
-              <input type="text" value="${p.name||''}" placeholder="Name"
+              <input type="text" value="${esc(p.name||'')}" placeholder="Name"
                      data-input="updatePersonField(${idx},'name',this.value)" data-change="save()">
             </div>
           </div>
@@ -5201,7 +5244,7 @@ function renderPeopleConfig() {
           ${payIdFields}
           <div class="person-field">
             <div class="person-field-label">Email</div>
-            <input type="email" value="${p.email||''}" placeholder="Notifications email"
+            <input type="email" value="${esc(p.email||'')}" placeholder="Notifications email"
                    data-input="updatePersonField(${idx},'email',this.value)" data-change="save()">
           </div>
           ${!isMe ? `
@@ -5215,7 +5258,7 @@ function renderPeopleConfig() {
   // Restore expanded state
   wasExpanded.forEach(id => {
     const card = document.getElementById(id);
-    if (card) card.classList.add('expanded');
+    if (card) { card.classList.add('expanded'); card.querySelector('.bill-expand-btn').setAttribute('aria-expanded','true'); }
   });
 }
 
@@ -5231,7 +5274,7 @@ function addPerson() {
   renderPeopleConfig();
   // Auto-expand the new card
   const card = document.getElementById(`person-card-${newPerson.id}`);
-  if (card) card.classList.add('expanded');
+  if (card) { card.classList.add('expanded'); card.querySelector('.bill-expand-btn').setAttribute('aria-expanded','true'); }
   save();
 }
 
@@ -5264,30 +5307,48 @@ function removePerson(idx) {
   }, { okLabel:'Remove', danger:true });
 }
 
-function exportData() {
-  window.open(`${API}/export`, '_blank');
+async function exportData() {
+  try {
+    await flushPending();
+    const response = await fetch(`${API}/export`);
+    if (!response.ok) throw new Error(`Export failed (${response.status})`);
+    const backup = BHData.backup(await response.json());
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)], {type:'application/json'}));
+    const link = document.createElement('a'); link.href = url; link.download = 'selfhive-backup.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Records exported. Back up server attachment files separately.');
+  } catch(error) { toast(error.message); }
 }
 
 async function importData(file) {
   try {
     const text = await file.text();
-    const data = JSON.parse(text);
+    const data = BHData.backup(JSON.parse(text));
+    document.getElementById('app').inert = true;
+    await flushPending();
     const res = await fetch(`${API}/import`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (res.ok) { toast('Import successful — reloading...'); setTimeout(()=>location.reload(), 1200); }
-    else toast('Import failed');
+    if (res.ok) { location.reload(); }
+    else { const failure = await res.json(); throw new Error(failure.error || 'Import failed'); }
   } catch(e) { toast('Import error: ' + e.message); }
+  finally { document.getElementById('app').inert = false; }
 }
 
 function clearAll() {
-  showConfirm('Reset ALL data for "' + _currentUser + '"? This cannot be undone.', async ok => {
+  showConfirm('Clear bills, people, checks and trips for "' + _currentUser + '"? Share links will be revoked. Monthly history, server attachments and email settings are retained. Export a backup first.', async ok => {
     if (!ok) return;
-    await fetch(`${API}/state`, { method: 'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({settings:{},people:[],bills:[],checklist:{},requestDates:{},checks:{checks:[]},trips:{trips:[],sharedTrips:[]},sharedBills:[]}) });
+    try {
+    document.getElementById('app').inert = true;
+    await flushPending();
+    const result = await fetch(`${API}/reset-setup`, { method: 'POST', headers:{'X-BillHive-User':_currentUser} });
+    if (!result.ok) throw new Error(`Clear failed (${result.status})`);
     location.reload();
-  }, { okLabel:'Reset', danger:true });
+    } catch(error) { toast(error.message); }
+    finally { document.getElementById('app').inert = false; }
+  }, { okLabel:'Clear setup', danger:true });
 }
 
 // Add mortgage URL/provider to settings
@@ -5371,6 +5432,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t === tab ? 'page' : 'false'));
     const page = tab.dataset.page;
     document.getElementById(`page-${page}`).classList.add('active');
     if (page==='bills') renderBills();
@@ -5449,17 +5511,38 @@ async function init() {
   const now = new Date();
   document.getElementById('monthSel').value = now.getMonth();
   document.getElementById('yearSel').value = now.getFullYear();
-  // Default theme before API loads — avoids flash if user has set 'light'.
   applyTheme();
-  showBanner('Loading...', 'info');
-  await load();
-  normalizeState();
-  applyTheme();
-  hideBanner();
-  renderBills();
-  recalcAll();
-  connectSSE();
+  document.getElementById('app').hidden = true;
+  _reloading = true;
+  try {
+    await load();
+    normalizeState(); applyTheme(); renderBills(); recalcAll();
+    document.getElementById('app').hidden = false;
+    document.getElementById('connection-panel').hidden = true;
+    hideBanner(); updateSyncStatus(); connectSSE();
+  } catch(error) {
+    _loaded = false;
+    document.getElementById('connection-panel').hidden = false;
+    document.getElementById('connection-message').textContent = error.message;
+    const secureLogin = location.protocol === 'https:' || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+    document.getElementById('session-form').hidden = error.status !== 401 || !secureLogin;
+    if (error.status === 401 && !secureLogin) document.getElementById('connection-message').textContent += ' Open this server over HTTPS to enter a device key.';
+  } finally { _reloading = false; }
 }
+document.getElementById('retry-load').addEventListener('click', init);
+document.getElementById('session-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = document.getElementById('session-key');
+  const key = input.value.trim(); input.value = '';
+  if (location.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
+    document.getElementById('connection-message').textContent = 'Use HTTPS before entering a device key.'; return;
+  }
+  try {
+    const response = await fetch(`${API}/session`, {method:'POST', headers:{Authorization:`Bearer ${key}`}});
+    if (!response.ok) throw new Error('The device key was not accepted.');
+    await init();
+  } catch(error) { document.getElementById('connection-message').textContent = error.message; }
+});
 
 function showBanner(msg, type) {
   let el = document.getElementById('banner');
@@ -5486,6 +5569,29 @@ function hideBanner() {
 // for a consistent dark-theme look. Uses a single #modal-overlay element
 // shared between both modes. The callback receives the input value (prompt)
 // or true/false (confirm).
+let dialogReturnFocus = null;
+function activateDialog(overlay) {
+  dialogReturnFocus = document.activeElement;
+  document.getElementById('app').inert = true;
+  const controls = [...overlay.querySelectorAll('button,input,select,textarea,a[href]')].filter(el => el.getClientRects().length && !el.disabled);
+  controls[0]?.focus();
+}
+function restoreDialogFocus() {
+  document.getElementById('app').inert = false;
+  if (dialogReturnFocus?.isConnected) dialogReturnFocus.focus();
+  dialogReturnFocus = null;
+}
+document.addEventListener('keydown', event => {
+  const overlay = document.getElementById('bhModal') || (document.getElementById('modal-overlay')?.style.display === 'flex' ? document.getElementById('modal-overlay') : null);
+  if (!overlay) return;
+  if (event.key === 'Escape') { event.preventDefault(); if (overlay.id === 'bhModal') closeBhModal(); else _modalCancel(); return; }
+  if (event.key !== 'Tab') return;
+  const controls = [...overlay.querySelectorAll('button,input,select,textarea,a[href]')].filter(el => el.getClientRects().length && !el.disabled);
+  const first = controls[0], last = controls[controls.length-1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+});
+
 let _modalCb = null, _modalMode = 'confirm';
 
 function showPrompt(title, placeholder, cb) {
@@ -5497,6 +5603,7 @@ function showPrompt(title, placeholder, cb) {
   document.getElementById('modal-ok-btn').className = 'btn btn-green btn-sm';
   document.getElementById('modal-cancel-btn').style.display = '';
   document.getElementById('modal-overlay').style.display = 'flex';
+  activateDialog(document.getElementById('modal-overlay'));
   setTimeout(() => inp.focus(), 50);
 }
 
@@ -5508,28 +5615,37 @@ function showConfirm(title, cb, { okLabel = 'OK', danger = false } = {}) {
   document.getElementById('modal-ok-btn').className = 'btn btn-sm ' + (danger ? 'btn-danger' : 'btn-green');
   document.getElementById('modal-cancel-btn').style.display = '';
   document.getElementById('modal-overlay').style.display = 'flex';
+  activateDialog(document.getElementById('modal-overlay'));
 }
 
 function _modalOk() {
   const val = _modalMode === 'prompt' ? document.getElementById('modal-input').value.trim() : true;
   document.getElementById('modal-overlay').style.display = 'none';
+  restoreDialogFocus();
   const cb = _modalCb; _modalCb = null;
   if (cb) cb(val);
 }
 
 function _modalCancel() {
   document.getElementById('modal-overlay').style.display = 'none';
+  restoreDialogFocus();
   _modalCb = null;
 }
 
+document.querySelectorAll('.setting-group-header').forEach(header => {
+  header.setAttribute('role','button'); header.tabIndex = 0;
+  header.setAttribute('aria-expanded', String(!header.parentElement.classList.contains('collapsed')));
+  header.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); header.click(); } });
+});
+document.querySelector('.tab.active').setAttribute('aria-current', 'page');
 init();
 </script>
 
 <!-- ════════════════ MODAL ════════════════ -->
 <div id="modal-overlay" data-click="_modalCancel()">
-  <div id="modal-box" data-click="event.stopPropagation()">
+  <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-click="event.stopPropagation()">
     <div id="modal-title"></div>
-    <input id="modal-input" type="text" data-keydown="_modalOk()" data-keydown-key="Enter">
+    <input id="modal-input" aria-labelledby="modal-title" type="text" data-keydown="_modalOk()" data-keydown-key="Enter">
     <div id="modal-footer">
       <button class="btn btn-ghost btn-sm" id="modal-cancel-btn" data-click="_modalCancel()">Cancel</button>
       <button class="btn btn-green btn-sm" id="modal-ok-btn" data-click="_modalOk()">OK</button>
