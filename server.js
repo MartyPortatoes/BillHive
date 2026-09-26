@@ -35,6 +35,7 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 const Data = require('./public/data-contract.js');
 const { SyncStore, SyncError } = require('./sync-store');
 const { GuestTripSync } = require('./guest-sync-store');
+const { AttachmentStore } = require('./attachment-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -171,6 +172,8 @@ db.exec(`
 
 const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
 const guestSync = new GuestTripSync(db, sync, publicTripShape);
+const attachments = new AttachmentStore(db, sync);
+sync.validateReferences = userId => attachments.validateReferences(userId);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
 // significantly faster repeated execution. All are synchronous (.get / .run / .all).
@@ -569,7 +572,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, attachmentProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -1607,6 +1610,27 @@ app.get('/api/events', (req, res) => {
 });
 
 // ── Trip attachments ─────────────────────────────────────────────────────────
+// Managed uploads stage immutable bytes. A later revision-checked household save
+// publishes the descriptor; unreferenced uploads cannot be downloaded.
+function attachmentIdentity(req) {
+  return {userId:req.get('X-BillHive-User'),serverInstanceId:req.get('X-BillHive-Server'),householdId:req.get('X-BillHive-Household')};
+}
+function sendManagedAttachment(res, row) {
+  res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
+  res.attachment(row.filename); res.setHeader('Content-Type','application/octet-stream');
+  res.setHeader('X-Attachment-SHA256',row.sha256); res.setHeader('ETag',`"sha256:${row.sha256}"`);
+  res.send(row.bytes);
+}
+app.put('/api/sync/attachments/:kind/:tripId/:recordId/:filename', express.raw({type:'application/octet-stream',limit:'10mb'}), (req,res) => {
+  const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);
+  res.json(attachments.upload(req.userId,scope,attachmentIdentity(req),
+    {id:req.get('X-Attachment-Id'),mimeType:req.get('X-Attachment-Type'),sha256:req.get('X-Attachment-SHA256')},req.body));
+});
+app.get('/api/sync/attachments/:kind/:tripId/:recordId/:filename', (req,res) => {
+  const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);
+  sendManagedAttachment(res,attachments.download(req.userId,scope,attachmentIdentity(req)));
+});
+
 // Per-expense receipt images and per-itinerary files, stored on disk alongside
 // the SQLite database. The attachment *metadata* (id, filename, mimeType) lives
 // inside the Trip JSON in user_state and syncs automatically. These endpoints
@@ -1668,6 +1692,7 @@ app.post('/api/trips/:tripId/expenses/:expenseId/attachments',
     }
 
     const filename = `${attachmentId}.jpg`;
+    if (attachments.isManagedLegacyPath(req.userId,'expenses',expenseId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Managed attachment content cannot be overwritten.');
     const dir = receiptsDir(req.userId, expenseId);
     const filePath = path.join(dir, filename);
 
@@ -1691,6 +1716,10 @@ app.get('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req, re
   const filename = sanitizeFilename(req.params.filename);
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
 
+  if (attachments.isManagedLegacyPath(req.userId,'expenses',expenseId,filename)) {
+    return sendManagedAttachment(res,attachments.download(req.userId,attachments.scope('expenses',req.params.tripId,expenseId,filename)));
+  }
+
   const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
 
@@ -1709,6 +1738,7 @@ app.delete('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req,
 
   const filename = sanitizeFilename(req.params.filename);
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+  if (attachments.isManagedLegacyPath(req.userId,'expenses',expenseId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Remove the attachment reference with a revision-checked household save.');
 
   const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
   try {
@@ -1735,6 +1765,7 @@ app.post('/api/trips/:tripId/itinerary/:eventId/attachments',
 
     const filename = sanitizeFilename(req.headers['x-filename']);
     if (!filename) return res.status(400).json({ error: 'X-Filename header required' });
+    if (attachments.isManagedLegacyPath(req.userId,'itinerary',eventId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Managed attachment content cannot be overwritten.');
 
     if (!Buffer.isBuffer(req.body) || !req.body.length) {
       return res.status(400).json({ error: 'Empty body — expected attachment data' });
@@ -1762,6 +1793,10 @@ app.get('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, res
   const filename = sanitizeFilename(req.params.filename);
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
 
+  if (attachments.isManagedLegacyPath(req.userId,'itinerary',eventId,filename)) {
+    return sendManagedAttachment(res,attachments.download(req.userId,attachments.scope('itinerary',req.params.tripId,eventId,filename)));
+  }
+
   const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
 
@@ -1778,6 +1813,7 @@ app.delete('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, 
 
   const filename = sanitizeFilename(req.params.filename);
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
+  if (attachments.isManagedLegacyPath(req.userId,'itinerary',eventId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Remove the attachment reference with a revision-checked household save.');
 
   const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
   try {

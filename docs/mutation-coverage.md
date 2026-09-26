@@ -19,7 +19,8 @@ contracts are verified. Existing deployed services have not been changed.
 | Email send/test POST | Owner authentication and separate rate limit; external relay side effect. | Stable operation/outcome record and explicit handling of delivery uncertainty; a database receipt alone cannot prove mail delivery. |
 | API key create/delete | Owner-scoped key issue/revocation; session invalidation on revoke. | Retry semantics for issuance and credential recovery; multi-device management lifecycle tests. |
 | Server authentication settings PUT | Admin authorization; server-wide configuration outside household stream. | Configuration revision/concurrent admin update and rollout/recovery evidence. |
-| Expense and itinerary attachment POST/DELETE | Owner namespace, validated paths, upload bounds and isolated download behavior. | Parent-record ownership/lifecycle, content identity, idempotent upload/delete, interruption recovery and garbage collection. File bytes are outside SQLite JSON commits. |
+| Managed expense/itinerary attachment PUT and reference commits | Protocol v1 pins owner/server/household, stages immutable bytes, validates managed references inside JSON transactions and serves only current references. Exact uploads replay; legacy paths cannot overwrite managed files. | Native editor integration, legacy byte migration, expiry/garbage collection, physical purge, portable restore and rollout. See [attachment protocol](attachment-protocol.md). |
+| Unmanaged legacy attachment POST/DELETE | Owner namespace, validated paths, upload bounds and isolated download behavior. | These retain weaker parent/lifecycle and overwrite behavior; managed protocol coverage does not certify old files. |
 | `/api/session` | Device-key exchange into HTTP-only browser session. | Deployment cookie/proxy checks; this is authentication state, not a household revision write. |
 
 Existing tests are useful within their assertions. In particular, current

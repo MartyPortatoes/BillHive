@@ -204,6 +204,7 @@ class GuestTripSync {
       recordGuestActivity(context.trip, change, invite, input.mutationId);
       Data.state({trips:context.trips});
       this.sync.setState.run(invite.owner_user_id, 'trips', JSON.stringify(context.trips));
+      this.sync.validateReferences(invite.owner_user_id);
       const snapshot = this.snapshotInside(invite, context);
       this.saveReceipt.run(tokenHash,input.mutationId,requestHash,invite.owner_user_id,invite.trip_id,invite.member_id,snapshot.revision);
       return {userId:invite.owner_user_id, response:{...envelope, committedRevision:snapshot.revision, replayed:false, access:'active', snapshot}};

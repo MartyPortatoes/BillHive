@@ -20,6 +20,7 @@ class SyncStore {
   constructor(db, {requirePreconditions = false} = {}) {
     this.db = db;
     this.requirePreconditions = requirePreconditions;
+    this.validateReferences = () => {};
     db.transaction(() => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS sync_revisions (
@@ -84,6 +85,7 @@ class SyncStore {
       if (ifMatch && ifMatch !== this.etag(metadata)) fail(409, 'REVISION_CONFLICT', 'The household changed. Your edits were not applied.');
       const value = operation();
       if (value && typeof value.then === 'function') throw new Error('Sync transactions must be synchronous');
+      this.validateReferences(userId);
       return {value, metadata:this.metadata(userId)};
     }).immediate();
   }
@@ -126,6 +128,7 @@ class SyncStore {
       for (const [key,value] of Object.entries(input.monthly)) this.setMonth.run(userId,key,JSON.stringify(value));
       for (const key of input.deleteStateKeys) this.deleteState.run(userId,key);
       for (const key of input.deleteMonths) this.deleteMonth.run(userId,key);
+      this.validateReferences(userId);
       const snapshot = this.snapshotInside(userId);
       this.saveReceipt.run(userId,input.mutationId,hash,snapshot.revision);
       return {...snapshot, mutationId:input.mutationId, committedRevision:snapshot.revision, replayed:false};
