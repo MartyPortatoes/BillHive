@@ -134,5 +134,25 @@ class SyncStore {
       return {...snapshot, mutationId:input.mutationId, committedRevision:snapshot.revision, replayed:false};
     }).immediate();
   }
+
+  /** Read-only preflight of a complete replacement. The eventual commit still checks its revision. */
+  validateRestore(userId, body, inspectFiles) {
+    const input = this.validateCommit(body);
+    return this.db.transaction(() => {
+      if (!this.requirePreconditions) fail(428, 'PROTECTION_DISABLED', 'Enable revision protection before restoring.');
+      const current = this.snapshotInside(userId);
+      if (input.serverInstanceId !== current.serverInstanceId || input.householdId !== current.householdId) {
+        fail(409, 'HOUSEHOLD_CHANGED', 'The server or signed-in household changed.');
+      }
+      if (input.baseRevision !== current.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Review the restore again.');
+      for (const [before, after, deleted] of [[current.state,input.state,input.deleteStateKeys], [current.monthly,input.monthly,input.deleteMonths]]) {
+        if (Object.keys(before).some(key => !Object.hasOwn(after,key) && !deleted.includes(key))) {
+          fail(400, 'INVALID_RESTORE', 'A restore must explicitly replace all household records and history.');
+        }
+      }
+      return {protocolVersion:1, userId, serverInstanceId:current.serverInstanceId, householdId:current.householdId,
+        baseRevision:current.revision, mutationId:input.mutationId, missing:inspectFiles(input.state)};
+    }).immediate();
+  }
 }
 module.exports = {SyncStore, SyncError};

@@ -409,6 +409,8 @@ app.use(limiter);
 // ── Middleware ────────────────────────────────────────────────────────────────
 // 2 MB limit is generous enough for large bill configs + monthly data imports
 // while protecting against accidental mega-payloads.
+// A portable restore allows 8 MiB of records plus the pinned commit envelope.
+app.use(['/api/sync/commit', '/api/sync/restore/validate'], express.json({ limit: '10mb' }));
 app.use(express.json({ limit: '2mb' }));
 
 // ── Auth resolution ──────────────────────────────────────────────────────────
@@ -572,7 +574,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, attachmentProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -1127,6 +1129,9 @@ app.post('/api/sync/commit', (req, res) => {
   res.json(result);
   if (!result.replayed) broadcastChange(req.userId);
 });
+app.post('/api/sync/restore/validate', (req,res) => {
+  res.json(sync.validateRestore(req.userId,req.body,state => attachments.missingForRestore(req.userId,state)));
+});
 
 function legacyWrite(req, res, operation, userId = req.userId) {
   const result = sync.write(userId, req.get('If-Match'), operation);
@@ -1625,6 +1630,13 @@ app.put('/api/sync/attachments/:kind/:tripId/:recordId/:filename', express.raw({
   const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);
   res.json(attachments.upload(req.userId,scope,attachmentIdentity(req),
     {id:req.get('X-Attachment-Id'),mimeType:req.get('X-Attachment-Type'),sha256:req.get('X-Attachment-SHA256')},req.body));
+});
+app.put('/api/sync/restore/attachments/:kind/:tripId/:recordId/:filename', express.raw({type:'application/octet-stream',limit:'10mb'}), (req,res) => {
+  const revision = req.get('X-BillHive-Revision');
+  if (!revision || !/^(0|[1-9][0-9]*)$/.test(revision)) throw new SyncError(400,'INVALID_RESTORE','A restore revision is required.');
+  const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);
+  res.json(attachments.upload(req.userId,scope,attachmentIdentity(req),
+    {id:req.get('X-Attachment-Id'),mimeType:req.get('X-Attachment-Type'),sha256:req.get('X-Attachment-SHA256')},req.body,Number(revision)));
 });
 app.get('/api/sync/attachments/:kind/:tripId/:recordId/:filename', (req,res) => {
   const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);

@@ -56,7 +56,7 @@ class AttachmentStore {
       (descriptor.storageVersion == null && descriptor.sha256 == null && descriptor.sizeBytes == null ||
         descriptor.storageVersion === 1 && descriptor.sha256 === row.sha256 && descriptor.sizeBytes === row.size_bytes);
   }
-  upload(userId, scope, expected, descriptor, bytes) {
+  upload(userId, scope, expected, descriptor, bytes, restoreRevision = null) {
     const limit = scope[0] === 'expenses' ? 2 * 1024 * 1024 : 10 * 1024 * 1024;
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > limit || !segment(descriptor.id) ||
         !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(descriptor.mimeType || '') || descriptor.mimeType.length > 128 ||
@@ -68,6 +68,7 @@ class AttachmentStore {
     return this.db.transaction(() => {
       const identity = this.identity(userId, expected);
       if (!this.sync.requirePreconditions) fail(428,'PROTECTION_DISABLED','Enable revision protection before uploading.');
+      if (restoreRevision !== null && (!Number.isSafeInteger(restoreRevision) || restoreRevision < 0)) fail(400,'INVALID_RESTORE','Invalid restore revision.');
       const old = this.find.get(userId,...scope);
       if (old) {
         if (old.attachment_id !== descriptor.id || old.mime_type !== descriptor.mimeType || old.sha256 !== descriptor.sha256 || !old.bytes.equals(bytes)) {
@@ -75,14 +76,59 @@ class AttachmentStore {
         }
         return {...identity,...this.descriptor(old),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:true};
       }
-      const {trip,record} = this.parent(userId,scope);
-      if (trip.isArchived) fail(409,'TRIP_ARCHIVED','Reopen the trip before adding attachments.');
-      if (Array.isArray(record.attachments) && record.attachments.some(item => item?.filename === scope[3] || item?.id === descriptor.id) ||
-          this.findId.get(userId,scope[0],scope[1],scope[2],descriptor.id)) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity is already in use.');
+      if (restoreRevision === null) {
+        const {trip,record} = this.parent(userId,scope);
+        if (trip.isArchived) fail(409,'TRIP_ARCHIVED','Reopen the trip before adding attachments.');
+        if (Array.isArray(record.attachments) && record.attachments.some(item => item?.filename === scope[3] || item?.id === descriptor.id)) {
+          fail(409,'ATTACHMENT_ID_REUSED','This attachment identity is already in use.');
+        }
+      } else if (this.sync.metadata(userId).revision !== restoreRevision) {
+        // This only rejects staging. It says nothing about a prior metadata commit's outcome.
+        fail(409,'REVISION_CONFLICT','The household changed. Retry the original restore commit to confirm its outcome.');
+      }
+      if (this.findId.get(userId,scope[0],scope[1],scope[2],descriptor.id)) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity is already in use.');
       if (this.usage.get(userId).bytes + bytes.length > 256 * 1024 * 1024) fail(413,'ATTACHMENT_QUOTA','The household attachment storage limit has been reached.');
       this.insert.run(userId,...scope,descriptor.id,descriptor.mimeType,descriptor.sha256,bytes.length,bytes);
       return {...identity,...this.descriptor(this.find.get(userId,...scope)),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:false};
     }).immediate();
+  }
+  /** Inspect managed references in prospective restore JSON without publishing records or bytes. */
+  missingForRestore(userId, state) {
+    const missing = []; let count = 0; let requiredBytes = 0;
+    for (const trip of state.trips?.trips || []) for (const kind of ['expenses','itinerary']) for (const record of trip[kind] || []) {
+      if (record.attachments == null) continue;
+      if (!Array.isArray(record.attachments)) fail(400,'INVALID_ATTACHMENT','Invalid restore attachments.');
+      const ids = new Set(); const names = new Set();
+      for (const item of record.attachments) {
+        if (++count > 10000 || !item || typeof item !== 'object' || Array.isArray(item) ||
+            !segment(item.id) || !filename(item.filename) || ids.has(item.id) || names.has(item.filename)) {
+          fail(400,'INVALID_ATTACHMENT','Invalid or repeated restore attachment reference.');
+        }
+        ids.add(item.id); names.add(item.filename);
+        const scope = this.scope(kind,trip.id,record.id,item.filename);
+        const row = this.findMetadata.get(userId,...scope);
+        const registeredId = this.findId.get(userId,kind,trip.id,record.id,item.id);
+        const declared = ['storageVersion','sha256','sizeBytes'].some(key => Object.hasOwn(item,key));
+        if (!declared) {
+          if (row && !this.matches(row,item) || registeredId && registeredId.filename !== item.filename) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity already belongs to another file.');
+          continue; // Records-only legacy references make no promise of available bytes.
+        }
+        if (item.storageVersion !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256 || '') ||
+            !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(item.mimeType || '') || item.mimeType.length > 128 ||
+            !Number.isSafeInteger(item.sizeBytes) || item.sizeBytes <= 0 || item.sizeBytes > (kind === 'expenses' ? 2 : 10)*1024*1024 ||
+            kind === 'expenses' && (item.mimeType !== 'image/jpeg' || !item.filename.endsWith('.jpg'))) {
+          fail(400,'INVALID_ATTACHMENT','Invalid restore attachment content identity.');
+        }
+        if (row && !this.matches(row,item) || registeredId && registeredId.filename !== item.filename) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity already belongs to another file.');
+        if (!row) {
+          requiredBytes += item.sizeBytes;
+          missing.push({kind,tripId:trip.id,recordId:record.id,id:item.id,filename:item.filename,mimeType:item.mimeType,
+            storageVersion:1,sha256:item.sha256,sizeBytes:item.sizeBytes});
+        }
+      }
+    }
+    if (this.usage.get(userId).bytes + requiredBytes > 256*1024*1024) fail(413,'ATTACHMENT_QUOTA','The household attachment storage limit has been reached.');
+    return missing;
   }
   /** Called after JSON writes but before their transaction commits, including legacy and guest writers. */
   validateReferences(userId) {

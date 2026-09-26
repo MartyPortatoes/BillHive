@@ -98,3 +98,95 @@ test('unmanaged legacy and opaque future descriptors survive unrelated owner sav
  const latest=await f.read();latest.state.trips.trips[0].itinerary[0].attachments.push(f.descriptor);
  assert.equal((await f.commit(latest,latest.state)).status,200);assert.equal((await f.download()).status,200);
 });
+
+async function restoreFixture() {
+ const f=await fixture();
+ const state={settings:{currencyCode:'EUR',futureSetting:'retained'},trips:{trips:[{id:'imported-trip',name:'Archived vacation',isArchived:true,
+  members:[],expenses:[],itinerary:[{id:'imported-event',title:'Reservation',attachments:[f.descriptor]}]}]}};
+ const request={serverInstanceId:f.snapshot.serverInstanceId,householdId:f.snapshot.householdId,baseRevision:f.snapshot.revision,
+  mutationId:crypto.randomUUID(),state,monthly:{'2024-02':{totals:{},futureMonth:'retained'}},
+  deleteStateKeys:Object.keys(f.snapshot.state).filter(k=>!(k in state)),deleteMonths:Object.keys(f.snapshot.monthly)};
+ const post=(url,body=request,extra={})=>fetch(base+url,{method:'POST',headers:{...f.headers,'X-BillHive-User':f.user,'content-type':'application/json',...extra},body:JSON.stringify(body)});
+ const fileUrl='/api/sync/attachments/itinerary/imported-trip/imported-event/ticket.pdf';
+ const upload=(extra={})=>f.upload(f.bytes,{'X-BillHive-Revision':String(request.baseRevision),...extra},fileUrl.replace('/attachments/','/restore/attachments/'));
+ return {...f,request,post,fileUrl,restoreUpload:upload,preflight:()=>post('/api/sync/restore/validate'),restoreCommit:()=>post('/api/sync/commit')};
+}
+test('restore stages into an absent archived parent then atomically replaces records and history',async()=>{
+ const f=await restoreFixture();const original=await f.read();
+ assert.equal((await f.upload(f.bytes,{},f.fileUrl)).status,404,'ordinary uploads still require a current parent');
+ const response=await f.preflight();assert.equal(response.status,200);const plan=await response.json();
+ assert.equal(plan.baseRevision,original.revision);assert.equal(plan.mutationId,f.request.mutationId);assert.equal(plan.userId,f.user);
+ assert.equal(plan.missing.length,1);assert.equal(plan.missing[0].sha256,f.descriptor.sha256);
+ assert.deepEqual(await f.read(),original,'preflight publishes nothing');
+ assert.equal((await f.restoreCommit()).status,409);assert.deepEqual(await f.read(),original,'missing file rolls back records');
+ assert.equal((await f.restoreUpload()).status,200);assert.deepEqual(await f.read(),original);
+ assert.equal((await f.download({},f.fileUrl)).status,404,'staged bytes stay hidden');
+ assert.deepEqual((await (await f.preflight()).json()).missing,[]);
+ const committed=await f.restoreCommit();assert.equal(committed.status,200);const receipt=await committed.json();
+ assert.deepEqual(receipt.state,f.request.state);assert.deepEqual(receipt.monthly,f.request.monthly);
+ assert.deepEqual(Buffer.from(await (await f.download({},f.fileUrl)).arrayBuffer()),f.bytes);
+ const newer=await f.read();newer.state.settings.futureSetting='newer edit';assert.equal((await f.commit(newer,newer.state)).status,200);
+ const replay=await (await f.restoreCommit()).json();assert.equal(replay.replayed,true);assert.equal(replay.committedRevision,receipt.committedRevision);
+ assert.equal(replay.state.settings.futureSetting,'newer edit','lost receipt recovery cannot roll back subsequent edits');
+ assert.equal((await (await f.restoreUpload()).json()).replayed,true,'exact bytes replay even after later revisions');
+});
+test('restore preflight and staging pin the household and require an unchanged review',async()=>{
+ const f=await restoreFixture();
+ assert.equal((await f.post('/api/sync/restore/validate',{...f.request,householdId:'another'})).status,409);
+ assert.equal((await f.post('/api/sync/restore/validate',f.request,{'X-BillHive-User':'another'})).status,409);
+ assert.equal((await f.restoreUpload({'X-BillHive-User':'another'})).status,409);
+ for(const invalid of ['', '-1','1.5','9007199254740992']) assert.equal((await f.restoreUpload({'X-BillHive-Revision':invalid})).status,400);
+ const newer=await f.read();newer.state.settings={currencyCode:'GBP'};assert.equal((await f.commit(newer,newer.state)).status,200);
+ assert.equal((await f.preflight()).status,409);assert.equal((await f.restoreUpload()).status,409);assert.equal((await f.restoreCommit()).status,409);
+ assert.equal((await f.download({},f.fileUrl)).status,404);
+});
+test('restore preflight rejects malformed references and immutable collisions before publication',async()=>{
+ const f=await restoreFixture();const before=await f.read();
+ for(const change of [{sha256:'bad'},{sizeBytes:0},{sizeBytes:11*1024*1024},{storageVersion:2},{filename:'../bad'}]) {
+  const bad=structuredClone(f.request);bad.state.trips.trips[0].itinerary[0].attachments=[{...f.descriptor,...change}];
+  assert.equal((await f.post('/api/sync/restore/validate',bad)).status,400);
+ }
+ const duplicate=structuredClone(f.request);duplicate.state.trips.trips[0].itinerary[0].attachments.push(f.descriptor);
+ assert.equal((await f.post('/api/sync/restore/validate',duplicate)).status,400);
+ assert.equal((await f.restoreUpload()).status,200);
+ const collision=structuredClone(f.request);collision.state.trips.trips[0].itinerary[0].attachments[0].sha256='0'.repeat(64);
+ assert.equal((await f.post('/api/sync/restore/validate',collision)).status,409);
+ assert.equal((await f.upload(Buffer.from('different'),{'X-BillHive-Revision':String(before.revision)},f.fileUrl.replace('/attachments/','/restore/attachments/'))).status,409);
+ assert.deepEqual(await f.read(),before);
+});
+test('restore requires explicit removed keys and months and accepts records larger than the legacy 2 MiB limit',async()=>{
+ const f=await restoreFixture();const original=await f.read();
+ original.state.obsolete={old:true};const seeded=await f.commit(original,original.state);assert.equal(seeded.status,200);
+ const latest=await f.read();f.request.baseRevision=latest.revision;
+ assert.equal((await f.preflight()).status,400,'cannot leave an omitted existing key behind');
+ f.request.deleteStateKeys.push('obsolete');f.request.state.trips.trips[0].itinerary[0].attachments=[];
+ f.request.state.unknownLargeField='x'.repeat(3*1024*1024);
+ assert.equal((await f.preflight()).status,200);assert.equal((await f.restoreCommit()).status,200);
+ const restored=await f.read();assert.equal(restored.state.obsolete,undefined);assert.equal(restored.state.unknownLargeField.length,3*1024*1024);
+ const incomplete={...f.request,baseRevision:restored.revision,mutationId:crypto.randomUUID(),monthly:{},deleteMonths:[]};
+ assert.equal((await f.post('/api/sync/restore/validate',incomplete)).status,400);
+});
+test('records-only restore can reuse retained managed bytes and preserves honest legacy references',async()=>{
+ const f=await restoreFixture();await f.restoreUpload();await f.restoreCommit();
+ const s=await f.read();s.state.trips.trips=[];assert.equal((await f.commit(s,s.state)).status,200);
+ f.request.baseRevision=(await f.read()).revision;f.request.mutationId=crypto.randomUUID();
+ f.request.state.trips.trips[0].itinerary[0].attachments.push({id:'old',filename:'old.pdf',mimeType:'application/pdf'});
+ const preflight=await f.preflight();assert.equal(preflight.status,200);assert.deepEqual((await preflight.json()).missing,[]);
+ assert.equal((await f.restoreCommit()).status,200);assert.equal((await f.download({},f.fileUrl)).status,200);
+});
+test('restore enforces protection and accounts for retained storage before and during staging',async()=>{
+ const Database=require('better-sqlite3');const {SyncStore}=require('../sync-store');const {AttachmentStore}=require('../attachment-store');
+ const f=await restoreFixture();const db=new Database(path.join(dir,'test.db'));
+ try {
+  const compatible=new SyncStore(db,{requirePreconditions:false});const compatibleFiles=new AttachmentStore(db,compatible);
+  assert.throws(()=>compatible.validateRestore(f.user,f.request,state=>compatibleFiles.missingForRestore(f.user,state)),e=>e.code==='PROTECTION_DISABLED');
+  const scope=compatibleFiles.scope('itinerary','imported-trip','imported-event','ticket.pdf');
+  const identity={userId:f.user,serverInstanceId:f.snapshot.serverInstanceId,householdId:f.snapshot.householdId};
+  assert.throws(()=>compatibleFiles.upload(f.user,scope,identity,f.descriptor,f.bytes,f.snapshot.revision),e=>e.code==='PROTECTION_DISABLED');
+  // Synthetic accounting row avoids allocating a 256 MiB payload in a quota test.
+  db.prepare('INSERT INTO trip_attachment_blobs(user_id,kind,trip_id,record_id,filename,attachment_id,mime_type,sha256,size_bytes,bytes) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(f.user,'itinerary','retained','old','old.txt','old','text/plain','0'.repeat(64),256*1024*1024,Buffer.from('quota fixture'));
+  assert.equal((await f.preflight()).status,413);assert.equal((await f.restoreUpload()).status,413);
+  assert.deepEqual(await f.read(),f.snapshot);
+ } finally {db.close();}
+});

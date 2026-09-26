@@ -73,8 +73,9 @@ Use an online SQLite backup or a stopped-server copy that includes consistent
 WAL state; copying a live main database file alone is insufficient. Existing
 `trip-receipts/` and `trip-itinerary-attachments/` trees still need filesystem
 backup. JSON `/api/export` does not contain any attachment bytes. Portable backup
-restore, staged restore into an empty household, retention/purge and disaster
-recovery exercises remain open. `Dockerfile` now includes `attachment-store.js`;
+restore into an empty household is now supported by the separate
+[protected restore protocol](restore-protocol.md). Retention/purge and operational
+disaster recovery exercises remain open. `Dockerfile` includes `attachment-store.js`;
 the Docker/Alpine image has not been runtime-tested for this checkpoint.
 
 `test/attachments.test.js` exercises real HTTP staging/publication/replay,
