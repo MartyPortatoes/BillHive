@@ -63,6 +63,12 @@ Android repository records its UI/server assertions and recovery evidence in
 `docs/evidence/2026-09-26/server-editing/verification.md`. This does not change
 the server's coverage boundary or default-off protection flag.
 
-Swift owner/guest compatibility and Android release QA must be
-completed before strict production rollout. Docker/Alpine, live reverse proxies,
+Swift owner compatibility was subsequently implemented in companion iOS commit
+`2094893`: atomic load/save/import/reset, durable retry bytes, preserved unknown
+wire fields, stale rejection, recovery export and explicit reload. Its separate
+audit is `iOS_App/docs/audits/2026-09-26-selfhive-owner-sync.md`; the Node suite
+above is not evidence for that Swift behavior. The Apple app changes are local
+and have not been released. Guest compatibility, broader mutation coverage and
+Android release QA must be completed before strict production rollout.
+Docker/Alpine, live reverse proxies,
 physical devices and production backups/restores have not been certified.

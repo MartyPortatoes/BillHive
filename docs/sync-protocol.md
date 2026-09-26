@@ -112,6 +112,38 @@ changes, removed members, changed share-line structure and stale settlements
 cannot bypass the domain checks. A changed comparison is rejected atomically.
 Uncertain requests stay frozen and are retried with their original bytes/ID.
 
+## Swift owner compatibility
+
+The companion Swift/SwiftUI implementation (`iOS_App` commit `2094893`) negotiates the atomic owner
+protocol and retains its Apple UI. On capable servers, state/month loading,
+ordinary saves, and explicit JSON import/reset use coherent snapshots and
+atomic commits. It checks the authenticated user, pins the server/household,
+rejects protocol redirects and refuses a later downgrade to legacy writes.
+Older servers retain the existing legacy path. Swift does not require the
+strict flag while compatible clients are being shipped; unguarded older clients
+can still overwrite data until enforcement is enabled.
+
+A private, backup-excluded file journal retains the confirmed wire document,
+its stable typed projection, the latest working draft, and immutable pending
+request bytes. Disk persistence precedes sending and acknowledgement. Unknown
+wire fields survive edits, including inside ID-bearing records. Missing fields
+that Swift decoders synthesize are not written simply because another field
+changed. Explicit import/reset deliberately replaces the JSON keys and months.
+
+After a stale rejection, the owner can export a records-only recovery JSON and
+explicitly load current server values. Pending uncertain requests must first be
+resolved by replay. Export and discard are checked against the current draft;
+a changed comparison cannot discard newer edits. Swift currently offers export
+and reload, rather than Android's field-by-field conflict application. Recovery
+copies do not include attachment bytes. An API-key change selects a different
+journal partition; the prior files are retained, but cross-credential recovery
+UI remains unfinished.
+
+Local evidence is in the companion iOS repository at
+`docs/audits/2026-09-26-selfhive-owner-sync.md`. This implementation has not been
+released to Apple users. Native guest compatibility and the server coverage
+boundary below remain open, so this checkpoint does not enable strict rollout.
+
 ## Existing routes and coverage boundary
 
 The existing state PUT/PATCH, monthly PUT/DELETE, import and reset endpoints
@@ -148,7 +180,7 @@ Before enabling strict mode on a real server:
    back up its attachment directory; verify restoration on an isolated server.
 2. Deploy the additive server schema and the matching web assets together.
    Confirm legacy reads/writes and authenticated user isolation with the flag off.
-3. Finish and ship Swift owner/guest compatibility and the remaining
+3. Release the implemented Swift owner compatibility, finish guest compatibility and the remaining
    mutation-coverage audit. Complete release QA for the Android recovery/conflict
    flows. Test mixed clients and real
    proxy/device-key authentication. This repository has not completed that gate.
