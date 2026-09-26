@@ -33,6 +33,7 @@ const { sendEmail, maskConfig } = require('./email.js');
 const { buildEmailHtml } = require('./emailTemplate.js');
 
 const Data = require('./public/data-contract.js');
+const { SyncStore, SyncError } = require('./sync-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -166,6 +167,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_bills_invites_owner ON bills_invites(owner_user_id);
   CREATE INDEX IF NOT EXISTS idx_bills_invites_person ON bills_invites(owner_user_id, person_id);
 `);
+
+const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
 // significantly faster repeated execution. All are synchronous (.get / .run / .all).
@@ -564,6 +567,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
+    capabilities: {syncProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -937,163 +941,87 @@ function sharedBillsDataResponse(payload) {
 
 // GET /public/trip/invite/:token — preview the trip before joining.
 // Returns the trip data (stripped of host-only info) + invite metadata.
+function readPublicTrip(req, {requireJoined = false, join = false} = {}) {
+  return db.transaction(() => {
+    const invite = stmts.findTripInviteByToken.get(req.params.token);
+    if (!invite) throw new SyncError(404, 'INVITE_NOT_FOUND', 'Invite not found');
+    if (invite.revoked_at) throw new SyncError(410, 'INVITE_REVOKED', 'This invite has been revoked');
+    if (requireJoined && !invite.joined_at) throw new SyncError(403, 'INVITE_NOT_JOINED', 'Invite not yet accepted');
+    const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
+    if (!trip) throw new SyncError(404, 'TRIP_NOT_FOUND', 'Trip not found');
+    const member = (trip.members || []).find(item => item.id === invite.member_id);
+    if (!member) throw new SyncError(410, 'MEMBER_REMOVED', 'This trip member was removed');
+    if (join && !invite.joined_at) stmts.markTripInviteJoined.run(req.params.token);
+    return {metadata:sync.metadata(invite.owner_user_id), payload:{
+      trip:publicTripShape(trip), memberId:invite.member_id, memberName:member.name || '',
+      joined:join || !!invite.joined_at, createdAt:invite.created_at,
+    }};
+  }).immediate();
+}
 app.get('/public/trip/invite/:token', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-
-  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
-  if (!trip) return res.status(404).json({ error: 'Trip not found' });
-
-  const member = (trip.members || []).find(m => m.id === invite.member_id);
-  res.json({
-    trip: publicTripShape(trip),
-    memberId: invite.member_id,
-    memberName: member ? member.name : '',
-    joined: !!invite.joined_at,
-    createdAt: invite.created_at,
-  });
+  const result = readPublicTrip(req);
+  res.setHeader('ETag', sync.etag(result.metadata));res.json(result.payload);
 });
-
-// POST /public/trip/invite/:token/join — claim the invite. Idempotent:
-// calling twice on an already-joined invite is a no-op success.
 app.post('/public/trip/invite/:token/join', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-
-  if (!invite.joined_at) {
-    stmts.markTripInviteJoined.run(req.params.token);
-  }
-
-  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
-  if (!trip) return res.status(404).json({ error: 'Trip not found' });
-
-  const member = (trip.members || []).find(m => m.id === invite.member_id);
-  res.json({
-    ok: true,
-    trip: publicTripShape(trip),
-    memberId: invite.member_id,
-    memberName: member ? member.name : '',
-  });
+  const result = readPublicTrip(req, {join:true});
+  res.setHeader('ETag', sync.etag(result.metadata));res.json({ok:true,...result.payload});
 });
-
-// GET /public/trip/invite/:token/trip — full trip data for a joined invite.
-// The iOS app calls this to refresh the trip while the member has it open.
 app.get('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
-
-  const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
-  if (!trip) return res.status(404).json({ error: 'Trip not found' });
-  res.json({ trip: publicTripShape(trip) });
+  const result = readPublicTrip(req, {requireJoined:true});
+  res.setHeader('ETag', sync.etag(result.metadata));res.json({trip:result.payload.trip});
 });
 
 // POST /public/trip/invite/:token/expense — add or update an expense on
 // the shared trip. Body: a full Expense object. If an expense with the
 // same id already exists, it's replaced (update); otherwise it's appended.
+function guestTripWrite(req, res, update) {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({error:'Invite not found'});
+  legacyWrite(req, res, () => {
+    // Recheck authorization inside the same transaction as the owner's revision and mutation.
+    const current = stmts.findTripInviteByToken.get(req.params.token);
+    if (!current || current.revoked_at) throw new SyncError(410, 'INVITE_REVOKED', 'This invite has been revoked');
+    if (!current.joined_at) throw new SyncError(403, 'INVITE_NOT_JOINED', 'Invite not yet accepted');
+    const row = stmts.getState.get(current.owner_user_id, 'trips');
+    if (!row) throw new SyncError(404, 'TRIP_NOT_FOUND', 'Trip not found');
+    const tripsState = JSON.parse(row.value);
+    const trip = (tripsState.trips || []).find(item => item.id === current.trip_id);
+    if (!trip) throw new SyncError(404, 'TRIP_NOT_FOUND', 'Trip not found');
+    if (trip.isArchived) throw new SyncError(409, 'TRIP_ARCHIVED', 'This trip is archived');
+    if (!(trip.members || []).some(member => member.id === current.member_id)) throw new SyncError(410, 'MEMBER_REMOVED', 'This trip member was removed');
+    update(trip);
+    Data.state({trips:tripsState});
+    stmts.setState.run(current.owner_user_id, 'trips', JSON.stringify(tripsState));
+  }, invite.owner_user_id);
+}
+
 app.post('/public/trip/invite/:token/expense', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
-
-  try { Data.tree(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
+  try { Data.tree(req.body); } catch (_) { return res.status(400).json({error:'Invalid expense payload'}); }
   const expense = req.body;
-  if (!expense || !expense.id || typeof expense.name !== 'string') {
-    return res.status(400).json({ error: 'Invalid expense payload' });
-  }
-
-  // Read the owner's state, find the trip, mutate, and write back.
-  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
-  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
-
-  let tripsState;
-  try { tripsState = JSON.parse(stateRow.value); } catch {
-    return res.status(500).json({ error: 'Corrupt trip state' });
-  }
-
-  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
-  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
-
-  const trip = tripsState.trips[tripIdx];
-  const expenses = trip.expenses || [];
-  const existingIdx = expenses.findIndex(e => e.id === expense.id);
-  if (existingIdx >= 0) {
-    expenses[existingIdx] = expense;
-  } else {
-    expenses.unshift(expense);
-  }
-  trip.expenses = expenses;
-  tripsState.trips[tripIdx] = trip;
-
-  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
-  broadcastChange(invite.owner_user_id);
-  res.json({ ok: true });
+  if (!expense || !expense.id || typeof expense.name !== 'string') return res.status(400).json({error:'Invalid expense payload'});
+  guestTripWrite(req, res, trip => {
+    const expenses = trip.expenses || [];
+    const index = expenses.findIndex(item => item.id === expense.id);
+    if (index >= 0) expenses[index] = expense; else expenses.unshift(expense);
+    trip.expenses = expenses;
+  });
 });
 
-// DELETE /public/trip/invite/:token/expense/:expenseId — delete a single
-// expense from the shared trip.
 app.delete('/public/trip/invite/:token/expense/:expenseId', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
-
-  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
-  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
-
-  let tripsState;
-  try { tripsState = JSON.parse(stateRow.value); } catch {
-    return res.status(500).json({ error: 'Corrupt trip state' });
-  }
-
-  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
-  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
-
-  const trip = tripsState.trips[tripIdx];
-  trip.expenses = (trip.expenses || []).filter(e => e.id !== req.params.expenseId);
-  tripsState.trips[tripIdx] = trip;
-
-  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
-  broadcastChange(invite.owner_user_id);
-  res.json({ ok: true });
+  guestTripWrite(req, res, trip => { trip.expenses = (trip.expenses || []).filter(item => item.id !== req.params.expenseId); });
 });
 
-// POST /public/trip/invite/:token/settlement — record a settlement on
-// the shared trip. Body: a SettledTransfer object.
 app.post('/public/trip/invite/:token/settlement', publicLimiter, (req, res) => {
-  const invite = stmts.findTripInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
-
+  try { Data.tree(req.body); } catch (_) { return res.status(400).json({error:'Invalid settlement payload'}); }
   const settlement = req.body;
-  if (!settlement || !settlement.id) {
-    return res.status(400).json({ error: 'Invalid settlement payload' });
-  }
-
-  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
-  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
-
-  let tripsState;
-  try { tripsState = JSON.parse(stateRow.value); } catch {
-    return res.status(500).json({ error: 'Corrupt trip state' });
-  }
-
-  const tripIdx = (tripsState.trips || []).findIndex(t => t.id === invite.trip_id);
-  if (tripIdx === -1) return res.status(404).json({ error: 'Trip not found' });
-
-  const trip = tripsState.trips[tripIdx];
-  if (!trip.settlements) trip.settlements = [];
-  trip.settlements.push(settlement);
-  tripsState.trips[tripIdx] = trip;
-
-  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
-  broadcastChange(invite.owner_user_id);
-  res.json({ ok: true });
+  if (!settlement || !settlement.id) return res.status(400).json({error:'Invalid settlement payload'});
+  guestTripWrite(req, res, trip => {
+    const settlements = trip.settlements || [];
+    const existing = settlements.find(item => item.id === settlement.id);
+    if (existing && !require('node:util').isDeepStrictEqual(existing, settlement)) throw new SyncError(409, 'SETTLEMENT_ID_REUSED', 'This settlement ID already exists');
+    if (!existing) settlements.push(settlement);
+    trip.settlements = settlements;
+  });
 });
 
 // ── Bills invite public routes ───────────────────────────────────────────────
@@ -1162,36 +1090,44 @@ app.use('/api', requireAuth);
 //
 // The frontend's save flow: user input → mutate S → debounced save() (600ms) →
 // PUT /api/state → server broadcasts SSE → other tabs reload.
+app.get('/api/sync/snapshot', (req, res) => {
+  const snapshot = sync.snapshot(req.userId);
+  res.setHeader('ETag', sync.etag(snapshot));
+  res.json(snapshot);
+});
+app.post('/api/sync/commit', (req, res) => {
+  if (req.get('X-BillHive-Require-Protection') === '1' && !sync.requirePreconditions) throw new SyncError(428, 'PROTECTION_DISABLED', 'Enable server revision protection before saving with this client.');
+  const result = sync.commit(req.userId, req.body);
+  res.setHeader('ETag', sync.etag(result));
+  res.json(result);
+  if (!result.replayed) broadcastChange(req.userId);
+});
+
+function legacyWrite(req, res, operation, userId = req.userId) {
+  const result = sync.write(userId, req.get('If-Match'), operation);
+  res.setHeader('ETag', sync.etag(result.metadata));
+  res.json(result.value ?? {ok:true});
+  broadcastChange(userId);
+}
+
 app.get('/api/state', (req, res) => {
-  const rows = stmts.getAllState.all(req.userId);
-  const state = {};
-  rows.forEach(r => { state[r.key] = JSON.parse(r.value); });
-  res.json(state);
+  const snapshot = sync.snapshot(req.userId);
+  res.setHeader('ETag', sync.etag(snapshot));
+  res.json(snapshot.state);
 });
 
 app.put('/api/state', (req, res) => {
   const body = req.body;
   try { Data.state(body); } catch (error) { return res.status(400).json({ error: error.message }); }
 
-  // Wrap in a transaction so all keys are written atomically — prevents
-  // partial state if the server crashes mid-write.
-  const saveMany = db.transaction((userId, data) => {
-    for (const [key, val] of Object.entries(data)) {
-      stmts.setState.run(userId, key, JSON.stringify(val));
-    }
+  legacyWrite(req, res, () => {
+    for (const [key, val] of Object.entries(body)) stmts.setState.run(req.userId, key, JSON.stringify(val));
   });
-  saveMany(req.userId, body);
-  res.json({ ok: true });
-
-  // Notify other tabs/devices AFTER responding — keeps the save latency low.
-  broadcastChange(req.userId);
 });
 
 app.patch('/api/state/:key', (req, res) => {
   try { Data.state({ [req.params.key]: req.body }); } catch (error) { return res.status(400).json({ error: error.message }); }
-  stmts.setState.run(req.userId, req.params.key, JSON.stringify(req.body));
-  res.json({ ok: true });
-  broadcastChange(req.userId);
+  legacyWrite(req, res, () => { stmts.setState.run(req.userId, req.params.key, JSON.stringify(req.body)); });
 });
 
 // ── Monthly data API ──────────────────────────────────────────────────────────
@@ -1200,16 +1136,15 @@ app.patch('/api/state/:key', (req, res) => {
 // PUT  /api/months/:key  — upsert a month's data (totals, amounts, computed owes)
 // DELETE /api/months/:key — remove a month's data entirely
 app.get('/api/months', (req, res) => {
-  const rows = stmts.getAllMonths.all(req.userId);
-  const months = {};
-  rows.forEach(r => { months[r.month_key] = JSON.parse(r.data); });
-  res.json(months);
+  const snapshot = sync.snapshot(req.userId);
+  res.setHeader('ETag', sync.etag(snapshot));
+  res.json(snapshot.monthly);
 });
 
 app.get('/api/months/:key', (req, res) => {
-  const row = stmts.getMonth.get(req.userId, req.params.key);
-  if (!row) return res.json({});
-  res.json(JSON.parse(row.data));
+  const snapshot = sync.snapshot(req.userId);
+  res.setHeader('ETag', sync.etag(snapshot));
+  res.json(snapshot.monthly[req.params.key] || {});
 });
 
 app.put('/api/months/:key', (req, res) => {
@@ -1217,15 +1152,12 @@ app.put('/api/months/:key', (req, res) => {
   // Validate format to prevent arbitrary keys from polluting the table
   if (!Data.monthKey(key)) return res.status(400).json({ error: 'Invalid month key (expected YYYY-MM)' });
   try { Data.month(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
-  stmts.setMonth.run(req.userId, key, JSON.stringify(req.body));
-  res.json({ ok: true });
-  broadcastChange(req.userId);
+  legacyWrite(req, res, () => { stmts.setMonth.run(req.userId, key, JSON.stringify(req.body)); });
 });
 
 app.delete('/api/months/:key', (req, res) => {
-  stmts.deleteMonth.run(req.userId, req.params.key);
-  res.json({ ok: true });
-  broadcastChange(req.userId);
+  if (!Data.monthKey(req.params.key)) return res.status(400).json({error:'Invalid month key'});
+  legacyWrite(req, res, () => { stmts.deleteMonth.run(req.userId, req.params.key); });
 });
 
 // ── Export / Import ───────────────────────────────────────────────────────────
@@ -1235,12 +1167,10 @@ app.delete('/api/months/:key', (req, res) => {
 //                    (upsert semantics) so it won't delete months/keys that
 //                    aren't in the backup.
 app.get('/api/export', (req, res) => {
-  const state = {};
-  stmts.getAllState.all(req.userId).forEach(r => { state[r.key] = JSON.parse(r.value); });
-  const monthly = {};
-  stmts.getAllMonths.all(req.userId).forEach(r => { monthly[r.month_key] = JSON.parse(r.data); });
+  const snapshot = sync.snapshot(req.userId);
+  res.setHeader('ETag', sync.etag(snapshot));
   res.setHeader('Content-Disposition', `attachment; filename="billhive-backup-${req.userId}-${Date.now()}.json"`);
-  res.json({ user: req.userId, exportedAt: new Date().toISOString(), state, monthly });
+  res.json({user:req.userId, exportedAt:new Date().toISOString(), state:snapshot.state, monthly:snapshot.monthly});
 });
 
 app.post('/api/import', (req, res) => {
@@ -1263,23 +1193,20 @@ app.post('/api/import', (req, res) => {
       }
     }
   });
-  importAll(req.userId, state, monthly);
-  res.json({ ok: true });
-  broadcastChange(req.userId);
+  legacyWrite(req, res, () => { importAll(req.userId, state, monthly); });
 });
 
 // Clear editable setup and revoke links together; history/files/relay settings
 // deliberately remain. The web confirmation describes that exact scope.
 app.post('/api/reset-setup', (req, res) => {
-  db.transaction(() => {
+  legacyWrite(req, res, () => {
     db.prepare('DELETE FROM user_state WHERE user_id = ?').run(req.userId);
     stmts.setState.run(req.userId, 'people', '[]');
     stmts.setState.run(req.userId, 'bills', '[]');
     db.prepare('UPDATE share_checks SET revoked_at = unixepoch() WHERE user_id = ? AND revoked_at IS NULL').run(req.userId);
     db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND revoked_at IS NULL').run(req.userId);
     db.prepare('UPDATE bills_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND revoked_at IS NULL').run(req.userId);
-  })();
-  res.json({ ok: true }); broadcastChange(req.userId);
+  });
 });
 
 // ── Check share links (AUTH) ─────────────────────────────────────────────────
@@ -1854,6 +1781,7 @@ function serveShell(req, res) {
 }
 app.get('*', serveShell);
 app.use((error, _req, res, _next) => {
+  if (error instanceof SyncError) return res.status(error.status).json({error:error.message, code:error.code});
   const status = error.status === 413 ? 413 : error.status === 400 ? 400 : 500;
   res.status(status).json({ error: status === 500 ? 'Stored data could not be read or the operation failed. Existing data has been preserved.' : 'Invalid or oversized request body' });
 });

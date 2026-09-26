@@ -11,6 +11,8 @@ services:
     environment:
       PORT: 8080
       DB_PATH: /data/billhive.db
+      # Enable only after the client-compatibility gates in docs/sync-protocol.md.
+      SYNC_REQUIRE_PRECONDITIONS: "${SYNC_REQUIRE_PRECONDITIONS:-0}"
     volumes:
       - billhive-data:/data
 

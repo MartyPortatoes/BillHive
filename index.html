@@ -486,7 +486,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 @media(prefers-color-scheme:light){ :root[data-theme="system"] { color-scheme:light; --edge:rgba(255,255,255,.80); } }
 body{font-size:15px;}
 #app{grid-template-rows:auto auto minmax(0,1fr);height:100dvh;}
-header{min-height:76px;padding:14px 28px;gap:16px;background:var(--glass);}
+header{min-height:76px;padding:14px 28px;gap:16px;background:var(--glass);flex-wrap:wrap;}
 .logo-name{font-size:23px;letter-spacing:-.7px;text-transform:none;}
 .logo-sub{letter-spacing:.12em;font-size:10px;margin-top:4px;}
 .header-right{flex-wrap:wrap;justify-content:flex-end;}
@@ -526,7 +526,7 @@ button{min-width:44px;min-height:44px;}
 .auth-panel label{display:block;margin-bottom:8px;}
 .auth-panel input{width:100%;margin-bottom:16px;}
 #sync-status{font-size:12px;color:var(--muted);}
-#retry-save{display:none;}
+#retry-save,#download-unsaved{display:none;}
 @supports(backdrop-filter:blur(16px)){header,nav,.card,.bill-card,.mode-card{backdrop-filter:blur(16px);}}
 @media(max-width:680px){
   header{padding:12px 16px;flex-wrap:wrap;}
@@ -576,7 +576,7 @@ button{min-width:44px;min-height:44px;}
       <div class="logo-sub">bills · checks · trips</div>
     </div>
   </div>
-  <div class="header-right"><span id="sync-status" role="status" aria-live="polite">Loading…</span><button type="button" id="retry-save" class="btn btn-ghost btn-sm">Retry save</button>
+  <div class="header-right"><span id="sync-status" role="status" aria-live="polite">Loading…</span><button type="button" id="retry-save" class="btn btn-ghost btn-sm">Retry save</button><button type="button" id="download-unsaved" class="btn btn-ghost btn-sm">Download unsaved copy</button>
     <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--muted);">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 10c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       <span id="currentUser">local</span>
@@ -956,6 +956,7 @@ button{min-width:44px;min-height:44px;}
 
 <script src="/data-contract.js"></script>
 <script src="/persistence.js"></script>
+<script src="/revision-client.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
         integrity="sha512-SIMGYRUjwY8+gKg7nn9EItdD8LCADSDfJNutF9TPrvEo86sQmFMh6MyralfIyhADlajSxqc7G0gs7+MwWF/ogQ=="
         crossorigin="anonymous"></script>
@@ -1299,7 +1300,17 @@ let _currentUser = 'local';  // Display name from /api/health — shown in heade
 let _loaded = false;
 let _editVersion = 0;
 let _stateDirty = false;
+let _revisionSync = false;
+const revisionClient = new RevisionClient(async request => {
+  const response = await fetch(`${API}/sync/commit`, {method:'POST', headers:{'Content-Type':'application/json','X-BillHive-User':_currentUser},body:JSON.stringify(request)});
+  if (!response.ok) {
+    const message = response.status === 409 ? 'The household changed on another device. Your edits are kept here. Download your unsaved copy and reload to review the latest data.' : `Save failed (${response.status}). Your edits are still in this tab.`;
+    throw new Error(message);
+  }
+  return response.json();
+});
 const writer = new SnapshotWriter(async (path, body) => {
+  if (path === '/snapshot') return revisionClient.sendSnapshot(JSON.parse(body));
   const response = await fetch(`${API}${path}`, {method:'PUT',headers:{'Content-Type':'application/json','X-BillHive-User':_currentUser},body});
   if (!response.ok) throw new Error(`Save failed (${response.status}). Your edits are still in this tab.`);
 }, updateSyncStatus);
@@ -1307,6 +1318,7 @@ function updateSyncStatus() {
   const status = document.getElementById('sync-status');
   if (status) status.textContent = writer.error ? 'Not saved' : (_stateDirty || writer.dirty ? 'Saving…' : 'Saved');
   document.getElementById('retry-save').style.display = writer.error ? 'inline-flex' : 'none';
+  document.getElementById('download-unsaved').style.display = writer.error ? 'inline-flex' : 'none';
   if (writer.error) showBanner(writer.error.message, 'warning');
   else if (!_stateDirty && !writer.dirty) {
     hideBanner();
@@ -1323,14 +1335,18 @@ function _flushState() {
   clearTimeout(_saveTimer); _saveTimer = null;
   if (!_loaded) return Promise.reject(new Error('Load your data before saving'));
   const { monthly, ...state } = S;
-  BHData.state(state);
+  BHData.state(state); BHData.months(monthly);
   _stateDirty = false;
-  return writer.enqueue('/state', state);
+  return _revisionSync ? writer.enqueue('/snapshot', {state,monthly}) : writer.enqueue('/state', state);
 }
 function saveMonthNow(key, data) {
   if (!_loaded || _reloading) return;
   _editVersion++;
-  try { BHData.month(data); writer.enqueue(`/months/${key}`, data).catch(() => {}); }
+  try {
+    BHData.month(data);
+    if (_revisionSync) { S.monthly[key] = data; _flushState().catch(() => {}); }
+    else writer.enqueue(`/months/${key}`, data).catch(() => {});
+  }
   catch(error) { showBanner(error.message, 'warning'); }
 }
 async function flushPending() {
@@ -1338,6 +1354,7 @@ async function flushPending() {
   await writer.flush();
 }
 document.getElementById('retry-save').addEventListener('click', () => flushPending().catch(() => {}));
+document.getElementById('download-unsaved').addEventListener('click', downloadUnsavedCopy);
 window.addEventListener('beforeunload', event => {
   if (_stateDirty || writer.dirty) { event.preventDefault(); event.returnValue = ''; }
 });
@@ -1397,14 +1414,24 @@ function normalizePaymentTrackingState() {
 
 async function load() {
   const version = _editVersion;
-  const [stateRes, monthsRes, healthRes] = await Promise.all([fetch(`${API}/state`), fetch(`${API}/months`), fetch(`${API}/health`)]);
-  for (const response of [stateRes, monthsRes, healthRes]) if (!response.ok) {
-    const error = new Error(response.status === 401 ? 'Authentication required. Sign in through your proxy or use a device key.' : `Could not load data (${response.status}). Existing data has not been replaced.`);
-    error.status = response.status; throw error;
+  const healthRes = await fetch(`${API}/health`);
+  async function checked(response) {
+    if (!response.ok) {
+      const error = new Error(response.status === 401 ? 'Authentication required. Sign in through your proxy or use a device key.' : `Could not load data (${response.status}). Existing data has not been replaced.`);
+      error.status = response.status; throw error;
+    }
+    return response.json();
   }
-  const parsed = BHData.state(await stateRes.json());
-  const months = BHData.months(await monthsRes.json());
-  const health = await healthRes.json();
+  const health = await checked(healthRes);
+  let parsed, months, snapshot = null;
+  if (health.capabilities?.syncProtocol === 1) {
+    snapshot = await checked(await fetch(`${API}/sync/snapshot`));
+    if (snapshot.userId !== health.user) throw new Error('The signed-in account changed. Reload before saving.');
+    parsed = BHData.state(snapshot.state); months = BHData.months(snapshot.monthly);
+  } else {
+    const [stateRes, monthsRes] = await Promise.all([fetch(`${API}/state`),fetch(`${API}/months`)]);
+    parsed = BHData.state(await checked(stateRes)); months = BHData.months(await checked(monthsRes));
+  }
   if (_loaded && health.user !== _currentUser) {
     _loaded = false;
     document.getElementById('app').hidden = true;
@@ -1412,6 +1439,8 @@ async function load() {
   }
   if (version !== _editVersion || _stateDirty || writer.dirty) return false;
   if (_loaded && isEditing()) { _pendingReload = true; return false; }
+  if (snapshot) revisionClient.load(snapshot);
+  _revisionSync = snapshot !== null;
   S = {...emptyState(), ...parsed, monthly:months};
   S.settings = {...emptyState().settings, ...parsed.settings};
   _currFmt = null; _currentUser = health.user; _loaded = true;
@@ -5307,6 +5336,17 @@ function removePerson(idx) {
   }, { okLabel:'Remove', danger:true });
 }
 
+function downloadUnsavedCopy() {
+  try {
+    const {monthly, ...state} = S;
+    const backup = BHData.backup({version:1, exportedAt:new Date().toISOString(),state,monthly});
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)], {type:'application/json'}));
+    const link = document.createElement('a');link.href = url;link.download = 'selfhive-unsaved-copy.json';link.click();
+    setTimeout(() => URL.revokeObjectURL(url),1000);
+    toast('Unsaved copy downloaded. Server attachment files are separate.');
+  } catch(error) { toast(error.message); }
+}
+
 async function exportData() {
   try {
     await flushPending();
@@ -5328,7 +5368,7 @@ async function importData(file) {
     await flushPending();
     const res = await fetch(`${API}/import`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-BillHive-User':_currentUser, ...(_revisionSync ? revisionClient.headers : {}) },
       body: JSON.stringify(data)
     });
     if (res.ok) { location.reload(); }
@@ -5343,7 +5383,7 @@ function clearAll() {
     try {
     document.getElementById('app').inert = true;
     await flushPending();
-    const result = await fetch(`${API}/reset-setup`, { method: 'POST', headers:{'X-BillHive-User':_currentUser} });
+    const result = await fetch(`${API}/reset-setup`, { method: 'POST', headers:{'X-BillHive-User':_currentUser,...(_revisionSync ? revisionClient.headers : {})} });
     if (!result.ok) throw new Error(`Clear failed (${result.status})`);
     location.reload();
     } catch(error) { toast(error.message); }
@@ -5549,8 +5589,9 @@ function showBanner(msg, type) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'banner';
-    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;padding:8px 20px;font-size:12px;text-align:center;font-family:DM Mono,monospace;transition:all .3s;';
-    document.body.appendChild(el);
+    el.style.cssText = 'flex-basis:100%;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.5;';
+    el.setAttribute('role','status');
+    document.querySelector('#app > header').appendChild(el);
   }
   el.textContent = msg;
   el.style.background = type === 'warning' ? cssVar('--accent-tint') : cssVar('--accent-subtle');

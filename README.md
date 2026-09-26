@@ -139,6 +139,11 @@ labels:
 
 ## Data Persistence
 
+The native Android sync work adds an atomic household snapshot/commit protocol.
+See [revision protocol and staged rollout](docs/sync-protocol.md) for its contract,
+coverage limits and client compatibility requirements. Strict preconditions are
+off by default; keep them off in production until the rollout gates are met.
+
 SQLite lives in a named Docker volume at `/data/billhive.db`.
 
 **Host-mounted path** (easier backups):

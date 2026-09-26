@@ -161,3 +161,15 @@ test('other proxy accounts cannot change server-wide authentication policy',asyn
   const response=await request('/api/auth/settings',{method:'PUT',headers:{'remote-user':'bob'},body:{requireDeviceKeys:false}});assert.equal(response.status,403);
   const settings=await (await request('/api/auth/settings',{headers:{'remote-user':'bob'}})).json();assert.equal(settings.canManage,false);
 });
+
+test('compatibility mode keeps older clients working but refuses clients requiring global revision protection',async()=>{
+  const headers={'remote-user':'compatibility-fixture'};
+  const health=await (await request('/api/health',{headers})).json();assert.equal(health.capabilities.revisionPreconditionsRequired,false);
+  const before=await (await request('/api/sync/snapshot',{headers})).json();
+  const body={serverInstanceId:before.serverInstanceId,householdId:before.householdId,baseRevision:before.revision,
+    mutationId:require('node:crypto').randomUUID(),state:{people:[]},monthly:{}};
+  const protectedWrite=await request('/api/sync/commit',{method:'POST',headers:{...headers,'X-BillHive-Require-Protection':'1'},body});
+  assert.equal(protectedWrite.status,428);assert.equal((await protectedWrite.json()).code,'PROTECTION_DISABLED');
+  assert.equal((await request('/api/state',{method:'PUT',headers,body:{settings:{currencyCode:'USD'}}})).status,200);
+  const stale=await request('/api/sync/commit',{method:'POST',headers,body});assert.equal(stale.status,409);
+});

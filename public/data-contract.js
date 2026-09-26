@@ -10,7 +10,7 @@
     if (!value || typeof value !== 'object') return;
     for (const [key, item] of Object.entries(value)) {
       assert(!['__proto__', 'constructor', 'prototype'].includes(key), 'Unsafe data key');
-      if (key === 'id' || ['personId','coveredById','paidById','remainderLineId','memberId','tripId','expenseId','eventId','linkedPersonId','fromId','toId','participantId'].includes(key)) {
+      if (key === 'id' || ['personId','coveredById','paidById','remainderLineId','memberId','tripId','expenseId','eventId','linkedPersonId','fromId','toId','participantId','fromMemberId','toMemberId'].includes(key)) {
         if (item !== null && item !== '') assert(id(item), 'Invalid identifier: ' + key);
       }
       if (key === 'color' && item != null) assert(typeof item === 'string' && /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(item), 'Invalid color');
@@ -42,7 +42,7 @@
     if ('trips' in value) {
       assert(record(value.trips), 'Invalid trips state'); rows(value.trips.trips, 'Trips');
       if ('sharedTrips' in value.trips) refs(value.trips.sharedTrips, 'Shared trips');
-      for (const trip of value.trips.trips) for (const key of ['members', 'expenses', 'itinerary', 'settledTransfers']) if (key in trip) rows(trip[key], key);
+      for (const trip of value.trips.trips) for (const key of ['members', 'expenses', 'itinerary', 'settlements', 'settledTransfers']) if (key in trip) rows(trip[key], key);
     }
     return value;
   }
