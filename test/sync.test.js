@@ -87,12 +87,20 @@ test('guest commits preserve host-only fields, return only public trip data and 
   assert.equal(canonical.futureTripField,'keep');assert.equal(canonical.expenses[0].importFingerprint,'private-import');
   assert.deepEqual(canonical.expenses[0].attachments,[{id:'receipt',filename:'private.jpg'}]);
   assert.deepEqual(canonical.expenses[0].futureHostOnly,{keep:true});
+  assert.equal(canonical.activity.length,1);assert.equal(canonical.activity[0].kind,'expenseUpdated');
+  assert.equal(canonical.activity[0].actorName,'Guest');assert.equal(canonical.activity[0].actorMemberId,'guest');
+  assert.match(canonical.activity[0].createdAtISO,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.equal(canonical.activity[0].amountText,'USD 24.00');assert.equal(saved.snapshot.trip.activity,undefined);
   assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),fixture.headers)).status,409);
   const settled = await fixture.send(guestBody(saved.snapshot,{kind:'recordSettlement',settlement:{id:'payment',fromMemberId:'guest',toMemberId:'host',amount:12}}));
   assert.equal(settled.status,200);
   const next = (await settled.json()).snapshot;
   const deleted = await fixture.send(guestBody(next,{kind:'deleteExpense',expenseId:'expense'}));assert.equal(deleted.status,200);
   const final = (await deleted.json()).snapshot;assert.equal(final.trip.expenses.length,0);assert.equal(final.trip.settlements.length,1);
+  assert.equal(final.trip.activity,undefined);
+  assert.deepEqual((await snapshot(fixture.headers)).data.state.trips.trips[0].activity.map(event=>event.kind),
+    ['expenseDeleted','settlementRecorded','expenseUpdated']);
+  assert.equal((await snapshot(fixture.headers)).data.state.trips.trips[0].activity[1].detail,'Guest → Host · USD 12.00');
 });
 
 test('guest lost-response replay survives intervening edits and database reopen without repeating a mutation',async()=>{
@@ -105,6 +113,8 @@ test('guest lost-response replay survives intervening edits and database reopen 
   const replay = await (await fixture.send(body)).json();
   assert.equal(replay.replayed,true);assert.equal(replay.committedRevision,first.committedRevision);
   assert.equal(replay.snapshot.revision,before.data.revision);assert.equal((await snapshot(fixture.headers)).etag,before.etag);
+  assert.equal(before.data.state.trips.trips[0].activity.length,1);
+  assert.deepEqual((await snapshot(fixture.headers)).data.state.trips.trips[0].activity,before.data.state.trips.trips[0].activity);
   const reused = await fixture.send({...body,operation:{kind:'deleteExpense',expenseId:'expense'}});
   assert.equal(reused.status,409);assert.equal((await reused.json()).code,'MUTATION_ID_REUSED');
   const stale = await fixture.send(guestBody(baseline,{kind:'deleteExpense',expenseId:'expense'}));
@@ -188,6 +198,34 @@ test('guest data and receipt commit together, rolling both back if receipt persi
     db.exec('DROP TRIGGER reject_guest_receipt');
     assert.equal((await fixture.send(body)).status,200);
   } finally {db.exec('DROP TRIGGER IF EXISTS reject_guest_receipt');db.close();}
+});
+
+test('guest activity retains recent history, ignores no-op commands and cannot accept a forged actor',async()=>{
+  const fixture=await guestFixture(); const owner=await snapshot(fixture.headers);
+  const trip=owner.data.state.trips.trips[0];
+  trip.activity=Array.from({length:100},(_,index)=>({id:'history-'+index,kind:'futureKind',actorName:'Earlier owner',
+    createdAtISO:index===0?'2100-01-01T00:00:00Z':'2020-01-01T00:00:00Z',futureMetadata:{keep:index}}));
+  assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),fixture.headers)).status,200);
+  const db=new Database(path.join(dir,'test.db'));
+  try {
+    const store=new GuestTripSync(db,new SyncStore(db,{requirePreconditions:true}),trip=>({id:trip.id}));
+    const send=operation=>store.commit(fixture.invite.token,guestBody(store.snapshot(fixture.invite.token),operation),{requireProtection:true});
+    send({kind:'upsertExpense',expense:guestExpense});
+    const recorded=(await snapshot(fixture.headers)).data.state.trips.trips[0].activity;
+    assert.equal(recorded.length,100);assert.equal(recorded[0].actorName,'Guest');
+    assert.deepEqual(recorded[1].futureMetadata,{keep:0});
+    send({kind:'upsertExpense',expense:guestExpense});
+    send({kind:'deleteExpense',expenseId:'already-missing'});
+    assert.deepEqual((await snapshot(fixture.headers)).data.state.trips.trips[0].activity,recorded);
+    const forged=guestBody(store.snapshot(fixture.invite.token),{kind:'upsertExpense',expense:guestExpense});
+    forged.actorName='Owner';
+    assert.throws(()=>store.commit(fixture.invite.token,forged),error=>error.code==='INVALID_GUEST_COMMIT');
+    const settlement={id:'same-payment',fromMemberId:'guest',toMemberId:'host',amount:3};
+    send({kind:'recordSettlement',settlement});
+    const first=(await snapshot(fixture.headers)).data.state.trips.trips[0].activity;
+    send({kind:'recordSettlement',settlement});
+    assert.deepEqual((await snapshot(fixture.headers)).data.state.trips.trips[0].activity,first);
+  } finally {db.close();}
 });
 
 test('lost-response retry is idempotent even after another commit; mutation-ID reuse cannot change data',async()=>{

@@ -127,9 +127,17 @@ and revision bounds before consuming a draft. `REVISION_CONFLICT` is definitive
 only because receipt lookup precedes it. An unavailable invitation or changed
 server is not blanket proof that an earlier request never committed.
 
+## Owner activity history
+
+Protected guest commits now record expense changes and new settlements in the
+owner's trip activity, in the same transaction as the mutation and receipt.
+Attribution comes from the invitation's member. Replays and unchanged commands
+add no entry. The public projection still excludes activity. See the
+[activity contract and verification](guest-activity-verification-2026-09-26.md).
+
 ## Verification and remaining integration
 
-The complete Node suite passes 34 tests. Six added HTTP/store cases cover public
+The complete Node suite passes 35 tests. The original six added HTTP/store cases cover public
 projection, preserved host fields, owner/guest conflicts, deletion/settlements,
 replay after intervening edits, database reopen, revoked/member-removed replay,
 invitation isolation, archive/join checks, bad operations and transactional

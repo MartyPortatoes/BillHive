@@ -1,0 +1,47 @@
+
+> billhive@1.0.0 test
+> node --test
+
+✔ authentication cannot be bypassed by requesting HTML, including public pages (455.301458ms)
+✔ current proxy account overrides stale cookie; public requests do not receive host sessions (3.517333ms)
+✔ cross-origin browser writes are rejected, same-origin and native writes work (4.816458ms)
+✔ malformed imports fail atomically; native references and unknown state fields survive (9.967417ms)
+✔ uploads cannot execute in the app origin, alias traversal paths, or leak across users (5.452667ms)
+✔ CSP only authorizes known inline scripts; private responses are not cached (2.244292ms)
+✔ shared contract rejects unsafe keys, malformed nested state, and allows payment addresses (0.471209ms)
+✔ serial writer preserves immutable snapshots and keeps failed writes dirty for retry (0.722083ms)
+✔ email sanitization preserves layout but strips active attributes; SMTP verifies TLS (28.835291ms)
+✔ a browser with unsaved edits cannot write into a switched proxy account (9.275625ms)
+✔ bill editor escapes synchronized names and descriptions in HTML attributes (2.270375ms)
+✔ clear setup revokes shares atomically and preserves the advertised history and other users (17.577375ms)
+✔ corrupt persisted records fail closed instead of exporting a partial backup (7.888ms)
+✔ web appearance preferences survive native state writes (3.040542ms)
+✔ other proxy accounts cannot change server-wide authentication policy (1.952542ms)
+✔ compatibility mode keeps older clients working but refuses clients requiring global revision protection (5.29125ms)
+✔ atomic snapshot and commit preserve unknown keys, write state/months together and reject stale snapshots (329.092625ms)
+✔ guest commits preserve host-only fields, return only public trip data and block stale owners (51.453042ms)
+✔ guest lost-response replay survives intervening edits and database reopen without repeating a mutation (18.530167ms)
+✔ revocation can acknowledge a prior guest request without revealing current trip data or permitting new writes (11.204666ms)
+✔ guest identity, token receipts, archive and membership authorization cannot cross invitations (24.73725ms)
+✔ invalid guest changes cannot replace attachments, add foreign members, or corrupt trip records (16.640917ms)
+✔ guest data and receipt commit together, rolling both back if receipt persistence fails (9.513083ms)
+✔ guest activity retains recent history, ignores no-op commands and cannot accept a forged actor (41.260875ms)
+✔ lost-response retry is idempotent even after another commit; mutation-ID reuse cannot change data (11.535ms)
+✔ only one of two writers with the same baseline can commit (2.869583ms)
+✔ validation and explicit deletion are atomic; omitted state/months are retained (9.397167ms)
+✔ household identity and receipts are isolated by authenticated user (7.110958ms)
+✔ every legacy JSON mutation requires a precondition in strict mode and advances the stream (31.673584ms)
+✔ guest expense/delete/settlement writes share the owner revision and stale owner saves cannot erase them (10.28275ms)
+✔ persisted corrupt snapshots are never replaced by a commit (3.164209ms)
+✔ revisions and receipts survive reopen, detect writes from other connections and roll back at safe integer overflow (3.426541ms)
+✔ web revision client retries the exact lost-response request before sending a newer immutable snapshot (5.783125ms)
+✔ web replay after an intervening edit blocks newer stale writes without erasing the other device (5.003375ms)
+✔ web client validates receipts and only loads a new baseline when no outcome is uncertain (1.04125ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 669.803458

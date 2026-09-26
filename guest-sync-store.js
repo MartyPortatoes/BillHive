@@ -16,6 +16,29 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 function fields(value, allowed) { return record(value) && Object.keys(value).every(key => allowed.has(key)); }
+function amountText(amount, currency) {
+  if (!amount) return '';
+  if (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) return String(amount);
+  try {
+    const digits = new Intl.NumberFormat('en', {style:'currency', currency}).resolvedOptions().maximumFractionDigits;
+    return currency + ' ' + Number(amount).toFixed(digits);
+  } catch (_) { return String(amount); }
+}
+
+// The owner history stays private: public trip projection deliberately omits it.
+function recordGuestActivity(trip, change, invite, mutationId, now = new Date()) {
+  if (!change) return;
+  const actor = (trip.members || []).find(member => member.id === invite.member_id);
+  const eventId = 'activity-' + crypto.createHash('sha256').update(invite.token + ':' + mutationId).digest('hex');
+  const events = Array.isArray(trip.activity) ? trip.activity : [];
+  if (events.some(event => event?.id === eventId)) return;
+  const event = {id:eventId, ...change, actorName:actor?.name || 'Trip guest', actorMemberId:invite.member_id,
+    createdAtISO:now.toISOString().replace(/\.\d{3}Z$/, 'Z')}; // Apple's trip activity decoder expects whole seconds.
+  // Keep this confirmed change even if imported events contain future dates.
+  const timestamp = event => { const value=Date.parse(event?.createdAtISO);return Number.isFinite(value)?value:Number.NEGATIVE_INFINITY; };
+  const ordered = events.slice().sort((a,b) => timestamp(b) - timestamp(a));
+  trip.activity = [event, ...ordered.slice(0,99)];
+}
 
 /** Invite-scoped receipts share the owner's revision but never return an owner's household snapshot. */
 class GuestTripSync {
@@ -125,11 +148,18 @@ class GuestTripSync {
       }
       const expenses = trip.expenses || [];
       const index = expenses.findIndex(item => item.id === expense.id);
+      const before = index >= 0 ? expenses[index] : null;
       // Public clients cannot replace host attachments/import metadata or future private fields.
       if (index >= 0) expenses[index] = {...expenses[index], ...expense}; else expenses.unshift(expense);
       trip.expenses = expenses;
+      if (before && canonical(before) === canonical(expenses[index])) return null;
+      return {kind:before ? 'expenseUpdated' : 'expenseAdded', subjectId:expense.id, subjectName:expense.name,
+        amountText:amountText(expense.amount, trip.currency), detail:''};
     } else if (operation.kind === 'deleteExpense') {
+      const removed = (trip.expenses || []).find(item => item.id === operation.expenseId);
       trip.expenses = (trip.expenses || []).filter(item => item.id !== operation.expenseId);
+      return removed ? {kind:'expenseDeleted', subjectId:removed.id, subjectName:removed.name || '',
+        amountText:amountText(removed.amount, trip.currency), detail:''} : null;
     } else {
       const settlement = operation.settlement;
       if (!members.has(settlement.fromMemberId) || !members.has(settlement.toMemberId)) fail(400, 'INVALID_GUEST_SETTLEMENT', 'Choose current trip members.');
@@ -138,6 +168,10 @@ class GuestTripSync {
       if (existing && canonical(existing) !== canonical(settlement)) fail(409, 'SETTLEMENT_ID_REUSED', 'This settlement ID already exists.');
       if (!existing) settlements.push(settlement);
       trip.settlements = settlements;
+      const from = trip.members.find(member => member.id === settlement.fromMemberId).name || 'Trip member';
+      const to = trip.members.find(member => member.id === settlement.toMemberId).name || 'Trip member';
+      return existing ? null : {kind:'settlementRecorded', subjectId:settlement.id, subjectName:'', amountText:'',
+        detail:from + ' → ' + to + ' · ' + amountText(settlement.amount, trip.currency)};
     }
   }
 
@@ -166,7 +200,8 @@ class GuestTripSync {
       if (requireProtection && !this.sync.requirePreconditions) fail(428, 'PROTECTION_DISABLED', 'Enable server revision protection before editing.');
       if (input.baseRevision !== metadata.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Your guest edit was not applied.');
       if (context.trip.isArchived) fail(409, 'TRIP_ARCHIVED', 'This trip is archived.');
-      this.apply(context.trip, input.operation);
+      const change = this.apply(context.trip, input.operation);
+      recordGuestActivity(context.trip, change, invite, input.mutationId);
       Data.state({trips:context.trips});
       this.sync.setState.run(invite.owner_user_id, 'trips', JSON.stringify(context.trips));
       const snapshot = this.snapshotInside(invite, context);
