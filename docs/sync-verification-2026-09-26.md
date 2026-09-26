@@ -57,6 +57,12 @@ In the strict fixture's actual browser UI:
 See [the protocol and rollout contract](sync-protocol.md). This is not complete
 server-wide mutation coverage. Attachment bytes, separate share/claim/invite
 records and configuration have separate unfinished concurrency contracts.
-Swift owner/guest compatibility and Android recovery/conflict UI must be
+Android subsequently wired its basic native editors, check completion, trip
+settlement/archive, pending retry and conflict comparison to the journal. The
+Android repository records its UI/server assertions and recovery evidence in
+`docs/evidence/2026-09-26/server-editing/verification.md`. This does not change
+the server's coverage boundary or default-off protection flag.
+
+Swift owner/guest compatibility and Android release QA must be
 completed before strict production rollout. Docker/Alpine, live reverse proxies,
 physical devices and production backups/restores have not been certified.

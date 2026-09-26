@@ -101,8 +101,16 @@ and receipt records. Preparing a request does not change the confirmed cache.
 The submitted draft is locked while its outcome is uncertain. A delayed receipt
 cannot roll back a newer confirmed cache; unexpectedly newer draft text is
 retained. The migration preserves version-1 household, local outbox and draft
-tables. These operations are implemented below the UI; Android's current
-SelfHive editing screens remain read-only pending recovery/conflict UI wiring.
+tables. Android's current basic editors and check/trip actions use this journal
+when connected to a protected server. Legacy servers remain read-only.
+
+The Android UI exposes pending-save retry and retained drafts. A rejected or
+locally conflicting draft can refresh a comparison, adopt the latest values,
+or apply only its changed fields to the reviewed snapshot. Applying a review
+does not submit it; Save performs another current-state validation. Currency
+changes, removed members, changed share-line structure and stale settlements
+cannot bypass the domain checks. A changed comparison is rejected atomically.
+Uncertain requests stay frozen and are retried with their original bytes/ID.
 
 ## Existing routes and coverage boundary
 
@@ -140,8 +148,9 @@ Before enabling strict mode on a real server:
    back up its attachment directory; verify restoration on an isolated server.
 2. Deploy the additive server schema and the matching web assets together.
    Confirm legacy reads/writes and authenticated user isolation with the flag off.
-3. Finish and ship Swift owner/guest compatibility, Android recovery/conflict
-   flows, and the remaining mutation-coverage audit. Test mixed clients and real
+3. Finish and ship Swift owner/guest compatibility and the remaining
+   mutation-coverage audit. Complete release QA for the Android recovery/conflict
+   flows. Test mixed clients and real
    proxy/device-key authentication. This repository has not completed that gate.
 4. In an isolated environment, enable the flag and exercise owner/guest writes,
    lost-response replay, stale rejection, offline drafts, server restart, and
