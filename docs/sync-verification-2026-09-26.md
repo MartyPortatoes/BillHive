@@ -72,3 +72,16 @@ and have not been released. Guest compatibility, broader mutation coverage and
 Android release QA must be completed before strict production rollout.
 Docker/Alpine, live reverse proxies,
 physical devices and production backups/restores have not been certified.
+
+## Subsequent guest protocol checkpoint
+
+The [guest protocol](guest-sync-protocol.md) adds invitation-scoped snapshots,
+commands and persisted receipts. The complete Node suite now passes 34 tests,
+including six new guest cases. Android's companion JVM/HTTP integration test
+uses the actual isolated server to join/save/replay/reject stale writes and
+acknowledge a request after revocation. Its evidence is in
+`Android_App/docs/evidence/2026-09-26/guest-protocol/verification.md`.
+
+This does not complete guest client UI/durable storage, Swift/browser guest
+integration or [remaining mutation contracts](mutation-coverage.md). The default
+strict flag and production/release boundaries are unchanged.

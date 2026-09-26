@@ -34,6 +34,7 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 
 const Data = require('./public/data-contract.js');
 const { SyncStore, SyncError } = require('./sync-store');
+const { GuestTripSync } = require('./guest-sync-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -169,6 +170,7 @@ db.exec(`
 `);
 
 const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
+const guestSync = new GuestTripSync(db, sync, publicTripShape);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
 // significantly faster repeated execution. All are synchronous (.get / .run / .all).
@@ -567,7 +569,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -714,15 +716,23 @@ function publicTripShape(trip) {
       dateISO: e.dateISO || '',
       category: e.category || 'other',
       customCategoryName: e.customCategoryName || '',
+      customCategoryIconName: e.customCategoryIconName || '',
       sourceAmount: e.sourceAmount || 0,
       sourceCurrency: e.sourceCurrency || '',
       exchangeRate: e.exchangeRate || 1,
+      exchangeRateTargetCurrency: e.exchangeRateTargetCurrency || '',
+      exchangeRateIsLocked: e.exchangeRateIsLocked || false,
+      exchangeRateDateISO: e.exchangeRateDateISO || '',
+      exchangeRateSource: e.exchangeRateSource || '',
       notes: e.notes || '',
     })),
     notes: trip.notes || '',
     isArchived: trip.isArchived || false,
-    settlements: trip.settlements || [],
-    checklistItems: trip.checklistItems || [],
+    settlements: (trip.settlements || []).map(s => ({id:s.id, fromMemberId:s.fromMemberId,
+      toMemberId:s.toMemberId, amount:s.amount, settledAtISO:s.settledAtISO || '', notes:s.notes || '',
+      ...(s.sourceActionId ? {sourceActionId:s.sourceActionId} : {})})),
+    checklistItems: (trip.checklistItems || []).map(item => ({id:item.id,label:item.label || '',
+      isDone:!!item.isDone,createdAtISO:item.createdAtISO || ''})),
   };
 }
 
@@ -969,6 +979,18 @@ app.post('/public/trip/invite/:token/join', publicLimiter, (req, res) => {
 app.get('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
   const result = readPublicTrip(req, {requireJoined:true});
   res.setHeader('ETag', sync.etag(result.metadata));res.json({trip:result.payload.trip});
+});
+
+app.get('/public/trip/invite/:token/sync/snapshot', publicLimiter, (req, res) => {
+  const snapshot = guestSync.snapshot(req.params.token);
+  res.setHeader('ETag', sync.etag(snapshot));
+  res.json(snapshot);
+});
+app.post('/public/trip/invite/:token/sync/commit', publicLimiter, (req, res) => {
+  const result = guestSync.commit(req.params.token, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
+  if (result.response.snapshot) res.setHeader('ETag', sync.etag(result.response.snapshot));
+  res.json(result.response);
+  if (!result.response.replayed) broadcastChange(result.userId);
 });
 
 // POST /public/trip/invite/:token/expense — add or update an expense on

@@ -9,6 +9,7 @@ const net = require('node:net');
 const crypto = require('node:crypto');
 const Database = require('better-sqlite3');
 const {SyncStore} = require('../sync-store');
+const {GuestTripSync} = require('../guest-sync-store');
 let dir, base, child;
 const proxy = {'remote-user':'sync-owner'};
 before(async () => {
@@ -45,6 +46,149 @@ test('atomic snapshot and commit preserve unknown keys, write state/months toget
   assert.deepEqual((await snapshot()).data,resultWithoutReceipt(result));
 });
 function resultWithoutReceipt(result) { const {mutationId,committedRevision,replayed,...snapshot}=result;return snapshot; }
+
+async function guestFixture() {
+  const headers = {'remote-user':'guest-owner-' + crypto.randomUUID()};
+  const first = await snapshot(headers);
+  const expense = {id:'expense',name:'Train',amount:20,paidByAmounts:{host:20},splitBetweenIds:['host','guest'],
+    attachments:[{id:'receipt',filename:'private.jpg'}],importFingerprint:'private-import',futureHostOnly:{keep:true}};
+  const trip = {id:'guest-trip',name:'Shared weekend',currency:'USD',members:[{id:'host',name:'Host',linkedPersonId:'private-person'},{id:'guest',name:'Guest'}],
+    expenses:[expense],settlements:[],checklistItems:[],futureTripField:'keep'};
+  assert.equal((await commit(commitBody(first.data,{state:{settings:{myEmail:'private@example.invalid'},trips:{trips:[trip]}}}),headers)).status,200);
+  const invite = await (await request('/api/trips/guest-trip/invite',{method:'POST',headers,body:{memberId:'guest'}})).json();
+  const prefix = `/public/trip/invite/${invite.token}`;
+  assert.equal((await request(prefix+'/join',{method:'POST',headers:{}})).status,200);
+  const read = async () => {
+    const response = await request(prefix+'/sync/snapshot',{headers:{}});
+    assert.equal(response.status,200);return response.json();
+  };
+  const send = body => request(prefix+'/sync/commit',{method:'POST',headers:{'X-BillHive-Require-Protection':'1'},body});
+  return {headers,invite,prefix,read,send};
+}
+function guestBody(snapshot, operation, mutationId=crypto.randomUUID()) {
+  return {serverInstanceId:snapshot.serverInstanceId,householdId:snapshot.householdId,
+    invitationId:snapshot.invitationId,
+    tripId:snapshot.tripId,memberId:snapshot.memberId,baseRevision:snapshot.revision,mutationId,operation};
+}
+const guestExpense = {id:'expense',name:'Guest renamed train',amount:24,paidByAmounts:{host:24},splitBetweenIds:['host','guest']};
+
+test('guest commits preserve host-only fields, return only public trip data and block stale owners',async()=>{
+  const fixture = await guestFixture(); const baseline = await fixture.read(); const owner = await snapshot(fixture.headers);
+  assert.equal(baseline.protocolVersion,1);assert.equal(baseline.revisionPreconditionsRequired,true);
+  assert.equal(baseline.userId,undefined);assert.equal(baseline.state,undefined);assert.equal(baseline.monthly,undefined);
+  assert.equal(baseline.trip.members[0].linkedPersonId,undefined);
+  assert.equal(baseline.trip.expenses[0].attachments,undefined);
+  const response = await fixture.send(guestBody(baseline,{kind:'upsertExpense',expense:guestExpense}));
+  assert.equal(response.status,200); const saved = await response.json();
+  assert.equal(saved.replayed,false);assert.equal(saved.snapshot.trip.expenses[0].amount,24);
+  assert.equal(saved.committedRevision,saved.snapshot.revision);assert.ok(saved.committedRevision>baseline.revision);
+  assert.equal(JSON.stringify(saved).includes('private'),false);
+  const canonical = (await snapshot(fixture.headers)).data.state.trips.trips[0];
+  assert.equal(canonical.futureTripField,'keep');assert.equal(canonical.expenses[0].importFingerprint,'private-import');
+  assert.deepEqual(canonical.expenses[0].attachments,[{id:'receipt',filename:'private.jpg'}]);
+  assert.deepEqual(canonical.expenses[0].futureHostOnly,{keep:true});
+  assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),fixture.headers)).status,409);
+  const settled = await fixture.send(guestBody(saved.snapshot,{kind:'recordSettlement',settlement:{id:'payment',fromMemberId:'guest',toMemberId:'host',amount:12}}));
+  assert.equal(settled.status,200);
+  const next = (await settled.json()).snapshot;
+  const deleted = await fixture.send(guestBody(next,{kind:'deleteExpense',expenseId:'expense'}));assert.equal(deleted.status,200);
+  const final = (await deleted.json()).snapshot;assert.equal(final.trip.expenses.length,0);assert.equal(final.trip.settlements.length,1);
+});
+
+test('guest lost-response replay survives intervening edits and database reopen without repeating a mutation',async()=>{
+  const fixture = await guestFixture(); const baseline = await fixture.read();
+  const body = guestBody(baseline,{kind:'upsertExpense',expense:guestExpense});
+  const first = await (await fixture.send(body)).json();
+  const owner = await snapshot(fixture.headers);
+  assert.equal((await commit(commitBody(owner.data,{state:{settings:{myEmail:'new-private@example.invalid'}}}),fixture.headers)).status,200);
+  const before = await snapshot(fixture.headers);
+  const replay = await (await fixture.send(body)).json();
+  assert.equal(replay.replayed,true);assert.equal(replay.committedRevision,first.committedRevision);
+  assert.equal(replay.snapshot.revision,before.data.revision);assert.equal((await snapshot(fixture.headers)).etag,before.etag);
+  const reused = await fixture.send({...body,operation:{kind:'deleteExpense',expenseId:'expense'}});
+  assert.equal(reused.status,409);assert.equal((await reused.json()).code,'MUTATION_ID_REUSED');
+  const stale = await fixture.send(guestBody(baseline,{kind:'deleteExpense',expenseId:'expense'}));
+  assert.equal(stale.status,409);assert.equal((await stale.json()).code,'REVISION_CONFLICT');
+  const db = new Database(path.join(dir,'test.db'));
+  try {
+    const store = new GuestTripSync(db,new SyncStore(db),trip=>({id:trip.id}));
+    const reopened = store.commit(fixture.invite.token,body,{requireProtection:true}).response;
+    assert.equal(reopened.replayed,true);assert.equal(reopened.committedRevision,first.committedRevision);
+    assert.throws(()=>store.commit(fixture.invite.token,{...body,mutationId:crypto.randomUUID()},{requireProtection:true}),error=>error.code==='PROTECTION_DISABLED');
+    assert.equal(db.prepare('SELECT count(*) AS n FROM sync_guest_receipts WHERE mutation_id=?').get(body.mutationId).n,1);
+  } finally {db.close();}
+});
+
+test('revocation can acknowledge a prior guest request without revealing current trip data or permitting new writes',async()=>{
+  const fixture = await guestFixture();const body = guestBody(await fixture.read(),{kind:'deleteExpense',expenseId:'expense'});
+  const saved = await (await fixture.send(body)).json();
+  assert.equal((await request('/api/trips/guest-trip/invite/guest',{method:'DELETE',headers:fixture.headers})).status,200);
+  assert.equal((await request(fixture.prefix+'/sync/snapshot',{headers:{}})).status,410);
+  const before = await snapshot(fixture.headers);const response = await fixture.send(body);assert.equal(response.status,200);
+  const replay = await response.json();assert.equal(replay.replayed,true);assert.equal(replay.access,'revoked');assert.equal(replay.snapshot,null);
+  assert.equal(replay.committedRevision,saved.committedRevision);assert.equal(replay.userId,undefined);
+  assert.notEqual(response.headers.get('etag'),before.etag);assert.equal(replay.revision,undefined);
+  assert.equal((await snapshot(fixture.headers)).etag,before.etag);
+  assert.equal((await fixture.send({...body,mutationId:crypto.randomUUID()})).status,410);
+});
+
+test('guest identity, token receipts, archive and membership authorization cannot cross invitations',async()=>{
+  const fixture = await guestFixture();const baseline = await fixture.read();const body = guestBody(baseline,{kind:'upsertExpense',expense:guestExpense});
+  for (const identity of [{memberId:'host'},{tripId:'other'},{householdId:'other'},{serverInstanceId:'other'},{invitationId:'other'}]) {
+    const rejected = await fixture.send({...body,...identity});assert.equal(rejected.status,409);assert.equal((await rejected.json()).code,'HOUSEHOLD_CHANGED');
+  }
+  const other = await (await request('/api/trips/guest-trip/invite',{method:'POST',headers:fixture.headers,body:{memberId:'host'}})).json();
+  const otherPrefix = `/public/trip/invite/${other.token}`;
+  assert.equal((await request(otherPrefix+'/sync/snapshot',{headers:{}})).status,403);
+  await request(otherPrefix+'/join',{method:'POST',headers:{}});
+  assert.equal((await fixture.send(body)).status,200);
+  const otherSnapshot = await (await request(otherPrefix+'/sync/snapshot',{headers:{}})).json();
+  const independent = await request(otherPrefix+'/sync/commit',{method:'POST',headers:{},body:guestBody(otherSnapshot,{kind:'deleteExpense',expenseId:'expense'},body.mutationId)});
+  assert.equal(independent.status,200);assert.equal((await independent.json()).replayed,false);
+  let owner = await snapshot(fixture.headers);owner.data.state.trips.trips[0].isArchived = true;
+  await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),fixture.headers);
+  const archived = await fixture.send(guestBody(await fixture.read(),{kind:'upsertExpense',expense:guestExpense}));
+  assert.equal(archived.status,409);assert.equal((await archived.json()).code,'TRIP_ARCHIVED');
+  owner = await snapshot(fixture.headers);owner.data.state.trips.trips[0].members = [{id:'host',name:'Host'}];
+  await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),fixture.headers);
+  assert.equal((await request(fixture.prefix+'/sync/snapshot',{headers:{}})).status,410);
+  const replay = await (await fixture.send(body)).json();assert.equal(replay.access,'memberRemoved');assert.equal(replay.snapshot,null);
+});
+
+test('invalid guest changes cannot replace attachments, add foreign members, or corrupt trip records',async()=>{
+  const fixture = await guestFixture();const baseline = await fixture.read();const before = await snapshot(fixture.headers);
+  const invalid = [
+    {kind:'upsertExpense',expense:{...guestExpense,attachments:[]}},
+    {kind:'upsertExpense',expense:{...guestExpense,amount:-1}},
+    {kind:'upsertExpense',expense:{...guestExpense,paidByAmounts:{outsider:24}}},
+    {kind:'upsertExpense',expense:{...guestExpense,splitBetweenIds:['guest','guest']}},
+    {kind:'upsertExpense',expense:{...guestExpense,exchangeRate:0}},
+    {kind:'recordSettlement',settlement:{id:'bad',fromMemberId:'guest',toMemberId:'guest',amount:10}},
+    {kind:'recordSettlement',settlement:{id:'bad',fromMemberId:'guest',toMemberId:'unknown',amount:10}},
+    {kind:'deleteExpense',expenseId:'../private'},
+    {kind:'replaceTrip',trip:{}},
+  ];
+  for (const operation of invalid) assert.equal((await fixture.send(guestBody(baseline,operation))).status,400);
+  assert.equal((await snapshot(fixture.headers)).etag,before.etag);
+  const settlements = guestBody(baseline,{kind:'recordSettlement',settlement:{id:'payment',fromMemberId:'guest',toMemberId:'host',amount:3}});
+  assert.equal((await fixture.send(settlements)).status,200);
+  const duplicate = await fixture.send(guestBody(await fixture.read(),{kind:'recordSettlement',settlement:{...settlements.operation.settlement,amount:4}}));
+  assert.equal(duplicate.status,409);assert.equal((await duplicate.json()).code,'SETTLEMENT_ID_REUSED');
+});
+
+test('guest data and receipt commit together, rolling both back if receipt persistence fails',async()=>{
+  const fixture = await guestFixture();const baseline = await fixture.read();const before = await snapshot(fixture.headers);
+  const body = guestBody(baseline,{kind:'upsertExpense',expense:guestExpense},'fail-receipt-1234567890');
+  const db = new Database(path.join(dir,'test.db'));
+  try {
+    db.exec("CREATE TRIGGER reject_guest_receipt BEFORE INSERT ON sync_guest_receipts WHEN NEW.mutation_id='fail-receipt-1234567890' BEGIN SELECT RAISE(ABORT,'fixture disk failure'); END");
+    assert.equal((await fixture.send(body)).status,500);
+    assert.equal((await snapshot(fixture.headers)).etag,before.etag);
+    assert.equal(db.prepare('SELECT count(*) AS n FROM sync_guest_receipts WHERE mutation_id=?').get(body.mutationId).n,0);
+    db.exec('DROP TRIGGER reject_guest_receipt');
+    assert.equal((await fixture.send(body)).status,200);
+  } finally {db.exec('DROP TRIGGER IF EXISTS reject_guest_receipt');db.close();}
+});
 
 test('lost-response retry is idempotent even after another commit; mutation-ID reuse cannot change data',async()=>{
   const original=await snapshot();const body=commitBody(original.data,{state:{settings:{currencyCode:'EUR'}}});

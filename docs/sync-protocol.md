@@ -153,19 +153,21 @@ successful writes return a coherent ETag. SQLite triggers advance revisions for
 every insert/update/delete of either covered JSON table, including legacy
 writers and writes through another SQLite connection.
 
-Public trip reads and joins return the owner's ETag. Guest expense creation,
+Public trip reads and joins return the owner's ETag. Legacy guest expense creation,
 update and deletion, and settlement writes check that ETag, invitation state,
 membership and archive status inside the transaction. These mutations advance
 the owner's revision, preventing a stale owner snapshot from erasing a guest's
-change. Guest endpoints do not yet use the owner commit receipt journal; guest
-clients need their own retry/review treatment. Existing Swift guest clients
-still require compatibility updates before strict rollout.
+change. The new [guest trip protocol](guest-sync-protocol.md) adds invitation-scoped
+receipts and a public-trip-only snapshot for updated native clients. Legacy guest
+routes retain no receipts. Guest clients still need durable local retry/review
+integration; existing Swift guest clients require compatibility updates before
+strict rollout.
 
 Separate check-share/claim rows, invitation metadata, attachment bytes,
 authentication/device keys and email configuration are **outside this JSON
 revision stream**. Their concurrency, ownership and lifecycle contracts remain
 separate unfinished work. In particular, don't describe this as complete
-server-wide mutation coverage.
+server-wide mutation coverage. See the [route inventory](mutation-coverage.md).
 
 ## Rollout and rollback
 

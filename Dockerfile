@@ -10,6 +10,7 @@ RUN npm ci --omit=dev
 
 COPY server.js .
 COPY sync-store.js .
+COPY guest-sync-store.js .
 COPY email.js .
 COPY emailTemplate.js .
 COPY index.html ./public/
