@@ -5507,20 +5507,26 @@ function autoFillPreservedBills() {
   S.bills.forEach(bill => {
     if (!bill.preserve) return;
     const curData = S.monthly[key];
-    const hasTotal = (curData?.totals?.[bill.id] ?? 0) > 0;
-    const hasLines = bill.lines.some(l => (curData?.amounts?.[bill.id]?.[l.id] ?? 0) > 0);
+    // Zero is an entered amount; retired share lines also protect the month.
+    const hasTotal = Object.hasOwn(curData?.totals ?? {}, bill.id);
+    const hasLines = Object.keys(curData?.amounts?.[bill.id] ?? {}).length > 0;
     if (hasTotal || hasLines) return; // already has data this month, don't overwrite
 
+    const sourceHasTotal = Object.hasOwn(prevData.totals ?? {}, bill.id);
+    const sourceAmounts = prevData.amounts?.[bill.id] ?? {};
+    const sourceHasLines = Object.keys(sourceAmounts).length > 0;
+    if (!sourceHasTotal && !sourceHasLines) return;
+
     if (!S.monthly[key]) S.monthly[key] = { totals: {}, amounts: {} };
-    if (prevData.totals?.[bill.id]) {
+    if (sourceHasTotal) {
+      if (!S.monthly[key].totals) S.monthly[key].totals = {};
       S.monthly[key].totals[bill.id] = prevData.totals[bill.id];
-      changed = true;
     }
-    if (prevData.amounts?.[bill.id]) {
+    if (sourceHasLines) {
       if (!S.monthly[key].amounts) S.monthly[key].amounts = {};
-      S.monthly[key].amounts[bill.id] = { ...prevData.amounts[bill.id] };
-      changed = true;
+      S.monthly[key].amounts[bill.id] = { ...sourceAmounts };
     }
+    changed = true;
   });
 
   if (changed) saveMonthNow(key, S.monthly[key]);
