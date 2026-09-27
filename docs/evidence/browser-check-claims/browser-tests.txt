@@ -1,0 +1,19 @@
+PASS prefixed trailing-slash page loads under shipped CSP; names are escaped and currency is EUR
+PASS same-name visitor is not mistaken for an existing guest
+PASS real browser selection creates a distinct same-name declaration on the strict server
+PASS empty selection withdraws only this browser guest
+PASS raw draft and selected items survive full page reload
+PASS concurrent tab conflict keeps unsaved input and blocks sending
+PASS removed selected item remains explicit until unchecked and comparison accepted
+PASS phone layout retains visible primary action with doubled rendered text
+PASS downloaded pending recovery includes original intent without credentials or link token
+PASS real Chrome process loss retries identical request and keeps newer server selections
+PASS receipt-only replay acknowledges a committed withdrawal after link revocation
+PASS real IndexedDB transaction abort leaves the prior record intact
+PASS storage failure preserves visible raw input and recovery export without sending
+PASS leaving unsaved input requires a browser warning; reload keeps the earlier durable draft
+PASS light phone and tablet layouts fit the viewport
+PASS keyboard selection and accessibility names use native labeled controls
+PASS completed check becomes read-only while keeping its unfinished selection
+All 17 browser checks passed. Evidence: /Users/mportelos/Documents/GitHub/BillHive/Web_App/docs/evidence/browser-check-claims
+Owned Chrome/server processes exited; proxy closed; disposable profile, database and downloads removed.

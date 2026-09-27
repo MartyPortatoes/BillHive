@@ -1,0 +1,27 @@
+{
+  "passed": 17,
+  "checks": [
+    "prefixed trailing-slash page loads under shipped CSP; names are escaped and currency is EUR",
+    "same-name visitor is not mistaken for an existing guest",
+    "real browser selection creates a distinct same-name declaration on the strict server",
+    "empty selection withdraws only this browser guest",
+    "raw draft and selected items survive full page reload",
+    "concurrent tab conflict keeps unsaved input and blocks sending",
+    "removed selected item remains explicit until unchecked and comparison accepted",
+    "phone layout retains visible primary action with doubled rendered text",
+    "downloaded pending recovery includes original intent without credentials or link token",
+    "real Chrome process loss retries identical request and keeps newer server selections",
+    "receipt-only replay acknowledges a committed withdrawal after link revocation",
+    "real IndexedDB transaction abort leaves the prior record intact",
+    "storage failure preserves visible raw input and recovery export without sending",
+    "leaving unsaved input requires a browser warning; reload keeps the earlier durable draft",
+    "light phone and tablet layouts fit the viewport",
+    "keyboard selection and accessibility names use native labeled controls",
+    "completed check becomes read-only while keeping its unfinished selection"
+  ],
+  "browser": "Chrome/151.0.7922.110 headless, isolated persistent profile",
+  "viewport": "390x844 phone; 1024x768 tablet",
+  "processLoss": "SIGKILL of owned Chrome process group; profile reopened",
+  "limits": "Doubled rendered text is injected for layout coverage, not an OS accessibility or physical-device certification.",
+  "runtimeErrors": []
+}
