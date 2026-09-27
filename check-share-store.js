@@ -85,6 +85,15 @@ class CheckShareSync {
     this.saveOwnerReceipt = db.prepare('INSERT INTO check_share_owner_receipts(user_id,mutation_id,check_id,request_hash,revision,result_token) VALUES (?,?,?,?,?,?)');
     this.claimReceipt = db.prepare('SELECT * FROM check_claim_receipts WHERE share_id=? AND claimant_id=? AND mutation_id=?');
     this.saveClaimReceipt = db.prepare('INSERT INTO check_claim_receipts(share_id,claimant_id,mutation_id,request_hash,revision) VALUES (?,?,?,?,?)');
+    sync.validateCheckSharePreconditions = (userId, guards) => {
+      if (!guards) return;
+      if (!sync.requirePreconditions) fail(428,'PROTECTION_DISABLED','Enable revision protection before applying check claims.');
+      for (const guard of guards) {
+        const active = this.active.get(userId,guard.checkId);
+        if (this.version(userId,guard.checkId) !== guard.shareRevision || (active ? hash(active.token) : null) !== guard.shareId)
+          fail(409,'CHECK_SHARE_CONFLICT','The check link or claims changed. Review the split again before saving.');
+      }
+    };
   }
   version(userId, checkId) { return this.readRevision.get(userId,checkId)?.revision || 0; }
   check(userId, checkId) {

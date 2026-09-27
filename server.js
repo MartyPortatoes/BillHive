@@ -569,7 +569,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -1213,15 +1213,20 @@ function publicBaseURL(req) {
 function shareInfoResponse(share, req) {
   return {...share,url:`${publicBaseURL(req)}/share/${share.token}`};
 }
+function ownerShareResponse(snapshot, req) {
+  // This is routing metadata, not part of the share revision: a self-hoster may
+  // change PUBLIC_BASE_URL without changing the check, token or guest claims.
+  return {...snapshot,shareUrl:snapshot.share ? shareInfoResponse(snapshot.share,req).url : null};
+}
 
 app.get('/api/share/check/:checkId/sync/snapshot', (req, res) => {
   const snapshot = checkSync.ownerSnapshot(req.userId, req.params.checkId);
-  res.setHeader('ETag', checkSync.etag(snapshot)); res.json(snapshot);
+  res.setHeader('ETag', checkSync.etag(snapshot)); res.json(ownerShareResponse(snapshot,req));
 });
 app.post('/api/share/check/:checkId/sync/commit', (req, res) => {
   const result = checkSync.ownerCommit(req.userId, req.params.checkId, req.body,
     {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
-  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json(result);
+  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json({...result,snapshot:ownerShareResponse(result.snapshot,req)});
   if (!result.replayed) broadcastChange(req.userId);
 });
 

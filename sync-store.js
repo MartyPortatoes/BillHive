@@ -21,6 +21,9 @@ class SyncStore {
     this.db = db;
     this.requirePreconditions = requirePreconditions;
     this.validateReferences = () => {};
+    this.validateCheckSharePreconditions = (_userId, guards) => {
+      if (guards) fail(428, 'CHECK_SHARE_GUARD_UNSUPPORTED', 'Update the server before applying reviewed check claims.');
+    };
     db.transaction(() => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS sync_revisions (
@@ -92,12 +95,21 @@ class SyncStore {
 
   validateCommit(body) {
     if (!record(body)) fail(400, 'INVALID_COMMIT', 'Expected a sync commit object.');
-    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths']);
+    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths','checkSharePreconditions']);
     if (Object.keys(body).some(key => !allowed.has(key))) fail(400, 'INVALID_COMMIT', 'Unknown sync commit field.');
     if (!identifier(body.serverInstanceId) || !identifier(body.householdId) || !identifier(body.mutationId) || body.mutationId.length < 16 ||
         !Number.isSafeInteger(body.baseRevision) || body.baseRevision < 0) fail(400, 'INVALID_COMMIT', 'Invalid sync identity, revision or mutation ID.');
     try { Data.state(body.state); Data.months(body.monthly); }
     catch (_) { fail(400, 'INVALID_COMMIT', 'Invalid household state or monthly data.'); }
+    if (Object.hasOwn(body,'checkSharePreconditions')) {
+      const guards = body.checkSharePreconditions;
+      if (!Array.isArray(guards) || guards.length < 1 || guards.length > 100 || guards.some(guard =>
+        !record(guard) || Object.keys(guard).length !== 3 || !['checkId','shareId','shareRevision'].every(key => Object.hasOwn(guard,key)) ||
+        !identifier(guard.checkId) || !Number.isSafeInteger(guard.shareRevision) || guard.shareRevision < 0 ||
+        !(guard.shareId === null || typeof guard.shareId === 'string' && /^[a-f0-9]{64}$/.test(guard.shareId))) ||
+        new Set(guards.map(guard => guard.checkId)).size !== guards.length)
+        fail(400, 'INVALID_COMMIT', 'Invalid check sharing preconditions.');
+    }
     const deleteStateKeys = body.deleteStateKeys ?? []; const deleteMonths = body.deleteMonths ?? [];
     if (!Array.isArray(deleteStateKeys) || !Array.isArray(deleteMonths) ||
         deleteStateKeys.some(key => !identifier(key) || Object.hasOwn(body.state, key)) ||
@@ -122,6 +134,9 @@ class SyncStore {
         return {...this.snapshotInside(userId), mutationId:input.mutationId, committedRevision:receipt.revision, replayed:true};
       }
       if (input.baseRevision !== metadata.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Your edits were not applied.');
+      // Shares advance independently of household JSON. Guard both streams while
+      // holding the same write transaction, after exact-request receipt lookup.
+      this.validateCheckSharePreconditions(userId,input.checkSharePreconditions);
       // Fail closed on corrupt persisted data before any overwrite, including unknown fields.
       this.snapshotInside(userId);
       for (const [key,value] of Object.entries(input.state)) this.setState.run(userId,key,JSON.stringify(value));
@@ -145,6 +160,7 @@ class SyncStore {
         fail(409, 'HOUSEHOLD_CHANGED', 'The server or signed-in household changed.');
       }
       if (input.baseRevision !== current.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Review the restore again.');
+      this.validateCheckSharePreconditions(userId,input.checkSharePreconditions);
       for (const [before, after, deleted] of [[current.state,input.state,input.deleteStateKeys], [current.monthly,input.monthly,input.deleteMonths]]) {
         if (Object.keys(before).some(key => !Object.hasOwn(after,key) && !deleted.includes(key))) {
           fail(400, 'INVALID_RESTORE', 'A restore must explicitly replace all household records and history.');

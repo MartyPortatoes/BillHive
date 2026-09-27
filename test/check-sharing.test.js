@@ -24,7 +24,7 @@ before(async () => {
   base = `http://127.0.0.1:${port}`;
   child = spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,
     HOST:'127.0.0.1',PORT:String(port),DB_PATH:path.join(dir,'test.db'),TRUST_PROXY:'loopback',
-    TRUSTED_AUTH_HEADERS:'remote-user',SYNC_REQUIRE_PRECONDITIONS:'1'},stdio:['ignore','pipe','pipe']});
+    TRUSTED_AUTH_HEADERS:'remote-user',SYNC_REQUIRE_PRECONDITIONS:'1',PUBLIC_BASE_URL:'https://checks.example.test/hive'},stdio:['ignore','pipe','pipe']});
   await new Promise((resolve,reject) => {
     const timer = setTimeout(()=>reject(new Error('Check-sharing fixture did not start')),10000);
     child.stdout.on('data',chunk=>{if(String(chunk).includes('running on')) {clearTimeout(timer);resolve();}});
@@ -77,8 +77,11 @@ async function shared() {
 }
 
 test('check sharing advertises capability and projects only public metadata, including correct currency',async()=>{
-  assert.equal((await good(await request('/api/health'))).capabilities.checkShareProtocol,1);
+  const capabilities=(await good(await request('/api/health'))).capabilities;
+  assert.equal(capabilities.checkShareProtocol,1);assert.equal(capabilities.checkShareGuardProtocol,1);
   const f=await shared();const pub=await f.publicRead();const legacy=await good(await request(f.prefix));
+  assert.equal(f.created.snapshot.shareUrl,`https://checks.example.test/hive/share/${f.token}`);
+  assert.equal((await f.read()).shareUrl,f.created.snapshot.shareUrl);assert.equal(pub.shareUrl,undefined);
   assert.equal(pub.currencyCode,'EUR');assert.equal(pub.check.isCompleted,false);assert.equal(pub.check.serviceFeeAmount,3);
   for(const value of [pub,legacy]) {
     assert.equal(JSON.stringify(value).includes('private'),false);assert.equal(value.userId,undefined);
@@ -101,6 +104,7 @@ test('exact owner replay survives newer rotation without reactivating the origin
   assert.equal(rotated.snapshot.revision,ownerRevision);
   const replay=await good(await f.send(body));assert.equal(replay.replayed,true);
   assert.equal(replay.resultToken,first.resultToken);assert.equal(replay.snapshot.share.token,rotated.resultToken);
+  assert.equal(replay.snapshot.shareUrl,`https://checks.example.test/hive/share/${rotated.resultToken}`);
   assert.equal(replay.committedShareRevision,first.committedShareRevision);
   await error(await request('/public/share/check/'+first.resultToken),410,'SHARE_REVOKED');
   await error(await f.send({...body,kind:'rotate'}),409,'MUTATION_ID_REUSED');
@@ -158,6 +162,7 @@ test('revoke acknowledges an already committed guest request without exposing cu
   const f=await shared();const credential=key();const body=claimCommand(await f.publicRead(),f.token,credential);
   const first=await good(await f.claim(body,credential));
   const revoked=await good(await f.send(ownerCommand(await f.read(),'revoke')));assert.equal(revoked.snapshot.share,null);
+  assert.equal(revoked.snapshot.shareUrl,null);
   const replay=await good(await f.claim(body,credential));assert.equal(replay.replayed,true);assert.equal(replay.access,'revoked');
   assert.equal(replay.snapshot,null);assert.equal(replay.committedShareRevision,first.committedShareRevision);
   await error(await f.claim({...body,mutationId:crypto.randomUUID()},credential),410,'SHARE_REVOKED');
@@ -286,4 +291,91 @@ test('upgrade revokes orphaned legacy tokens and preserves active legacy claims'
     assert.throws(()=>store.publicSnapshot('absent'),e=>e.code==='SHARE_REVOKED');
     assert.throws(()=>local.prepare('UPDATE share_checks SET check_id=? WHERE token=?').run('other','active'),/permanent/);
   } finally {local.close();}
+});
+
+const shareGuard = s => ({checkId:s.checkId,shareId:s.share?.shareId??null,shareRevision:s.shareRevision});
+async function reviewedCommit(f,share=undefined) {
+  const household=await f.household();share??=await f.read();
+  const state=structuredClone(household.state);
+  state.checks.checks[0].name='Reviewed split';
+  state.checks.checks[0].items[0].participantIds=['host','guest'];
+  state.checks.checks[0].participants.push({id:'guest',name:'Guest'});
+  return {serverInstanceId:household.serverInstanceId,householdId:household.householdId,baseRevision:household.revision,
+    mutationId:crypto.randomUUID(),state,monthly:household.monthly,checkSharePreconditions:[shareGuard(share)]};
+}
+const applyReviewed = (f,body) => request('/api/sync/commit',{method:'POST',headers:f.headers,body});
+
+test('reviewed financial saves reject newer guest claims even when the household revision did not change',async()=>{
+  const f=await shared();const before=await f.household();const body=await reviewedCommit(f);const credential=key();
+  await good(await f.claim(claimCommand(await f.publicRead(),f.token,credential),credential));
+  assert.deepEqual(await f.household(),before);
+  await error(await applyReviewed(f,body),409,'CHECK_SHARE_CONFLICT');
+  assert.deepEqual(await f.household(),before);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM sync_receipts WHERE user_id=? AND mutation_id=?').get(f.user,body.mutationId).n,0);
+  const refreshed=await reviewedCommit(f);const saved=await good(await applyReviewed(f,refreshed));
+  assert.equal(saved.state.checks.checks[0].name,'Reviewed split');
+  assert.deepEqual(saved.state.checks.checks[0].items[0].participantIds,['host','guest']);
+  assert.deepEqual(saved.state.checks.checks[0].futurePrivateField,{secret:true});
+  assert.deepEqual(saved.monthly,before.monthly);
+  assert.equal((await f.publicRead()).claims.length,1,'host application must not erase declarations');
+});
+
+test('a reviewed save and a concurrent guest change cannot both commit against their old snapshots',async()=>{
+  const f=await shared();const body=await reviewedCommit(f);const credential=key();
+  const claim=claimCommand(await f.publicRead(),f.token,credential);
+  const [host,guest]=await Promise.all([applyReviewed(f,body),f.claim(claim,credential)]);
+  assert.deepEqual([host.status,guest.status].sort(),[200,409]);
+  if(host.status===200) {await good(host);await error(guest,409,'SHARE_CONFLICT');}
+  else {await error(host,409,'CHECK_SHARE_CONFLICT');await good(guest);}
+  assert.equal(db.prepare('SELECT count(*) AS n FROM sync_receipts WHERE user_id=? AND mutation_id=?').get(f.user,body.mutationId).n,host.status===200?1:0);
+});
+
+test('exact reviewed-save replay acknowledges the original result after a new claim and link rotation',async()=>{
+  const f=await shared();const body=await reviewedCommit(f);const first=await good(await applyReviewed(f,body));
+  const credential=key();await good(await f.claim(claimCommand(await f.publicRead(),f.token,credential),credential));
+  await good(await f.send(ownerCommand(await f.read(),'rotate')));
+  const replay=await good(await applyReviewed(f,structuredClone(body)));
+  assert.equal(replay.replayed,true);assert.equal(replay.committedRevision,first.committedRevision);
+  assert.deepEqual(replay.state,first.state);
+  await error(await applyReviewed(f,{...body,checkSharePreconditions:[shareGuard(await f.read())]}),409,'MUTATION_ID_REUSED');
+  await error(await applyReviewed(f,{...body,mutationId:crypto.randomUUID(),baseRevision:replay.revision}),409,'CHECK_SHARE_CONFLICT');
+});
+
+test('share guards validate shape, identity, absence and changes made through another SQLite connection',async()=>{
+  const f=await shared();const body=await reviewedCommit(f);const initial=await f.household();const valid=body.checkSharePreconditions[0];
+  for(const invalid of [null,[],[valid,valid],[{...valid,shareRevision:-1}],[{...valid,shareRevision:1.5}],
+    [{...valid,shareRevision:Number.MAX_SAFE_INTEGER+1}],[{...valid,shareId:'bad'}],[{checkId:'dinner',shareRevision:1}],
+    [{...valid,extra:true}],[{...valid,checkId:'__proto__'}],Array.from({length:101},(_,i)=>({...valid,checkId:'c'+i}))])
+    await error(await applyReviewed(f,{...body,checkSharePreconditions:invalid}),400,'INVALID_COMMIT');
+  for(const shareId of [null,'b'.repeat(64)])
+    await error(await applyReviewed(f,{...body,checkSharePreconditions:[{...valid,shareId}]}),409,'CHECK_SHARE_CONFLICT');
+  db.prepare('UPDATE share_checks SET claims=? WHERE token=?').run(JSON.stringify([{claimerName:'Legacy',itemIds:[],claimedAt:'2026-09-27T12:00:00Z'}]),f.token);
+  await error(await applyReviewed(f,body),409,'CHECK_SHARE_CONFLICT');assert.deepEqual(await f.household(),initial);
+  await good(await f.send(ownerCommand(await f.read(),'revoke')));
+  const absent=await reviewedCommit(f);assert.equal(absent.checkSharePreconditions[0].shareId,null);
+  await good(await f.send(ownerCommand(await f.read(),'create')));
+  await error(await applyReviewed(f,absent),409,'CHECK_SHARE_CONFLICT');
+  assert.deepEqual(await f.household(),initial);
+});
+
+test('failed guarded receipt rolls back household changes and share revocation; old unguarded receipts still replay',async()=>{
+  const f=await shared();const before=await f.household();const share=await f.read();const body=await reviewedCommit(f);
+  body.state.checks.checks=[];
+  db.exec("CREATE TRIGGER test_guarded_receipt_failure BEFORE INSERT ON sync_receipts BEGIN SELECT RAISE(ABORT,'injected'); END");
+  try {assert.equal((await applyReviewed(f,body)).status,500);assert.deepEqual(await f.household(),before);assert.deepEqual(await f.read(),share);}
+  finally {db.exec('DROP TRIGGER test_guarded_receipt_failure');}
+  const saved=await good(await applyReviewed(f,body));assert.equal((await f.read()).share,null);
+  const replay=await good(await applyReviewed(f,body));assert.equal(replay.replayed,true);assert.equal(replay.committedRevision,saved.committedRevision);
+  const plain={...body,mutationId:crypto.randomUUID(),baseRevision:saved.revision};delete plain.checkSharePreconditions;
+  const first=await good(await applyReviewed(f,plain));const oldReplay=await good(await applyReviewed(f,plain));
+  assert.equal(oldReplay.replayed,true);assert.equal(oldReplay.committedRevision,first.committedRevision);
+  const second=new Database(path.join(dir,'test.db'));
+  try {
+    const sync=new SyncStore(second,{requirePreconditions:true});
+    assert.throws(()=>sync.commit(f.user,{...body,mutationId:crypto.randomUUID(),baseRevision:first.revision}),e=>e.code==='CHECK_SHARE_GUARD_UNSUPPORTED');
+    const store=new CheckShareSync(second,sync,c=>({id:c.id}));
+    const guarded={...body,mutationId:crypto.randomUUID(),baseRevision:first.revision,checkSharePreconditions:[shareGuard(store.ownerSnapshot(f.user,'dinner'))]};
+    sync.requirePreconditions=false;
+    assert.throws(()=>sync.commit(f.user,guarded),e=>e.code==='PROTECTION_DISABLED');
+  } finally {second.close();}
 });
