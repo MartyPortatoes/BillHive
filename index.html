@@ -606,6 +606,7 @@ button{min-width:44px;min-height:44px;}
 </nav>
 
 <main>
+<div id="owner-sharing-attention" class="mode-edit-section" role="status" aria-live="polite" hidden></div>
 
 <!-- ════════════════ BILLS ════════════════ -->
 <div id="page-bills" class="page active">
@@ -957,6 +958,9 @@ button{min-width:44px;min-height:44px;}
 <script src="/data-contract.js"></script>
 <script src="/persistence.js"></script>
 <script src="/revision-client.js"></script>
+<script src="/check-claim-client.js"></script>
+<script src="/check-owner-client.js"></script>
+<script src="/check-owner-session.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
         integrity="sha512-SIMGYRUjwY8+gKg7nn9EItdD8LCADSDfJNutF9TPrvEo86sQmFMh6MyralfIyhADlajSxqc7G0gs7+MwWF/ogQ=="
         crossorigin="anonymous"></script>
@@ -1221,6 +1225,7 @@ function _initEvtFns() {
     setCheckCompleted, deleteCheck, renderChecks,
     createCheckShareWeb, refreshCheckShareWeb, revokeCheckShareWeb,
     copyCheckShareURL, openCheckShareURL, pullCheckClaims,
+    openOwnerSharingRecovery, reopenCheckSharing, retryCheckSharing, dismissCheckSharing, exportCheckSharing,
     addTrip, updateTripField, updateTripDate,
     addTripMemberFromSelect, addTripMemberFromPerson,
     addAllTripHousehold, addTripMemberByName, removeTripMember,
@@ -1301,6 +1306,8 @@ let _loaded = false;
 let _editVersion = 0;
 let _stateDirty = false;
 let _revisionSync = false;
+let _ownerSharingSupported = false;
+let _accountChanged = false;
 const revisionClient = new RevisionClient(async request => {
   const response = await fetch(`${API}/sync/commit`, {method:'POST', headers:{'Content-Type':'application/json','X-BillHive-User':_currentUser},body:JSON.stringify(request)});
   if (!response.ok) {
@@ -1412,6 +1419,18 @@ function normalizePaymentTrackingState() {
   if (changed) save();
 }
 
+async function requireAccountReload() {
+  _loaded = false;
+  _accountChanged = true;
+  await ownerSharing.hydrate(null);
+  document.getElementById('app').hidden = true;
+  document.getElementById('connection-panel').hidden = false;
+  document.getElementById('connection-message').textContent = 'The signed-in account changed. Reload to open the current account. Saved check-sharing actions remain attached to their original account.';
+  document.getElementById('session-form').hidden = true;
+  document.getElementById('retry-load').textContent = 'Reload for changed account';
+  throw new Error('The signed-in account changed. Reload the page to continue.');
+}
+
 async function load() {
   const version = _editVersion;
   const healthRes = await fetch(`${API}/health`);
@@ -1426,17 +1445,13 @@ async function load() {
   let parsed, months, snapshot = null;
   if (health.capabilities?.syncProtocol === 1) {
     snapshot = await checked(await fetch(`${API}/sync/snapshot`));
-    if (snapshot.userId !== health.user) throw new Error('The signed-in account changed. Reload before saving.');
+    if (snapshot.userId !== health.user) await requireAccountReload();
     parsed = BHData.state(snapshot.state); months = BHData.months(snapshot.monthly);
   } else {
     const [stateRes, monthsRes] = await Promise.all([fetch(`${API}/state`),fetch(`${API}/months`)]);
     parsed = BHData.state(await checked(stateRes)); months = BHData.months(await checked(monthsRes));
   }
-  if (_loaded && health.user !== _currentUser) {
-    _loaded = false;
-    document.getElementById('app').hidden = true;
-    throw new Error('The signed-in account changed. Reload the page to continue.');
-  }
+  if (_loaded && health.user !== _currentUser) await requireAccountReload();
   if (version !== _editVersion || _stateDirty || writer.dirty) return false;
   if (_loaded && isEditing()) { _pendingReload = true; return false; }
   if (snapshot) revisionClient.load(snapshot);
@@ -1445,6 +1460,8 @@ async function load() {
   S.settings = {...emptyState().settings, ...parsed.settings};
   _currFmt = null; _currentUser = health.user; _loaded = true;
   document.getElementById('currentUser').textContent = _currentUser;
+  _ownerSharingSupported = health.capabilities?.checkShareProtocol === 1;
+  await ownerSharing.hydrate(_ownerSharingSupported ? snapshot : null);
   return true;
 }
 
@@ -1500,6 +1517,7 @@ function isEditing() {
   return ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) || document.getElementById('app').inert;
 }
 async function _reloadFromServer() {
+  if (_accountChanged) return;
   if (_reloading) return;
   if (isEditing()) { _pendingReload = true; return; }
   if (_stateDirty || writer.dirty) { _pendingReload = true; return; }
@@ -1757,7 +1775,58 @@ function personSelectOptions(selectedId, excludeLinkedIds = new Set()) {
     .map(p => `<option value="${esc(p.id)}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name || p.id)}</option>`)
     .join('');
 }
-const checkShareCache = {};
+const checkShareCache = Object.create(null);
+const ownerSharing = new BillHiveCheckOwnerSession({
+  owner: () => _loaded && _ownerSharingSupported ? revisionClient.baseline : null,
+  beforeAction: async () => {
+    await flushPending();
+    await _reloadFromServer();
+    if (!_loaded || _stateDirty || writer.dirty || isEditing()) throw new Error('Finish saving your household edits before changing sharing.');
+  },
+  confirm: (kind, snapshot) => new Promise(resolve => {
+    const name = findCheck(snapshot.checkId)?.name || snapshot.checkId;
+    const message = kind === 'dismiss' ? `Clear the rejected sharing action for “${name}”? It was not applied. Your other saved records stay available.` :
+      kind === 'rotate' ? `Replace the link for “${name}”? The previous link will stop working and its guest selections will no longer be on the new link.` :
+      `Stop sharing “${name}”? Guests will no longer be able to open this link.`;
+    showConfirm(message, resolve, {okLabel:kind === 'dismiss' ? 'Clear rejected action' : kind === 'rotate' ? 'Replace link' : 'Revoke link',danger:kind !== 'dismiss'});
+  }),
+  changed: () => {
+    for (const id of Object.keys(checkShareCache)) delete checkShareCache[id];
+    for (const [id, client] of ownerSharing.clients) {
+      const snapshot = client.row?.snapshot;
+      if (snapshot?.share) checkShareCache[id] = {...snapshot.share,url:snapshot.shareUrl || ''};
+    }
+    renderOwnerSharingAttention();
+    if (document.getElementById('page-checks')?.classList.contains('active') && !isEditing()) renderChecks();
+  }
+});
+function renderOwnerSharingAttention() {
+  const element = document.getElementById('owner-sharing-attention');
+  if (!element) return;
+  const attention = ownerSharing.listing.filter(row => row.pendingKind || row.error);
+  element.hidden = !ownerSharing.listError && !attention.length;
+  const html = `<div class="mode-toolbar-copy">${esc(ownerSharing.listError || `${attention.length} saved check-sharing action${attention.length === 1 ? '' : 's'} need attention.`)}</div>
+    <button class="btn btn-ghost btn-sm" data-click="openOwnerSharingRecovery()">Review saved sharing</button>`;
+  if (element.innerHTML !== html) element.innerHTML = html;
+}
+function openOwnerSharingRecovery() {
+  document.querySelector('.tab[data-page="checks"]')?.click();
+  document.getElementById('owner-sharing-recovery')?.scrollIntoView({block:'start'});
+}
+function reopenCheckSharing(id) { return ownerSharing.open(id); }
+function retryCheckSharing(id) { return ownerSharing.retry(id); }
+function dismissCheckSharing(id) { return ownerSharing.dismiss(id); }
+function exportCheckSharing(id) { return ownerSharing.export(id, text => {
+  const url = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+  const link = document.createElement('a'); link.href = url; link.download = 'check-sharing-recovery.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+}); }
+function renderOwnerSharingRecovery() {
+  const rows = ownerSharing.listing.filter(row => row.pendingKind || row.error || row.hasLink && !findCheck(row.checkId));
+  if (!rows.length && !ownerSharing.listError) return '';
+  return `<section id="owner-sharing-recovery" class="mode-card" aria-label="Saved check-sharing actions"><div class="mode-card-head"><h2>Saved sharing actions</h2></div>
+    ${ownerSharing.listError ? `<p class="mode-toolbar-copy">${esc(ownerSharing.listError)}</p>` : ''}
+    ${rows.map(row => row.checkId ? `<div class="mode-body"><h3>${esc(findCheck(row.checkId)?.name || `Removed check · ${row.checkId}`)}</h3>${renderCheckShareSection({id:row.checkId},true)}</div>` : `<p>${esc(row.error)}</p>`).join('')}</section>`;
+}
 const tripInviteCache = {};
 function formatEpochSeconds(value) {
   const n = Number(value);
@@ -2081,78 +2150,18 @@ function latestClaimsByName(claims) {
   });
   return [...byName.values()].sort((a, b) => String(a.claimerName).localeCompare(String(b.claimerName)));
 }
-function applyCheckShareInfo(checkId, info) {
-  const check = findCheck(checkId);
-  if (!check || !info) return;
-  check.shareToken = info.token || '';
-  check.shareURL = info.url || '';
-  check.shareBackend = 'server';
-  checkShareCache[checkId] = info;
+function createCheckShareWeb(checkId, rotate = false) { return ownerSharing.change(checkId, rotate ? 'rotate' : 'create'); }
+function refreshCheckShareWeb(checkId) { return ownerSharing.refresh(checkId); }
+function revokeCheckShareWeb(checkId) { return ownerSharing.change(checkId, 'revoke'); }
+async function copyCheckShareURL(checkId) {
+  if (!await ownerSharing.refresh(checkId)) return;
+  const view = ownerSharing.view(checkId);
+  await copyText(view.row?.snapshot?.shareUrl || '', 'Share link');
 }
-async function createCheckShareWeb(checkId, rotate = false) {
-  try {
-    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}${rotate ? '?rotate=1' : ''}`, { method: 'POST' });
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    const info = await res.json();
-    applyCheckShareInfo(checkId, info);
-    renderChecks();
-    save();
-    toast(rotate ? 'Share link rotated' : 'Share link ready');
-  } catch (e) {
-    toast('Share failed: ' + e.message);
-  }
-}
-async function refreshCheckShareWeb(checkId) {
-  try {
-    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}`);
-    if (res.status === 404) {
-      delete checkShareCache[checkId];
-      const check = findCheck(checkId);
-      if (check) {
-        check.shareToken = '';
-        check.shareURL = '';
-        check.shareBackend = '';
-      }
-      renderChecks();
-      save();
-      toast('No active share link');
-      return;
-    }
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    const info = await res.json();
-    applyCheckShareInfo(checkId, info);
-    renderChecks();
-    save();
-    toast('Claims refreshed');
-  } catch (e) {
-    toast('Refresh failed: ' + e.message);
-  }
-}
-async function revokeCheckShareWeb(checkId) {
-  try {
-    const res = await fetch(`${API}/share/check/${encodeURIComponent(checkId)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-    delete checkShareCache[checkId];
-    const check = findCheck(checkId);
-    if (check) {
-      check.shareToken = '';
-      check.shareURL = '';
-      check.shareBackend = '';
-    }
-    renderChecks();
-    save();
-    toast('Share link revoked');
-  } catch (e) {
-    toast('Revoke failed: ' + e.message);
-  }
-}
-function copyCheckShareURL(checkId) {
-  const check = findCheck(checkId);
-  copyText(check?.shareURL || checkShareCache[checkId]?.url || '', 'Share link');
-}
-function openCheckShareURL(checkId) {
-  const check = findCheck(checkId);
-  const url = check?.shareURL || checkShareCache[checkId]?.url || '';
+async function openCheckShareURL(checkId) {
+  if (!await ownerSharing.refresh(checkId)) return;
+  const view = ownerSharing.view(checkId);
+  const url = view.row?.snapshot?.shareUrl;
   if (url) window.open(url, '_blank', 'noopener');
 }
 function pullCheckClaims(checkId) {
@@ -2181,51 +2190,41 @@ function pullCheckClaims(checkId) {
   save();
   toast(added ? `Claims pulled (${added} new participant${added === 1 ? '' : 's'})` : 'Claims pulled');
 }
-function renderCheckShareSection(check) {
-  const info = checkShareCache[check.id];
-  const claims = latestClaimsByName(info?.claims || []);
-  const shareURL = check.shareURL || info?.url || '';
-  const claimRows = claims.length ? `
-    <div class="mode-section-title" style="margin-top:10px;">Claims</div>
-    ${claims.map(claim => `<div class="mode-row">
-      <div>
-        <div class="mode-row-name">${esc(claim.claimerName)}</div>
-        <div class="mode-row-sub">${asList(claim.itemIds).length || 'Joined'} ${asList(claim.itemIds).length === 1 ? 'item' : 'items'}${claim.claimedAt ? ' · ' + esc(shortDate(claim.claimedAt)) : ''}</div>
-      </div>
-      <div class="mode-row-val">${asList(claim.itemIds).length || ''}</div>
-    </div>`).join('')}
-  ` : '';
-
-  if (!shareURL) {
-    return `<div class="mode-edit-section">
-      <div class="mode-section-title">Share Link</div>
-      <div class="mode-toolbar-copy">Create a no-account claim link so guests can choose the items they had. Pull claims back into this check when they are done.</div>
-      <div class="mode-actions" style="margin-top:8px;">
-        <button class="btn btn-ghost btn-xs" data-click="refreshCheckShareWeb('${check.id}')">Refresh</button>
-        <button class="btn btn-green btn-xs" data-click="createCheckShareWeb('${check.id}')">Generate Share Link</button>
-      </div>
-    </div>`;
-  }
-
-  return `<div class="mode-edit-section">
-    <div class="mode-section-title">Share Link</div>
-    <div class="mode-row">
-      <div>
-        <div class="mode-row-name">Active claim link</div>
-        <div class="mode-row-sub">${esc(shareURL)}${info?.createdAt ? ' · created ' + esc(formatEpochSeconds(info.createdAt)) : ''}</div>
-      </div>
-      <span class="mode-chip good">${claims.length ? `${claims.length} claim${claims.length === 1 ? '' : 's'}` : 'Active'}</span>
-    </div>
+function renderCheckShareSection(check, recovery = false) {
+  const view = ownerSharing.view(check.id), snapshot = view.row?.snapshot;
+  const pending = view.row?.pending, unknown = pending && !pending.rejection;
+  const action = pending ? JSON.parse(pending.payload).kind : view.entry?.pendingKind;
+  const blocked = view.busy || pending || !!view.entry?.error || !snapshot?.revisionPreconditionsRequired;
+  const link = snapshot?.shareUrl || '';
+  const claims = asList(snapshot?.share?.claims);
+  const claimRows = claims.map(claim => `<div class="mode-row"><div><div class="mode-row-name">${esc(claim.claimerName)}</div><div class="mode-row-sub">${esc(claim.claimantId?.slice(-8) || 'Earlier selection')} · ${claim.itemIds.length} selected items</div></div></div>`).join('');
+  const arg = esc(JSON.stringify(check.id));
+  const button = (label, fn, blocked = view.busy, style = 'btn-ghost') => `<button type="button" class="btn ${style} btn-xs" ${blocked ? 'disabled' : ''} data-click="${fn}(${arg})">${label}</button>`;
+  const description = !view.available ? 'This server needs protected check-sharing support before links can be managed here.' :
+    !snapshot ? 'Open saved details or refresh to load the current link. Saved actions stay available across browser restarts.' :
+    !snapshot.checkExists ? 'This check was removed. Resolve any saved link action or export its recovery copy.' :
+    snapshot.isCompleted ? 'Completed check. An existing link can be viewed or revoked; reopen the check to create or replace it.' :
+    !snapshot.revisionPreconditionsRequired ? 'Enable server revision protection before changing links.' :
+    'Guests choose items for host review. Link actions do not change financial assignments.';
+  return `<section class="mode-edit-section owner-check-sharing" data-owner-check="${esc(check.id)}" aria-label="Check sharing">
+    <div class="mode-section-title">${recovery ? 'Saved sharing' : 'Share Link'}</div>
+    <p class="mode-toolbar-copy">${esc(description)}</p>
+    ${view.message ? `<p role="status" class="mode-toolbar-copy owner-share-message">${esc(view.message)}</p>` : ''}
+    ${action ? `<p class="mode-toolbar-copy owner-share-pending">Saved ${esc(action)} action: ${pending?.rejection || view.entry?.rejected ? 'not applied; review before clearing' : 'awaiting confirmation; retry sends the original request'}.</p>` : ''}
+    ${link ? `<p class="mode-toolbar-copy owner-share-url" style="overflow-wrap:anywhere">Last loaded active link: ${esc(link)}</p>` : snapshot ? '<p class="mode-toolbar-copy">No active public link loaded.</p>' : ''}
     <div class="mode-actions" style="margin-top:10px;">
-      <button class="btn btn-ghost btn-xs" data-click="copyCheckShareURL('${check.id}')">Copy</button>
-      <button class="btn btn-ghost btn-xs" data-click="openCheckShareURL('${check.id}')">Open</button>
-      <button class="btn btn-ghost btn-xs" data-click="refreshCheckShareWeb('${check.id}')">Refresh Claims</button>
-      <button class="btn btn-green btn-xs" ${claims.length ? '' : 'disabled'} data-click="pullCheckClaims('${check.id}')">Pull Claims</button>
-      <button class="btn btn-ghost btn-xs" data-click="createCheckShareWeb('${check.id}',true)">Rotate</button>
-      <button class="btn btn-danger btn-xs" data-click="revokeCheckShareWeb('${check.id}')">Revoke</button>
+      ${button('Refresh', 'refreshCheckShareWeb',view.busy || !view.available)}
+      ${button('Reopen saved action','reopenCheckSharing',view.busy || !view.available)}
+      ${unknown ? button('Retry saved action','retryCheckSharing',view.busy,'btn-green') : ''}
+      ${pending?.rejection ? button('Clear rejected action','dismissCheckSharing') : ''}
+      ${view.row ? button('Export recovery copy','exportCheckSharing') : ''}
+      ${link ? button('Copy link','copyCheckShareURL',view.busy || !!pending) + button('Open link','openCheckShareURL',view.busy || !!pending) : ''}
+      ${!snapshot?.share && !action && !recovery ? button('Generate Share Link','createCheckShareWeb',view.busy || !view.available || !!view.entry?.error || !!snapshot && blocked || !!snapshot?.isCompleted || snapshot?.checkExists === false,'btn-green') : ''}
+      ${snapshot?.share ? `<button type="button" class="btn btn-ghost btn-xs" ${blocked || snapshot.isCompleted ? 'disabled' : ''} data-click="createCheckShareWeb(${arg},true)">Replace link</button>` + button('Revoke link','revokeCheckShareWeb',blocked,'btn-danger') : ''}
+      ${claims.length && !recovery ? button('Pull Claims','pullCheckClaims',view.busy || !!pending || !!snapshot?.isCompleted,'btn-green') : ''}
     </div>
-    ${claimRows}
-  </div>`;
+    ${claims.length ? '<div class="mode-section-title" style="margin-top:12px;">Guest selections</div>' + claimRows : ''}
+  </section>`;
 }
 function renderCheckAssigneeChips(check, item) {
   const explicit = asList(item.sharedByParticipantIds);
@@ -2335,7 +2334,7 @@ function renderChecks() {
   });
   updateTabBadge();
 
-  const toolbar = `<div class="mode-toolbar">
+  const toolbar = renderOwnerSharingRecovery() + `<div class="mode-toolbar">
     <div class="mode-toolbar-copy">Add people and receipt items, split the cost, and track who has paid.</div>
     <button class="btn btn-green btn-sm" data-click="addCheck()">+ Add Check</button>
   </div>`;
@@ -2384,7 +2383,7 @@ function renderChecks() {
       `${checkItems(check).length} item${checkItems(check).length === 1 ? '' : 's'}`,
       `${participants.length} participant${participants.length === 1 ? '' : 's'}`
     ].filter(Boolean);
-    const shareChip = (check.shareURL || check.shareToken) ? `<span class="mode-chip">Shared</span>` : '';
+    const shareChip = ownerSharing.view(check.id).row?.snapshot?.share ? `<span class="mode-chip">Shared</span>` : '';
     const statusChip = check.isCompleted ? `<span class="mode-chip good">Completed</span>` : `<span class="mode-chip warn">Open</span>`;
     return `<div class="mode-card ${check.isCompleted ? 'is-completed' : ''}">
       <div class="mode-card-head">
@@ -5554,6 +5553,7 @@ function toast(msg) {
 //   5. recalcAll() computes summary, send/receive, and persists the month snapshot
 //   6. Open SSE connection for real-time sync with other tabs/devices
 async function init() {
+  if (_accountChanged) { location.reload(); return; }
   const now = new Date();
   document.getElementById('monthSel').value = now.getMonth();
   document.getElementById('yearSel').value = now.getFullYear();
@@ -5676,7 +5676,8 @@ function _modalOk() {
 function _modalCancel() {
   document.getElementById('modal-overlay').style.display = 'none';
   restoreDialogFocus();
-  _modalCb = null;
+  const cb = _modalCb; _modalCb = null;
+  if (_modalMode === 'confirm' && cb) cb(false);
 }
 
 document.querySelectorAll('.setting-group-header').forEach(header => {

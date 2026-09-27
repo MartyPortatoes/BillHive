@@ -1,11 +1,10 @@
 # Browser owner check-link journal
 
 `public/check-owner-client.js` implements the owner protocol and IndexedDB journal
-for protected create/rotate/revoke actions. It is verified as a data module;
-**the existing controls in `index.html` are not connected to it yet**. The full
-browser owner migration still requires that integration, recovery navigation and
-guarded host review of guest declarations. No legacy feature was disabled or
-replaced with a placeholder in this checkpoint.
+for protected create/rotate/revoke actions. `check-owner-session.js` now connects
+the actual owner controls to the journal. Startup attention and Checks recovery
+retain unfinished actions, including removed checks. Guarded host review of guest
+declarations and reviewed deletion remain required for the full browser migration.
 
 ## Contract
 
@@ -44,20 +43,25 @@ metadata, but exclude user names, link tokens, public URLs and guest declaration
 The browser's private IndexedDB retains link data under its origin; this is not
 an Android Keystore encryption claim or a cross-browser credential-transfer flow.
 
-## Remaining integration
+## Owner controls
 
-1. Load the module in the owner application and bind it to the validated owner
-   snapshot. Reconcile household saves before preparing new link actions.
-2. Replace legacy link POST/GET/DELETE calls and stop copying link metadata into
-   the financial household document. Show the journal's current validated link.
-3. Confirm replacement/revocation against freshly reviewed state. Present saved
-   retry, definite rejection, recovery export and corrupt-record outcomes.
-4. Surface pending actions on startup and for checks removed from the ordinary
-   list; maintain account isolation during reload and authentication changes.
-5. Replace name-based Pull Claims with explicit claimant mapping, provenance,
-   split preview and an atomic household/share revision guard. This remains
-   required, not replaced by a disabled control or warning.
-6. Verify actual owner UI, process recovery, large text, keyboard behavior and
-   mixed-client flows before enabling strict protection in a deployment.
+New link actions flush household edits, refresh the signed-in household and load
+matching sharing state. Replacement/revocation confirmation requires an unchanged
+fresh comparison. Cancellation resolves without preparing a request. Copy/Open
+refresh first and use only the current validated public URL. Link metadata no
+longer gets written into the financial household document.
+
+Unknown outcomes expose exact retry; definite rejections require explicit clearing.
+Reopen, sanitized export and unreadable-record recovery remain available after
+reload. Changing accounts hides the old household and presents an explicit reload
+control; original saved actions stay bound to their original account.
+
+Guest declarations are displayed independently, including identical names. The
+legacy **Pull Claims** application is still name-based and must be replaced with
+explicit claimant mapping, provenance, split preview and an atomic household/share
+revision guard. Reviewed browser deletion and Swift migration are also still open.
+No deployment enforcement is enabled at this checkpoint.
 
 See [journal verification](evidence/browser-owner-check-links/verification.md).
+See [actual control verification](evidence/browser-owner-check-ui/verification.md)
+for process recovery, phone layout checks and remaining acceptance limits.

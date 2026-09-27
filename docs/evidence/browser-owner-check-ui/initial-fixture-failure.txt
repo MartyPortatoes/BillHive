@@ -1,0 +1,37 @@
+Error: SyntaxError: Unexpected token ':'
+    at CDP.evaluate (file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-owner-ui.mjs:46:178)
+    at async file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-owner-ui.mjs:145:3
+{
+  "failures": [],
+  "body": "SelfHive\nBILLS · CHECKS · TRIPS\nSaved\nowner-ui-test\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nBills\n0/0\nSummary\nPay & Collect\nChecks\n1\nTrips\n0\nTrends\nSettings\n1 saved check-sharing action need attention.\nReview saved sharing\nChecks\nCreate, split, and collect restaurant checks synced with SelfHive.\nSaved sharing actions\nDinner with a descriptive name\nSAVED SHARING\n\nOpen saved details or refresh to load the current link. Saved actions stay available across browser restarts.\n\nSaved sharing details could not be opened. The original record is kept.\n\nRefresh\nReopen saved action\nAdd people and receipt items, split the cost, and track who has paid.\n+ Add Check\nTOTAL CHECKS\n1\nOPEN\n1\nGRAND TOTAL\n€15.00\n🍽️ Dinner with a descriptive name\nOPEN\nSep 27, 2026 · 1 item · 1 participant\n€15.00\nComplete\nDelete\nICON\nNAME\nDATE\nTAX\nTIP\nDISCOUNT\nSERVICE FEE\nNOTES\nSHARE LINK\n\nOpen saved details or refresh to load the current link. Saved actions stay available across browser restarts.\n\nSaved sharing details could not be opened. The original record is kept.\n\nRefresh\nReopen saved action\nGenerate Share Link\nPARTICIPANTS\nHost\nGuest · €15.00\nRequested\nMark Paid\n✕\nAdd household member\nHost\nAdd\nAdd Everyone\n+ Name\nITEMS\nEveryone\nHost\n✕\n+ Add Item\nSPLIT SUMMARY\nHost OPEN\n12.00 subtotal share\n€15.00",
+  "state": {
+    "busy": null,
+    "message": "Saved sharing details could not be opened. The original record is kept.",
+    "inert": false,
+    "editing": false,
+    "focus": "<body>\n<section id=\"connection-panel\" class=\"card auth-panel\" hidden=\"\">\n<h1>Connect to SelfHive</h1><p id=\"connection-message\" role=\"alert\"></p>\n<form id=\"session-form\" hidden=\"\"><label for=\"session-key\">Device API key</label><input id=\"session-key\" type=\"password\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"bh_live_…\"><button class=\"btn btn-green\" type=\"submit\">Connect securely</button></form>\n<button id=\"retry-load\" class=\"btn btn-ghost\" type=\"button\">Retry connection</button></section",
+    "pending": false,
+    "buttons": [
+      {
+        "text": "Refresh",
+        "disabled": false
+      },
+      {
+        "text": "Reopen saved action",
+        "disabled": false
+      },
+      {
+        "text": "Refresh",
+        "disabled": false
+      },
+      {
+        "text": "Reopen saved action",
+        "disabled": false
+      },
+      {
+        "text": "Generate Share Link",
+        "disabled": true
+      }
+    ]
+  }
+}

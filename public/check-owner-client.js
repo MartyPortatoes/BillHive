@@ -121,6 +121,10 @@
       this.store=store;this.crypto=crypto;this.transport=transport||new Transport({binding:this.binding,apiBase});this.row=null;
     }
     validate(row) {
+      try { return this.validateRecord(row); }
+      catch { throw new Error('Saved sharing details could not be opened. The original record is kept.'); }
+    }
+    validateRecord(row) {
       requireValue(object(row)&&row.version===1&&row.scope===this.scope&&row.checkId===this.binding.checkId&&revision(row.generation),'Saved sharing details could not be opened. The original record is kept.');
       if(row.snapshot)validateSnapshot(row.snapshot,this.binding);
       if(row.pending){const p=row.pending,r=requestValue(p.payload,this.binding);
