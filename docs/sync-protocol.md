@@ -165,8 +165,10 @@ strict rollout.
 
 Separate check-share/claim rows, invitation metadata, attachment bytes,
 authentication/device keys and email configuration are **outside this JSON
-revision stream**. Their concurrency, ownership and lifecycle contracts remain
-separate unfinished work. In particular, don't describe this as complete
+revision stream**. The [Checks sharing protocol](check-sharing-protocol.md) now
+gives share links and claims their own revisions, receipts and deletion lifecycle;
+client UI/journals and rollout remain open. Other separate-resource contracts
+remain unfinished work. In particular, don't describe this as complete
 server-wide mutation coverage. See the [route inventory](mutation-coverage.md).
 
 ## Rollout and rollback

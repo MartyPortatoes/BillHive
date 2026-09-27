@@ -1,0 +1,14 @@
+{
+  "check-share-store.js": "0b13ab69d007d4fa81bb502204bcd0e3547386f92809800c149c034e3771d812",
+  "server.js": "33104aa0e74457f25c8d164453a46047c231d1fc6cab0fb819c931a8a33644c1",
+  "Dockerfile": "706959cebab1519e4cd0d9ca18b159f0c707357e2f4001816e5d40ebda348aa9",
+  "sync-store.js": "83667a5ca9e7240239377a6e9f769f7fbb5b13d3111b61c3732a8fed97c3fe05",
+  "public/data-contract.js": "52a5e90d4d65085df454b70a7d48353f8e6bea282558a04e5696af8fd0c9451d",
+  "test/check-sharing.test.js": "31c1470c2c3daeaef6657e224f9652f055971abdbfb6f4dbb51d73ca532736b3",
+  "test/sync.test.js": "bd4e3bc14ab8c4aee4d3267a697372097209a756a50541b3f4d6e492c9e4cf27",
+  "test/security.test.js": "56d47b5d2ea1857d99443a3ce0f7a2b25f222382d4e85fd7564600de91b8310c",
+  "test/attachments.test.js": "e2d041f6adada0dbe4ff00e4a895f367b00499eceb83b8cd2febf4169eb54f2b",
+  "test/bill-months.test.js": "b9e283e72534595d738c2a1e63367542266ba0dc6ac4ecdcad397b144048c482",
+  "package.json": "ba3d57e28afa041c76536a793ffdc9fb2f240aac7efdca9b73d3223cba4c3050",
+  "package-lock.json": "f664ea0a71e3c8289adf8d3980d80869faae6a4feed93b4ab3ba01b9fe46e4a4"
+}

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="staged bytes are immutable, retryable and hidden until an atomic reference commit" time="0.214937" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="unready or altered references reject and roll back the complete owner or legacy JSON write" time="0.027845" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="pinned identity, parent lifecycle, content digest and namespace are enforced" time="0.026717" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="Apple download routes read managed files but cannot overwrite or delete their bytes" time="0.017683" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="receipt JPEG policy and upload bounds reject invalid bytes" time="0.029453" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="SQLite reopen retains byte identity and an aborted reference transaction retains staged content" time="0.029629" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="unmanaged legacy and opaque future descriptors survive unrelated owner saves" time="0.010639" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="restore stages into an absent archived parent then atomically replaces records and history" time="0.021275" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="restore preflight and staging pin the household and require an unchanged review" time="0.010675" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="restore preflight rejects malformed references and immutable collisions before publication" time="0.011974" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="restore requires explicit removed keys and months and accepts records larger than the legacy 2 MiB limit" time="0.064166" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="records-only restore can reuse retained managed bytes and preserves honest legacy references" time="0.009269" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="restore enforces protection and accounts for retained storage before and during staging" time="0.005596" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/attachments.test.js"/>
+	<testcase name="carry-forward protects zero totals and zero active or retired share amounts" time="0.003033" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="carry-forward copies zero and all source lines across January once, preserving metadata" time="0.001386" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="fixed-only zero source fills an empty share map without inventing a total" time="0.000610" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="empty or disabled sources do not create or persist an empty destination month" time="0.001605" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="only the preceding calendar month supplies carry-forward" time="0.000682" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="a destination with omitted totals or amounts accepts the corresponding source fields" time="0.000556" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/bill-months.test.js"/>
+	<testcase name="check sharing advertises capability and projects only public metadata, including correct currency" time="0.201723" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="exact owner replay survives newer rotation without reactivating the original bearer link" time="0.020539" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="different guests with the same display name remain distinct; update and withdrawal preserve the other guest" time="0.023241" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="simultaneous guests cannot overwrite each other; loser refreshes and retains both declarations" time="0.014390" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="household edits invalidate guest and owner commands; completed checks remain readable but reject writes" time="0.050947" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="revoke acknowledges an already committed guest request without exposing current data" time="0.027968" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="check deletion atomically revokes links; restoring the same check ID cannot resurrect them" time="0.013707" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="legacy writers require matching resource ETags in strict mode and participate in the same revision stream" time="0.013197" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="malformed requests, unsafe identifiers and mismatched route identities are rejected without writes" time="0.016591" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="receipt failure rolls back claim bytes, rotation and all resource revisions together" time="0.012280" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="stored legacy claims and unknown fields survive updates; corrupt state and capacity fail without data loss" time="0.023993" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="receipts and revisions survive database reopen; legacy non-strict writes advance native snapshots" time="0.015239" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="simultaneous rotations issue one new active token and revision exhaustion rolls back all changes" time="0.009991" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="upgrade revokes orphaned legacy tokens and preserves active legacy claims" time="0.002271" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/check-sharing.test.js"/>
+	<testcase name="authentication cannot be bypassed by requesting HTML, including public pages" time="0.359868" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="current proxy account overrides stale cookie; public requests do not receive host sessions" time="0.003810" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="cross-origin browser writes are rejected, same-origin and native writes work" time="0.003172" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="malformed imports fail atomically; native references and unknown state fields survive" time="0.006731" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="uploads cannot execute in the app origin, alias traversal paths, or leak across users" time="0.004396" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="CSP only authorizes known inline scripts; private responses are not cached" time="0.002781" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="shared contract rejects unsafe keys, malformed nested state, and allows payment addresses" time="0.000478" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="serial writer preserves immutable snapshots and keeps failed writes dirty for retry" time="0.000432" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="email sanitization preserves layout but strips active attributes; SMTP verifies TLS" time="0.026491" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="a browser with unsaved edits cannot write into a switched proxy account" time="0.001723" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="bill editor escapes synchronized names and descriptions in HTML attributes" time="0.001376" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="clear setup revokes shares atomically and preserves the advertised history and other users" time="0.013665" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="corrupt persisted records fail closed instead of exporting a partial backup" time="0.006416" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="web appearance preferences survive native state writes" time="0.002936" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="other proxy accounts cannot change server-wide authentication policy" time="0.001786" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="compatibility mode keeps older clients working but refuses clients requiring global revision protection" time="0.005561" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/security.test.js"/>
+	<testcase name="atomic snapshot and commit preserve unknown keys, write state/months together and reject stale snapshots" time="0.189543" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest commits preserve host-only fields, return only public trip data and block stale owners" time="0.052143" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest lost-response replay survives intervening edits and database reopen without repeating a mutation" time="0.027697" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="revocation can acknowledge a prior guest request without revealing current trip data or permitting new writes" time="0.023500" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest identity, token receipts, archive and membership authorization cannot cross invitations" time="0.046666" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="invalid guest changes cannot replace attachments, add foreign members, or corrupt trip records" time="0.020442" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest data and receipt commit together, rolling both back if receipt persistence fails" time="0.011775" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest activity retains recent history, ignores no-op commands and cannot accept a forged actor" time="0.028928" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="lost-response retry is idempotent even after another commit; mutation-ID reuse cannot change data" time="0.008046" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="only one of two writers with the same baseline can commit" time="0.002828" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="validation and explicit deletion are atomic; omitted state/months are retained" time="0.010581" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="household identity and receipts are isolated by authenticated user" time="0.006114" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="every legacy JSON mutation requires a precondition in strict mode and advances the stream" time="0.032648" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="guest expense/delete/settlement writes share the owner revision and stale owner saves cannot erase them" time="0.011492" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="persisted corrupt snapshots are never replaced by a commit" time="0.002506" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="revisions and receipts survive reopen, detect writes from other connections and roll back at safe integer overflow" time="0.001883" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="web revision client retries the exact lost-response request before sending a newer immutable snapshot" time="0.004484" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="web replay after an intervening edit blocks newer stale writes without erasing the other device" time="0.004871" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<testcase name="web client validates receipts and only loads a new baseline when no outcome is uncertain" time="0.001123" classname="test" file="/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/sync.test.js"/>
+	<!-- tests 68 -->
+	<!-- suites 0 -->
+	<!-- pass 68 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 559.213208 -->
+</testsuites>

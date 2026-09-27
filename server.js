@@ -35,6 +35,7 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 const Data = require('./public/data-contract.js');
 const { SyncStore, SyncError } = require('./sync-store');
 const { GuestTripSync } = require('./guest-sync-store');
+const { CheckShareSync } = require('./check-share-store');
 const { AttachmentStore } = require('./attachment-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -172,6 +173,7 @@ db.exec(`
 
 const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
 const guestSync = new GuestTripSync(db, sync, publicTripShape);
+const checkSync = new CheckShareSync(db, sync, publicCheckShape);
 const attachments = new AttachmentStore(db, sync);
 sync.validateReferences = userId => attachments.validateReferences(userId);
 
@@ -199,13 +201,6 @@ const stmts = {
   // App settings
   getSetting: db.prepare('SELECT value FROM app_settings WHERE key = ?'),
   setSetting: db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)'),
-
-  // Check share links
-  findShareByToken:           db.prepare('SELECT * FROM share_checks WHERE token = ?'),
-  findActiveShareForCheck:    db.prepare('SELECT * FROM share_checks WHERE user_id = ? AND check_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1'),
-  insertShare:                db.prepare('INSERT INTO share_checks (token, user_id, check_id, claims) VALUES (?, ?, ?, ?)'),
-  setShareClaims:             db.prepare('UPDATE share_checks SET claims = ? WHERE token = ? AND revoked_at IS NULL'),
-  revokeSharesForCheck:       db.prepare('UPDATE share_checks SET revoked_at = unixepoch() WHERE user_id = ? AND check_id = ? AND revoked_at IS NULL'),
 
   // Trip invites
   findTripInviteByToken:      db.prepare('SELECT * FROM trip_invites WHERE token = ?'),
@@ -574,7 +569,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -589,15 +584,6 @@ app.get('/api/health', (req, res) => {
 // null if the user has no state, has no checks, or the requested check
 // doesn't exist. Used by the public read endpoint and the authed share
 // info endpoint.
-function getCheckFromState(userId, checkId) {
-  const row = stmts.getState.get(userId, 'checks');
-  if (!row) return null;
-  let checksState;
-  try { checksState = JSON.parse(row.value); } catch { return null; }
-  const list = (checksState && checksState.checks) || [];
-  return list.find(c => c.id === checkId) || null;
-}
-
 // Public-safe shape: keep item names + prices + name + date, drop any
 // payment / email metadata the host might add later. Participants list is
 // kept because the page shows who's already on the check, but their
@@ -624,63 +610,30 @@ function publicCheckShape(check) {
   };
 }
 
-// GET /public/share/check/:token — anonymous read of a shared check.
-app.get('/public/share/check/:token', publicLimiter, (req, res) => {
-  const share = stmts.findShareByToken.get(req.params.token);
-  if (!share) return res.status(404).json({ error: 'Share not found' });
-  if (share.revoked_at) return res.status(410).json({ error: 'This share link has been revoked' });
-
-  const check = getCheckFromState(share.user_id, share.check_id);
-  if (!check) return res.status(404).json({ error: 'Check not found' });
-
-  let claims = [];
-  try { claims = JSON.parse(share.claims); } catch {}
-
-  res.json({
-    check: publicCheckShape(check),
-    claims,
-    createdAt: share.created_at,
-  });
+// Public sharing never returns owner credentials or the private household document.
+app.get('/public/share/check/:token/sync/snapshot', publicLimiter, (req, res) => {
+  const snapshot = checkSync.publicSnapshot(req.params.token);
+  res.setHeader('ETag', checkSync.etag(snapshot)); res.json(snapshot);
+});
+app.post('/public/share/check/:token/sync/claim', publicLimiter, (req, res) => {
+  const result = checkSync.claimCommit(req.params.token, req.get('X-BillHive-Claimant-Key'), req.body,
+    {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
+  if (result.response.snapshot) res.setHeader('ETag', checkSync.etag(result.response.snapshot));
+  res.json(result.response);
+  if (!result.response.replayed) broadcastChange(result.userId);
 });
 
-// POST /public/share/check/:token/claim — anonymous claim of items.
-// Body: { claimerName: String, itemIds: [String] }. Appends a new claim
-// to the share's claims array. We don't deduplicate (a claimer can return
-// multiple times to adjust); the iOS app reconciles claims on read.
+// Legacy clients retain their response shape. Strict mode requires the sharing
+// ETag for writes; these old commands have no durable request receipt.
+app.get('/public/share/check/:token', publicLimiter, (req, res) => {
+  const snapshot = checkSync.publicSnapshot(req.params.token);
+  res.setHeader('ETag', checkSync.etag(snapshot));
+  res.json({check:snapshot.check,claims:snapshot.claims,createdAt:snapshot.createdAt,currencyCode:snapshot.currencyCode});
+});
 app.post('/public/share/check/:token/claim', publicLimiter, (req, res) => {
-  const share = stmts.findShareByToken.get(req.params.token);
-  if (!share) return res.status(404).json({ error: 'Share not found' });
-  if (share.revoked_at) return res.status(410).json({ error: 'This share link has been revoked' });
-
-  const body = req.body || {};
-  const claimerName = typeof body.claimerName === 'string' ? body.claimerName.trim() : '';
-  const itemIds = Array.isArray(body.itemIds)
-    ? body.itemIds.filter(x => typeof x === 'string').slice(0, 200)
-    : [];
-  if (!claimerName || claimerName.length > 80) {
-    return res.status(400).json({ error: 'claimerName is required (1–80 chars)' });
-  }
-
-  let claims = [];
-  try { claims = JSON.parse(share.claims); } catch {}
-
-  claims.push({
-    claimerName,
-    itemIds,
-    claimedAt: new Date().toISOString(),
-  });
-
-  // Cap total claims per share to prevent unbounded growth from abuse.
-  if (claims.length > 500) claims = claims.slice(-500);
-
-  stmts.setShareClaims.run(JSON.stringify(claims), req.params.token);
-
-  // Tell the host's open SSE clients to refresh — they'll re-fetch
-  // /api/share/check/:checkId and see the new claim. C.1 leaves the
-  // iOS app at "manual refresh"; C.2 will hook this up.
-  broadcastChange(share.user_id);
-
-  res.json({ ok: true });
+  const result = checkSync.claimLegacy(req.params.token, req.body, req.get('If-Match'));
+  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json({ok:true});
+  broadcastChange(result.userId);
 });
 
 // ── Trip invite public routes ────────────────────────────────────────────────
@@ -1258,57 +1211,36 @@ function publicBaseURL(req) {
 }
 
 function shareInfoResponse(share, req) {
-  let claims = [];
-  try { claims = JSON.parse(share.claims); } catch {}
-  return {
-    token: share.token,
-    url: `${publicBaseURL(req)}/share/${share.token}`,
-    createdAt: share.created_at,
-    claims,
-  };
+  return {...share,url:`${publicBaseURL(req)}/share/${share.token}`};
 }
 
-// POST /api/share/check/:checkId — create (or rotate) a share link.
-// If a non-revoked share already exists for this check, returns it
-// (idempotent for the simple case). Pass ?rotate=1 to force a new token
-// and revoke the previous one (useful if the user accidentally posted
-// the old link publicly).
+app.get('/api/share/check/:checkId/sync/snapshot', (req, res) => {
+  const snapshot = checkSync.ownerSnapshot(req.userId, req.params.checkId);
+  res.setHeader('ETag', checkSync.etag(snapshot)); res.json(snapshot);
+});
+app.post('/api/share/check/:checkId/sync/commit', (req, res) => {
+  const result = checkSync.ownerCommit(req.userId, req.params.checkId, req.body,
+    {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
+  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json(result);
+  if (!result.replayed) broadcastChange(req.userId);
+});
+
 app.post('/api/share/check/:checkId', (req, res) => {
-  const checkId = req.params.checkId;
-  if (!getCheckFromState(req.userId, checkId)) {
-    return res.status(404).json({ error: 'Check not found' });
-  }
-
-  const rotate = req.query.rotate === '1' || req.query.rotate === 'true';
-  if (!rotate) {
-    const existing = stmts.findActiveShareForCheck.get(req.userId, checkId);
-    if (existing) return res.json(shareInfoResponse(existing, req));
-  } else {
-    stmts.revokeSharesForCheck.run(req.userId, checkId);
-  }
-
-  const token = crypto.randomBytes(24).toString('base64url');
-  stmts.insertShare.run(token, req.userId, checkId, '[]');
-  const share = stmts.findShareByToken.get(token);
-  res.json(shareInfoResponse(share, req));
+  const kind = req.query.rotate === '1' || req.query.rotate === 'true' ? 'rotate' : 'create';
+  const result = checkSync.ownerLegacy(req.userId, req.params.checkId, kind, req.get('If-Match'));
+  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json(shareInfoResponse(result.snapshot.share, req));
+  broadcastChange(req.userId);
 });
-
-// GET /api/share/check/:checkId — fetch the current active share + claims.
-// 404 if there's no active share. Used by the iOS app to refresh claim
-// counts after the host receives the SSE "data-changed" event (C.2)
-// or via manual refresh (C.1).
 app.get('/api/share/check/:checkId', (req, res) => {
-  const share = stmts.findActiveShareForCheck.get(req.userId, req.params.checkId);
-  if (!share) return res.status(404).json({ error: 'No active share' });
-  res.json(shareInfoResponse(share, req));
+  const snapshot = checkSync.ownerSnapshot(req.userId, req.params.checkId);
+  res.setHeader('ETag', checkSync.etag(snapshot));
+  if (!snapshot.share) return res.status(404).json({error:'No active share'});
+  res.json(shareInfoResponse(snapshot.share, req));
 });
-
-// DELETE /api/share/check/:checkId — revoke any active share for this check.
-// All future reads of the token return 410 Gone. Claims are kept in the row
-// for audit but the link no longer works.
 app.delete('/api/share/check/:checkId', (req, res) => {
-  stmts.revokeSharesForCheck.run(req.userId, req.params.checkId);
-  res.json({ ok: true });
+  const result = checkSync.ownerLegacy(req.userId, req.params.checkId, 'revoke', req.get('If-Match'));
+  res.setHeader('ETag', checkSync.etag(result.snapshot)); res.json({ok:true});
+  broadcastChange(req.userId);
 });
 
 
