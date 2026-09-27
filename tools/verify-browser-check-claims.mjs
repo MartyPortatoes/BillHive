@@ -14,7 +14,7 @@ const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const chromePath=process.env.CHROME_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const output=path.resolve(process.env.CLAIM_EVIDENCE_DIR||path.join(root,'docs/evidence/browser-check-claims'));
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'billhive-browser-claims-'));
-let server,chrome,proxy,cdp,base,upstream,browserVersion,dropNext=false,dropPayload=null,requests=[],failures=[],passes=[],dialogs=[];
+let server,chrome,proxy,cdp,base,upstream,browserVersion,dropNext=false,dropPayload=null,requests=[],ownerRequests=[],failures=[],passes=[],dialogs=[];
 const check=(name,fn)=>{fn();passes.push(name);console.log('PASS '+name);};
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,message,timeout=15000) {
@@ -80,7 +80,13 @@ async function fixture(){
   const guest=async()=>{const s=await publicRead(),key=crypto.randomBytes(32).toString('hex');return json('/public/share/check/'+token+'/sync/claim',
     {serverInstanceId:s.serverInstanceId,householdId:s.householdId,checkId:s.checkId,shareId:s.shareId,claimantId:crypto.createHash('sha256').update('check-claimant\0'+token+'\0'+key).digest('hex'),baseRevision:s.revision,baseShareRevision:s.shareRevision,mutationId:crypto.randomUUID(),claim:{claimerName:'Alex',itemIds:['bread']}},
     {'X-BillHive-Claimant-Key':key,'X-BillHive-Require-Protection':'1'});};
-  return {state,write,link,token,publicRead,guest,household,url:base+'/hive/share/'+token+'/'};
+  return {state,write,link,token,publicRead,guest,household,user:headers['remote-user'],url:base+'/hive/share/'+token+'/'};
+}
+async function ownerProbe(tab,fixture,owner){
+  await cdp.evaluate(tab,`new Promise((resolve,reject)=>{if(window.BillHiveCheckOwner){resolve();return;}const script=document.createElement('script');script.src='/hive/check-owner-client.js';script.onload=resolve;script.onerror=()=>reject(Error('Owner client script failed'));document.head.append(script);})`);
+  await cdp.evaluate(tab,`(async()=>{const owner=${JSON.stringify(owner)};const transport=new BillHiveCheckOwner.Transport({binding:{...owner,checkId:'dinner'},apiBase:'/hive/api',
+    fetcher:(url,options)=>fetch(url,{...options,headers:{...options.headers,'remote-user':${JSON.stringify(fixture.user)}}})});
+    window.ownerProbe=new BillHiveCheckOwner.Client({owner,checkId:'dinner',apiBase:'/hive/api',transport});window.probeHousehold=owner;await window.ownerProbe.open();})()`);
 }
 const saved=tab=>cdp.evaluate(tab,`(async()=>{const path=location.pathname.match(/^(.*?)\\/share\\/([A-Za-z0-9_-]+)\\/?$/);const client=new BillHiveCheckClaims.Client({token:path[2],prefix:path[1]});await client.open();return {generation:client.row.generation,claimantId:client.row.claimantId,draft:client.row.draft,pending:client.row.pending,access:client.row.access,snapshot:client.row.snapshot};})()`);
 try {
@@ -91,10 +97,11 @@ try {
   proxy=http.createServer((req,res)=>{const chunks=[];req.on('data',c=>chunks.push(c));req.on('end',()=>{
     const body=Buffer.concat(chunks),route=req.url.replace(/^\/hive(?=\/)/,'');const claim=req.method==='POST'&&route.endsWith('/sync/claim');
     if(claim)requests.push({body:body.toString(),key:req.headers['x-billhive-claimant-key']});
+    if(req.method==='POST'&&/^\/api\/share\/check\/[^/]+\/sync\/commit$/.test(route))ownerRequests.push(body.toString());
     // Chrome can transparently retry a disconnected POST. Lose every response
     // for this exact mutation until the scenario explicitly restores the link.
     const drop=claim&&(dropNext||dropPayload===body.toString());if(drop){dropNext=false;dropPayload=body.toString();}
-    const forward=http.request(upstream+route,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+serverPort,'x-forwarded-for':'192.0.2.123'}},response=>{
+    const forward=http.request(upstream+route,{method:req.method,headers:{...req.headers,'x-forwarded-for':'192.0.2.123'}},response=>{
       if(drop){response.resume();response.once('end',()=>res.destroy());}
       else{res.writeHead(response.statusCode,response.headers);response.pipe(res);}
     });forward.on('error',()=>res.destroy());forward.end(body);
@@ -181,6 +188,31 @@ try {
   g.state.checks.checks[0].isCompleted=true;await g.write();await cdp.click(tab,'#refresh');await cdp.idle(tab);
   assert.equal(await cdp.evaluate(tab,"document.querySelector('#nameInput').disabled"),true);assert.equal(await cdp.evaluate(tab,"document.querySelector('#confirmBtn').disabled"),true);assert.deepEqual((await saved(tab)).draft.itemIds,['soup']);
   check('completed check becomes read-only while keeping its unfinished selection',()=>{});
+  // This exercises the new owner protocol/storage module directly. The legacy
+  // owner page controls are deliberately not claimed as migrated by this probe.
+  const h=await fixture(),household=await h.household();await ownerProbe(tab,h,household);
+  await cdp.evaluate(tab,"(async()=>{await ownerProbe.refresh(probeHousehold);await ownerProbe.prepare('rotate',ownerProbe.row.snapshot,probeHousehold);})()");
+  await h.guest();
+  const rejection=await cdp.evaluate(tab,"ownerProbe.submit().then(()=>null,error=>({code:error.code,message:error.message}))");assert.equal(rejection?.code,'SHARE_CONFLICT',JSON.stringify(rejection));
+  assert.equal(await cdp.evaluate(tab,"(async()=>(await ownerProbe.list())[0].rejected)()"),true);
+  await cdp.evaluate(tab,"(async()=>{await ownerProbe.refresh(probeHousehold);await ownerProbe.dismissRejected();await ownerProbe.prepare('rotate',ownerProbe.row.snapshot,probeHousehold);const send=ownerProbe.transport.send.bind(ownerProbe.transport);ownerProbe.transport.send=async payload=>{await send(payload);throw Error('Synthetic lost owner response');};try{await ownerProbe.submit();}catch{} })()");
+  const ownerPayload=await cdp.evaluate(tab,'ownerProbe.row.pending.payload');
+  const ownerCopy=await cdp.evaluate(tab,'ownerProbe.recovery()');assert.equal(ownerCopy.includes(h.token),false);assert.equal(ownerCopy.includes(h.user),false);
+  check('owner journal uses actual IndexedDB and strict HTTP; a guest change rejects an old link review',()=>{});
+  const newer=await h.link('rotate');cdp.socket.close();await stop(chrome,true);chrome=null;await launchChrome();tab=await cdp.tab(g.url);
+  await ownerProbe(tab,h,household);assert.equal(await cdp.evaluate(tab,'ownerProbe.row.pending.payload'),ownerPayload);
+  const acknowledged=await cdp.evaluate(tab,"(async()=>{const receipt=await ownerProbe.submit();return {replayed:receipt.replayed,resultToken:receipt.resultToken,currentToken:ownerProbe.row.snapshot.share.token,url:ownerProbe.row.snapshot.shareUrl,pending:ownerProbe.row.pending};})()");
+  assert.equal(acknowledged.replayed,true);assert.equal(acknowledged.pending,null);assert.equal(acknowledged.currentToken,newer.resultToken);assert.notEqual(acknowledged.resultToken,newer.resultToken);assert.equal(ownerRequests.at(-1),ownerPayload);
+  check('owner journal survives Chrome process loss and old replay retains the latest rotated link',()=>{});
+  const switched=await cdp.evaluate(tab,"(async()=>{await ownerProbe.prepare('revoke',ownerProbe.row.snapshot,probeHousehold);const saved=ownerProbe.transport.fetcher;ownerProbe.transport.fetcher=(url,options)=>fetch(url,{...options,headers:{...options.headers,'remote-user':'switched-owner'}});let failed=false;try{await ownerProbe.submit();}catch{failed=true;}const kept=ownerProbe.row.pending;ownerProbe.transport.fetcher=saved;return {failed,kept};})()");
+  assert.equal(switched.failed,true);assert.ok(switched.kept);assert.equal(switched.kept.rejection,null);
+  assert.equal((await json('/api/share/check/dinner/sync/snapshot',undefined,{'remote-user':'switched-owner'})).share,null);
+  assert.equal((await h.link('create')).resultToken,newer.resultToken);
+  await cdp.evaluate(tab,'ownerProbe.submit()');
+  check('proxy account switch cannot redirect a saved owner action into another household',()=>{});
+  const listing=await cdp.evaluate(tab,"(async()=>{await ownerProbe.prepare('revoke',ownerProbe.row.snapshot,probeHousehold);await ownerProbe.store.transact(ownerProbe.id,row=>{row.pending.payload='corrupt request';return row;});let rejected=false;try{await ownerProbe.open();}catch{rejected=true;}return {rejected,rows:await ownerProbe.list(),raw:(await ownerProbe.store.transact(ownerProbe.id,row=>row)).pending.payload};})()");
+  assert.equal(listing.rejected,true);assert.equal(listing.raw,'corrupt request');assert.equal(listing.rows.length,1);assert.ok(listing.rows[0].error);
+  check('owner recovery list preserves a corrupt pending record without replacing it',()=>{});
   assert.equal(failures.length,0,failures.join('\n'));
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({passed:passes.length,checks:passes,browser:browserVersion+' headless, isolated persistent profile',viewport:'390x844 phone; 1024x768 tablet',processLoss:'SIGKILL of owned Chrome process group; profile reopened',limits:'Doubled rendered text is injected for layout coverage, not an OS accessibility or physical-device certification.',runtimeErrors:failures},null,2)+'\n');
   console.log('All '+passes.length+' browser checks passed. Evidence: '+output);
