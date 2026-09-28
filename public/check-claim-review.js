@@ -164,5 +164,6 @@
     return {...view,proposal,after,changedBalances:changed,clearedPaid,clearedRequests,ready:true};
   }
   function confirmed(view,confirmPaymentResets=false){requireValue(view.ready&&view.proposal,'Review the selections before applying them.');requireValue(confirmPaymentResets||!view.clearedPaid.length&&!view.clearedRequests.length,'Confirm the payment statuses that will be cleared after these balance changes.');return copy(view.proposal);}
-  return {instant,sourceId,sources,validateSource,ledger,validatePlan,seed,breakdown,preview,confirmed};
+  function formatUnits(value,places,currency,locale){const units=BigInt(value),negative=units<0n,absolute=negative?-units:units,divisor=10n**BigInt(places),whole=new Intl.NumberFormat(locale).format(absolute/divisor),decimal=new Intl.NumberFormat(locale).formatToParts(1.1).find(p=>p.type==='decimal')?.value||'.';return `${currency} ${negative?'-':''}${whole}${places?decimal+String(absolute%divisor).padStart(places,'0'):''}`;}
+  return {instant,sourceId,sources,validateSource,ledger,validatePlan,seed,breakdown,preview,confirmed,formatUnits};
 });

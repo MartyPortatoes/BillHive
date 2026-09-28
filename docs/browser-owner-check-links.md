@@ -56,10 +56,11 @@ Reopen, sanitized export and unreadable-record recovery remain available after
 reload. Changing accounts hides the old household and presents an explicit reload
 control; original saved actions stay bound to their original account.
 
-Guest declarations are displayed independently, including identical names. The
-legacy **Pull Claims** application is still name-based and must be replaced with
-explicit claimant mapping, provenance, split preview and an atomic household/share
-revision guard. Reviewed browser deletion and Swift migration are also still open.
+Guest declarations are displayed independently, including identical names.
+**Review guest split** now provides explicit claimant mapping, provenance, split
+preview and an atomic household/share revision guard; see
+[host review](browser-host-check-review.md). Reviewed browser deletion and Swift
+sharing migration are still open.
 No deployment enforcement is enabled at this checkpoint.
 
 See [journal verification](evidence/browser-owner-check-links/verification.md).

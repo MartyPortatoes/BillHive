@@ -120,7 +120,7 @@ class SyncStore {
     return {...body, deleteStateKeys, deleteMonths};
   }
 
-  commit(userId, body) {
+  commit(userId, body, {requireProtection=false}={}) {
     const input = this.validateCommit(body);
     const hash = crypto.createHash('sha256').update(canonical(input)).digest('hex');
     return this.db.transaction(() => {
@@ -133,6 +133,9 @@ class SyncStore {
         if (receipt.request_hash !== hash) fail(409, 'MUTATION_ID_REUSED', 'This mutation ID was already used with different data.');
         return {...this.snapshotInside(userId), mutationId:input.mutationId, committedRevision:receipt.revision, replayed:true};
       }
+      // A persisted receipt acknowledges an earlier write even after protection
+      // is disabled. Only new requests depend on the current protection policy.
+      if (requireProtection && !this.requirePreconditions) fail(428, 'PROTECTION_DISABLED', 'Enable server revision protection before saving with this client.');
       if (input.baseRevision !== metadata.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Your edits were not applied.');
       // Shares advance independently of household JSON. Guard both streams while
       // holding the same write transaction, after exact-request receipt lookup.

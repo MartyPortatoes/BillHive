@@ -45,7 +45,7 @@
   class Transport extends Owner.Transport {
     constructor({binding,apiBase='/api',fetcher}){super({binding:{...binding,checkId:'review'},apiBase,fetcher});this.path=apiBase+'/';this.apiBase=apiBase;this.rejections=rejections;}
     async load(checkId){
-      const health=await this.request('health');requireValue(health.user===this.binding.userId,'Sign in to the original account to continue this review.');
+      const health=await this.request('health');if(health.user!==this.binding.userId)throw Object.assign(new Error('Sign in to the original account to continue this review.'),{code:'REVIEW_ACCOUNT_CHANGED'});
       const owner=ownerSnapshot(await this.request('sync/snapshot'),this.binding);
       const sharing=await new Owner.Transport({binding:{...this.binding,checkId},apiBase:this.apiBase,fetcher:this.fetcher}).load();
       return {owner,sharing,capabilities:health.capabilities};

@@ -1,0 +1,18 @@
+✔ ordered raw edits retain the newest name and discard late preview results (20.701583ms)
+✔ failed draft storage keeps raw input, export and explicit saved reload (1.599417ms)
+✔ changed current data opens a comparison and clears prior payment confirmation (1.651042ms)
+✔ a comparison that changes again cannot be adopted without another review (1.144917ms)
+✔ unknown saves retain exact retry and block ordinary saves across a fresh journal read (3.600458ms)
+✔ ordinary household save failure prevents new split preparation but cannot block exact retry (2.472791ms)
+✔ pending link action prevents a new review application (0.743417ms)
+✔ existing draft can reopen without network and removed or completed records stay recoverable (0.735417ms)
+✔ account changes while a request loads cannot prepare or publish into the new account (2.169625ms)
+✔ stale-tab storage conflict preserves on-screen raw choices until explicit reload (1.40025ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 72.883584

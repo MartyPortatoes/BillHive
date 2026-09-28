@@ -1,0 +1,19 @@
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(await cdp.evaluate(tab,'hostReview.preview'))
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:154:301
+{
+  "failures": [],
+  "state": {
+    "error": "",
+    "storageError": "",
+    "message": "Your choices are saved as you edit. Refresh checks for newer selections.",
+    "dirty": false,
+    "busy": false,
+    "calculating": false,
+    "comparison": false,
+    "activeId": null
+  },
+  "body": "SelfHive\nBILLS · CHECKS · TRIPS\nSaved\nowner-ui-test\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nFailed to fetch\nBills\n0/0\nSummary\nPay & Collect\nChecks\n1\nTrips\n0\nTrends\nSettings\nSaved guest split reviews\nDinner\nChecks\nCreate, split, and collect restaurant checks synced with SelfHive.\nAdd people and receipt items, split the cost, and track who has paid.\n+ Add Check\nTOTAL CHECKS\n1\nOPEN\n1\nGRAND TOTAL\n€15.00\n🍽️ Dinner\nOPEN\nSep 27, 2026 · 1 item · 5 participants\n€15.00\nComplete\nDelete\nICON\nNAME\nDATE\nTAX\nTIP\nDISCOUNT\nSERVICE FEE\nNOTES\nSHARE LINK\n\nOpen saved details or refresh to load the current link. Saved actions stay available across browser restarts.\n\nRefresh\nReopen saved action\nExport recovery copy\nGenerate Share Link\nReview guest split\nPARTICIPANTS\nHost\nGuest · EUR 0.00\nRequested\nMark Paid\n✕\nOther tab name\nGuest · EUR 0.00\nRequested\nMark Paid\n✕\nAlex\nGuest · EUR 5.00\nRequested\nMark Paid\n✕\nAlex\nGuest · EUR 5.00\nRequested\nMark Paid\n✕\nAlex\nGuest · EUR 5.00\nRequested\nMark Paid\n✕\nAdd household member\nHost\nAdd\nAdd Everyone\n+ Name\nITEMS\nEveryone\nHost\nOther tab name\nAlex\nAlex\nAlex\n✕\n+ Add Item\nSPLIT SUMMARY\nHost OPEN\nEUR 0.00 subtotal share\nEUR 0.00\nOther tab name OPEN\nEUR 0.00 subtotal share\nEUR 0.00\nAlex OPEN\nEUR 4.00 subtotal share\nEUR 5.00\nAlex OPEN\nEUR 4.00 subtotal share\nEUR 5.00\nAlex OPEN\nEUR 4.00 subtotal share\nEUR 5.00"
+}

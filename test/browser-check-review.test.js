@@ -70,3 +70,6 @@ test('claim order cannot move a remainder penny on repeated application',()=>{
   const f=fixtures.cases.find(f=>f.name==='stable penny recipient'),old=R.confirmed(R.preview(f.check,f.currency,f.sources,f.plan),true);
   assert.deepEqual(R.confirmed(R.preview(old,f.currency,[...f.sources].reverse(),R.seed(old)),true),old);
 });
+test('exact minor-unit labels preserve cents and four decimal places without Number conversion',()=>{
+  assert.equal(R.formatUnits('1',2,'USD','en-US'),'USD 0.01');assert.equal(R.formatUnits('10000000000000001',4,'CLF','en-US'),'CLF 1,000,000,000,000.0001');assert.equal(R.formatUnits('10001',3,'KWD','de-DE'),'KWD 10,001');
+});

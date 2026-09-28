@@ -1076,8 +1076,7 @@ app.get('/api/sync/snapshot', (req, res) => {
   res.json(snapshot);
 });
 app.post('/api/sync/commit', (req, res) => {
-  if (req.get('X-BillHive-Require-Protection') === '1' && !sync.requirePreconditions) throw new SyncError(428, 'PROTECTION_DISABLED', 'Enable server revision protection before saving with this client.');
-  const result = sync.commit(req.userId, req.body);
+  const result = sync.commit(req.userId, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
   res.setHeader('ETag', sync.etag(result));
   res.json(result);
   if (!result.replayed) broadcastChange(req.userId);

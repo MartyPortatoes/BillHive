@@ -1,0 +1,19 @@
+PASS actual owner Generate control creates a protected link without changing household data
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 2
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-owner-ui.mjs:99:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 2,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

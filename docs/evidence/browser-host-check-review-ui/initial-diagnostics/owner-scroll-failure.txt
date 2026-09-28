@@ -1,0 +1,52 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 2
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-owner-ui.mjs:99:10
+{
+  "failures": [],
+  "body": "SelfHive\nBILLS · CHECKS · TRIPS\nSaved\nowner-ui-test\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nBills\n0/0\nSummary\nPay & Collect\nChecks\n1\nTrips\n0\nTrends\nSettings\nChecks\nCreate, split, and collect restaurant checks synced with SelfHive.\nAdd people and receipt items, split the cost, and track who has paid.\n+ Add Check\nTOTAL CHECKS\n1\nOPEN\n1\nGRAND TOTAL\n€15.00\n🍽️ Dinner with a descriptive name\nOPEN\nSHARED\nSep 27, 2026 · 1 item · 1 participant\n€15.00\nComplete\nDelete\nICON\nNAME\nDATE\nTAX\nTIP\nDISCOUNT\nSERVICE FEE\nNOTES\nSHARE LINK\n\nGuests choose items for host review. Link actions do not change financial assignments.\n\nThe link action is confirmed. The current link is shown below.\n\nLast loaded active link: http://127.0.0.1:63028/share/ziC72vCFaw5LeTirqkUMrqMcrohncSOn\n\nRefresh\nReopen saved action\nExport recovery copy\nCopy link\nOpen link\nReplace link\nRevoke link\nReview guest split\nPARTICIPANTS\nHost\nGuest · EUR 15.00\nRequested\nMark Paid\n✕\nAdd household member\nHost\nAdd\nAdd Everyone\n+ Name\nITEMS\nEveryone\nHost\n✕\n+ Add Item\nSPLIT SUMMARY\nHost OPEN\nEUR 12.00 subtotal share\nEUR 15.00",
+  "state": {
+    "busy": null,
+    "message": "The link action is confirmed. The current link is shown below.",
+    "inert": false,
+    "editing": false,
+    "focus": "<body>\n<section id=\"connection-panel\" class=\"card auth-panel\" hidden=\"\">\n<h1>Connect to SelfHive</h1><p id=\"connection-message\" role=\"alert\"></p>\n<form id=\"session-form\" hidden=\"\"><label for=\"session-key\">Device API key</label><input id=\"session-key\" type=\"password\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"bh_live_…\"><button class=\"btn btn-green\" type=\"submit\">Connect securely</button></form>\n<button id=\"retry-load\" class=\"btn btn-ghost\" type=\"button\">Retry connection</button></section",
+    "pending": false,
+    "protected": true,
+    "buttons": [
+      {
+        "text": "Refresh",
+        "disabled": false
+      },
+      {
+        "text": "Reopen saved action",
+        "disabled": false
+      },
+      {
+        "text": "Export recovery copy",
+        "disabled": false
+      },
+      {
+        "text": "Copy link",
+        "disabled": false
+      },
+      {
+        "text": "Open link",
+        "disabled": false
+      },
+      {
+        "text": "Replace link",
+        "disabled": false
+      },
+      {
+        "text": "Revoke link",
+        "disabled": false
+      },
+      {
+        "text": "Review guest split",
+        "disabled": false
+      }
+    ]
+  }
+}

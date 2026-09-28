@@ -1,0 +1,27 @@
+PASS rapid manual checkbox edits preserve every choice before asynchronous previews finish
+PASS actual host controls explicitly map same-name guests, preserve raw names and preview manual shares and payment resets
+PASS startup recovery reopens raw host choices after actual browser process loss
+PASS failed local storage preserves visible raw choices and downloadable recovery until explicit reload
+PASS two browser tabs cannot silently overwrite each other’s host-review choices
+PASS keyboard navigation and space toggles retain focus through review rerenders
+PASS changed selections require visible comparison before and after a definite server rejection
+PASS lost-response retry survives restart, applies once and preserves unrelated unsaved ordinary edits
+PASS withdrawal keeps prior charges until the owner explicitly reviews and applies the empty selection
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(await cdp.evaluate(tab,'hostReview.preview'))
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:154:301 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: null,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

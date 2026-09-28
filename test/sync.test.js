@@ -335,6 +335,33 @@ test('revisions and receipts survive reopen, detect writes from other connection
 });
 
 const RevisionClient = require('../public/revision-client');
+test('owner HTTP receipt replay survives a protection-policy change while new protected writes stay blocked',async()=>{
+  const headers={'remote-user':'protection-replay','X-BillHive-Require-Protection':'1'};
+  const first=(await snapshot(headers)).data;
+  const body=commitBody(first,{state:{settings:{currencyCode:'USD'}}});
+  const saved=await (await commit(body,headers)).json();
+  const newer=await (await commit(commitBody(saved,{state:{people:[{id:'later',name:'Later edit'}]}}),headers)).json();
+  const socket=net.createServer();await new Promise(resolve=>socket.listen(0,'127.0.0.1',resolve));
+  const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
+  const unprotected=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,
+    HOST:'127.0.0.1',PORT:String(port),DB_PATH:path.join(dir,'test.db'),TRUST_PROXY:'0',TRUSTED_AUTH_HEADERS:'remote-user',SYNC_REQUIRE_PRECONDITIONS:'0'},stdio:['ignore','pipe','pipe']});
+  try{
+    await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Policy-change fixture did not start')),10000);
+      unprotected.stdout.on('data',chunk=>{if(String(chunk).includes('running on')){clearTimeout(timer);resolve();}});
+      unprotected.once('exit',code=>{clearTimeout(timer);reject(new Error('Policy-change fixture exited '+code));});});
+    const send=(payload,identity=headers)=>fetch(`http://127.0.0.1:${port}/api/sync/commit`,{method:'POST',headers:{'content-type':'application/json',...identity},body:JSON.stringify(payload)});
+    const replay=await send(body);assert.equal(replay.status,200);const receipt=await replay.json();
+    assert.equal(receipt.replayed,true);assert.equal(receipt.committedRevision,saved.committedRevision);
+    assert.equal(receipt.revision,newer.revision);assert.deepEqual(receipt.state.people,newer.state.people);
+    const reused=await send({...body,state:{settings:{currencyCode:'JPY'}}});
+    assert.equal(reused.status,409);assert.equal((await reused.json()).code,'MUTATION_ID_REUSED');
+    const other=await send(body,{...headers,'remote-user':'another-policy-account'});
+    assert.equal(other.status,409);assert.equal((await other.json()).code,'HOUSEHOLD_CHANGED');
+    const fresh=await send(commitBody(newer,{state:{settings:{currencyCode:'EUR'}}}));
+    assert.equal(fresh.status,428);assert.equal((await fresh.json()).code,'PROTECTION_DISABLED');
+    assert.deepEqual((await snapshot(headers)).data,resultWithoutReceipt(newer));
+  }finally{if(unprotected.exitCode===null&&unprotected.signalCode===null){const done=new Promise(resolve=>unprotected.once('exit',resolve));unprotected.kill();await done;}}
+});
 test('web revision client retries the exact lost-response request before sending a newer immutable snapshot',async()=>{
   const headers={'remote-user':'web-retry'};
   const initial=(await snapshot(headers)).data;let loseResponse=true;const sent=[];
