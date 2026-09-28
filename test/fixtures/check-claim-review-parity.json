@@ -1,0 +1,842 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "freeze everyone before new guest",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "9",
+            "sharedByParticipantIds": []
+          },
+          {
+            "id": "tea",
+            "name": "Tea",
+            "price": "3",
+            "sharedByParticipantIds": [
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "c",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": [
+          {
+            "id": "c",
+            "name": " Alex ",
+            "linkedPersonId": null
+          }
+        ]
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "600",
+          "b": "300",
+          "c": "300"
+        },
+        "grandTotal": "1200",
+        "assignments": {
+          "meal": [
+            "a",
+            "b",
+            "c"
+          ],
+          "tea": [
+            "a"
+          ]
+        },
+        "clearedPaid": [
+          "a",
+          "b"
+        ],
+        "clearedRequests": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "same names map independently",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "9",
+            "sharedByParticipantIds": []
+          },
+          {
+            "id": "tea",
+            "name": "Tea",
+            "price": "3",
+            "sharedByParticipantIds": [
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        },
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "c",
+            "acceptRemovedItems": false
+          },
+          "c01321e9e435b7f5f40bb931d2b79ab95eecb2c1ee4fd6c6e0a390320a5d9ba3": {
+            "action": "APPLY",
+            "participantId": "d",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {
+          "meal": []
+        },
+        "newParticipants": [
+          {
+            "id": "c",
+            "name": "Alex"
+          },
+          {
+            "id": "d",
+            "name": "Alex"
+          }
+        ]
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816",
+        "c01321e9e435b7f5f40bb931d2b79ab95eecb2c1ee4fd6c6e0a390320a5d9ba3"
+      ],
+      "expected": {
+        "totals": {
+          "a": "300",
+          "b": "0",
+          "c": "450",
+          "d": "450"
+        },
+        "grandTotal": "1200",
+        "assignments": {
+          "meal": [
+            "c",
+            "d"
+          ],
+          "tea": [
+            "a"
+          ]
+        },
+        "clearedPaid": [
+          "a",
+          "b"
+        ],
+        "clearedRequests": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "manual overlap",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "9",
+            "sharedByParticipantIds": []
+          },
+          {
+            "id": "tea",
+            "name": "Tea",
+            "price": "3",
+            "sharedByParticipantIds": [
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "750",
+          "b": "450"
+        },
+        "grandTotal": "1200",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ],
+          "tea": [
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "stable penny recipient",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Tiny",
+            "price": "0.01",
+            "sharedByParticipantIds": [
+              "b",
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        },
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          },
+          "c01321e9e435b7f5f40bb931d2b79ab95eecb2c1ee4fd6c6e0a390320a5d9ba3": {
+            "action": "APPLY",
+            "participantId": "b",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {
+          "meal": []
+        },
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816",
+        "c01321e9e435b7f5f40bb931d2b79ab95eecb2c1ee4fd6c6e0a390320a5d9ba3"
+      ],
+      "expected": {
+        "totals": {
+          "a": "0",
+          "b": "1"
+        },
+        "grandTotal": "1",
+        "assignments": {
+          "meal": [
+            "b",
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "currency JPY",
+      "currency": "JPY",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Rounded",
+            "price": "10.5",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "paidParticipantIds": [],
+        "paymentRequestDates": {},
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "6",
+          "b": "5"
+        },
+        "grandTotal": "11",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "currency KWD",
+      "currency": "KWD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Rounded",
+            "price": "10.001",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "paidParticipantIds": [],
+        "paymentRequestDates": {},
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "5001",
+          "b": "5000"
+        },
+        "grandTotal": "10001",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "bounded credits and adjustments",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "9",
+            "sharedByParticipantIds": []
+          },
+          {
+            "id": "tea",
+            "name": "Tea",
+            "price": "3",
+            "sharedByParticipantIds": [
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        },
+        "discountAmount": "100",
+        "taxAmount": "1",
+        "tipAmount": "2"
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "187",
+          "b": "113"
+        },
+        "grandTotal": "300",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ],
+          "tea": [
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "legacy identical occurrences",
+      "currency": "USD",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "9",
+            "sharedByParticipantIds": []
+          },
+          {
+            "id": "tea",
+            "name": "Tea",
+            "price": "3",
+            "sharedByParticipantIds": [
+              "a"
+            ]
+          }
+        ],
+        "paidParticipantIds": [
+          "a",
+          "b"
+        ],
+        "paymentRequestDates": {
+          "a": "first",
+          "b": "second"
+        },
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": null,
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        },
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": null,
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 1
+        }
+      ],
+      "plan": {
+        "choices": {
+          "521f4099092e644b01d112c78d649d6c73d6a7681ae46d8ece7393fe1107ac12": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          },
+          "cff7882c772fe1f52eb8046353e02d4892597b591800e4d5270e83216712c443": {
+            "action": "APPLY",
+            "participantId": "b",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "521f4099092e644b01d112c78d649d6c73d6a7681ae46d8ece7393fe1107ac12",
+        "cff7882c772fe1f52eb8046353e02d4892597b591800e4d5270e83216712c443"
+      ],
+      "expected": {
+        "totals": {
+          "a": "750",
+          "b": "450"
+        },
+        "grandTotal": "1200",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ],
+          "tea": [
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "four decimal currency allocation bound",
+      "currency": "CLF",
+      "check": {
+        "id": "dinner",
+        "name": "Dinner",
+        "participants": [
+          {
+            "id": "a",
+            "name": "Alex"
+          },
+          {
+            "id": "b",
+            "name": "Blair"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Rounded",
+            "price": "200000000",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "paidParticipantIds": [],
+        "paymentRequestDates": {},
+        "notes": "Keep notes",
+        "futureField": {
+          "kept": true
+        }
+      },
+      "sources": [
+        {
+          "shareId": "1111111111111111111111111111111111111111111111111111111111111111",
+          "claimantId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Alex",
+          "itemIds": [
+            "meal"
+          ],
+          "claimedAt": "2026-09-27T12:00:00Z",
+          "legacyOccurrence": 0
+        }
+      ],
+      "plan": {
+        "choices": {
+          "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816": {
+            "action": "APPLY",
+            "participantId": "a",
+            "acceptRemovedItems": false
+          }
+        },
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "sourceIds": [
+        "c3454a9b930c254d78847a2e79760e5569649d95fb0d048702bbffbad721e816"
+      ],
+      "expected": {
+        "totals": {
+          "a": "1000000000000",
+          "b": "1000000000000"
+        },
+        "grandTotal": "2000000000000",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    }
+  ]
+}

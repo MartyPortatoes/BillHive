@@ -1,0 +1,96 @@
+{
+  "format": "billhive-host-check-review-recovery",
+  "version": 1,
+  "checkId": "dinner",
+  "serverInstanceId": "b22ca974-9f66-4d27-ab28-6974d323e1cb",
+  "householdId": "9614a1f7ed91b1fc445ccd6a6664df44",
+  "revision": 5,
+  "currency": "EUR",
+  "guard": {
+    "checkId": "dinner",
+    "shareId": "3fd59d3c92de54b45164093d803e7829385d9f26b2520d766514179ed08e347c",
+    "shareRevision": 3
+  },
+  "check": {
+    "id": "dinner",
+    "name": "Dinner",
+    "isCompleted": false,
+    "participants": [
+      {
+        "id": "host",
+        "name": "Host",
+        "linkedPersonId": null
+      }
+    ],
+    "items": [
+      {
+        "id": "soup",
+        "name": "Soup",
+        "price": 12,
+        "sharedByParticipantIds": [
+          "host"
+        ]
+      }
+    ],
+    "claimApplications": null,
+    "taxAmount": 1,
+    "tipAmount": 2,
+    "discountAmount": 0,
+    "compAmount": 0,
+    "serviceFeeAmount": 0
+  },
+  "sources": [
+    {
+      "shareId": "3fd59d3c92de54b45164093d803e7829385d9f26b2520d766514179ed08e347c",
+      "claimantId": "1ba8f921e0ec0e5dbf1ee6f1d05e700f84f2975749a5d68105a15be3be9da2f3",
+      "name": "Alex",
+      "itemIds": [
+        "soup"
+      ],
+      "claimedAt": "2026-09-28T00:08:17Z",
+      "legacyOccurrence": 0
+    },
+    {
+      "shareId": "3fd59d3c92de54b45164093d803e7829385d9f26b2520d766514179ed08e347c",
+      "claimantId": "f1443f6cd296c4f130a060a163f12a60e0a27ff2210ed61118e938b3a70f9131",
+      "name": "Alex",
+      "itemIds": [
+        "soup"
+      ],
+      "claimedAt": "2026-09-28T00:08:18Z",
+      "legacyOccurrence": 0
+    }
+  ],
+  "retainedSources": [],
+  "savedPlan": {
+    "choices": {
+      "6b6e3f656718028070e5039d2b990f6029a03e613cbdc56dd13f758ce679fd93": {
+        "action": "APPLY",
+        "participantId": "guest-1"
+      },
+      "f9254aadb18d6e6743ac962f7de5b6670189c404f6eaf4d135b7170a33115ab8": {
+        "action": "APPLY",
+        "participantId": "guest-2"
+      }
+    },
+    "manualByItem": {},
+    "newParticipants": [
+      {
+        "id": "guest-1",
+        "name": "Alex",
+        "linkedPersonId": null
+      },
+      {
+        "id": "guest-2",
+        "name": "Alex",
+        "linkedPersonId": null
+      }
+    ]
+  },
+  "workingPlan": null,
+  "pending": {
+    "mutationId": "claim-apply-74ffd3703e4d6cf41bf65b49adeaf9c2c33b58ceaf4a4261",
+    "requestHash": "68e0a2c06d9a2fb8c31b7bcffef224f17343144a42206d9cd2d9bbb0253b81a1",
+    "rejection": null
+  }
+}

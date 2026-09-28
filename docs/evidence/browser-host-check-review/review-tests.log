@@ -1,0 +1,27 @@
+✔ shared Android/browser fixture: freeze everyone before new guest (22.165834ms)
+✔ shared Android/browser fixture: same names map independently (2.776875ms)
+✔ shared Android/browser fixture: manual overlap (0.395167ms)
+✔ shared Android/browser fixture: stable penny recipient (0.582583ms)
+✔ shared Android/browser fixture: currency JPY (0.2965ms)
+✔ shared Android/browser fixture: currency KWD (0.192041ms)
+✔ shared Android/browser fixture: bounded credits and adjustments (0.22425ms)
+✔ shared Android/browser fixture: legacy identical occurrences (0.254917ms)
+✔ names never map automatically; payment reset confirmation is mandatory (0.825041ms)
+✔ withdrawal retains overlapping manual and other-guest contributions (0.946334ms)
+✔ withdrawal cannot turn an empty explicit split into everyone (0.381916ms)
+✔ new rotated identities need choices while prior contributions persist (0.654833ms)
+✔ changed manual assignments and removed participants require scoped review (2.06275ms)
+✔ removed selected items need acknowledgement and cannot return through stale provenance (0.454917ms)
+✔ legacy names and occurrences use separate identities, native renames do not (0.219834ms)
+✔ unsupported or forged provenance cannot erase manual assignments (0.302458ms)
+✔ linked people and unused additions are explicitly validated (0.329333ms)
+✔ money stays exact across tiny values, adjustment ties and large four-decimal amounts (0.145833ms)
+✔ claim order cannot move a remainder penny on repeated application (0.350334ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86.898417

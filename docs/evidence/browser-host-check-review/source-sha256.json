@@ -1,0 +1,11 @@
+{
+  "public/check-claim-review.js": "1bc8ecff2284468b7844f126e8d428bbd938bcebadc962b752723eec27152d78",
+  "public/check-review-client.js": "6b45b81b50ee529dedbc0fbb44ea6851616db0a6a6ce758accbc490b32b2600d",
+  "public/check-owner-client.js": "94e8573584120b3cb8e5eb078e09d2aa180612459111ee8b1abcbdda4996fc81",
+  "test/browser-check-review.test.js": "cd58ee62fb3d9336574ccb1bf828c4846c393e8c0aa0ba9afa4ad9358f3c7ea2",
+  "test/browser-check-review-client.test.js": "5b739e5cc24df9ca5816abd0fdabec82bca594f4bba8c448f505202e5f5a78e5",
+  "test/fixtures/check-claim-review-parity.json": "9bf5da8a20a4ab66a9333ac7eb154b00f54702d3f6f46cb49e766559811f8f09",
+  "tools/verify-browser-host-review.mjs": "a4bbe9da1c903ccbe3e42cc9234336cfaa1961b9aedd5b2756a60a5788c3a963",
+  "../Android_App/core/domain/src/test/resources/check-claim-review-parity.json": "9bf5da8a20a4ab66a9333ac7eb154b00f54702d3f6f46cb49e766559811f8f09",
+  "../Android_App/core/domain/src/test/kotlin/com/billhive/domain/BrowserCheckReviewParityTest.kt": "f38dcc0eaf72e9bcf9b364d159079a0402bba8215360139820feaec52369d60c"
+}

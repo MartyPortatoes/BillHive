@@ -88,7 +88,7 @@
     constructor({binding,apiBase='/api',fetcher=globalThis.fetch.bind(globalThis)}) {
       account(binding);requireValue(identifier(binding.checkId),'Invalid check identity.');
       requireValue(/^\/(?:[A-Za-z0-9._~-]+\/)*api$/.test(apiBase)&&!apiBase.split('/').some(v=>v==='.'||v==='..'),'Invalid server API path.');
-      this.binding=clone(binding);this.path=apiBase+'/share/check/'+encodeURIComponent(binding.checkId)+'/sync/';this.fetcher=fetcher;
+      this.binding=clone(binding);this.path=apiBase+'/share/check/'+encodeURIComponent(binding.checkId)+'/sync/';this.fetcher=fetcher;this.rejections=rejected;
     }
     async request(path,payload) {
       const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
@@ -105,7 +105,7 @@
         let body;try{body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{throw new Error('The sharing response was unreadable. Your saved action is kept.');}
         if(!response.ok) {
           const error=new Error(response.status===401?'Sign in to the same account before retrying this sharing action.':'The sharing action could not be confirmed. Your saved request is kept.');
-          if([400,404,409,428].includes(response.status)&&rejected.includes(body?.code))error.code=body.code;throw error;
+          if([400,404,409,428].includes(response.status)&&this.rejections.includes(body?.code))error.code=body.code;throw error;
         }
         return body;
       }finally{clearTimeout(timer);}
