@@ -1,0 +1,121 @@
+✔ shared Android/browser fixture: freeze everyone before new guest (18.94075ms)
+✔ shared Android/browser fixture: same names map independently (1.269333ms)
+✔ shared Android/browser fixture: manual overlap (0.328292ms)
+✔ shared Android/browser fixture: stable penny recipient (0.431791ms)
+✔ shared Android/browser fixture: currency JPY (0.177167ms)
+✔ shared Android/browser fixture: currency KWD (0.166083ms)
+✔ shared Android/browser fixture: bounded credits and adjustments (0.221125ms)
+✔ shared Android/browser fixture: legacy identical occurrences (0.2055ms)
+✔ shared Android/browser fixture: four decimal currency allocation bound (0.157167ms)
+✖ shared Android/browser fixture: maximum USD receipt has valid minor-unit weights (0.766083ms)
+✖ shared Android/browser fixture: large CLF receipt keeps the last minor unit (0.14375ms)
+✖ shared Android/browser fixture: large CLF positive adjustment tie (0.120916ms)
+✖ shared Android/browser fixture: large CLF credit adjustment tie (0.124458ms)
+✔ names never map automatically; payment reset confirmation is mandatory (0.492042ms)
+✔ withdrawal retains overlapping manual and other-guest contributions (0.644583ms)
+✔ withdrawal cannot turn an empty explicit split into everyone (0.314167ms)
+✔ new rotated identities need choices while prior contributions persist (0.6125ms)
+✔ changed manual assignments and removed participants require scoped review (0.405666ms)
+✔ removed selected items need acknowledgement and cannot return through stale provenance (0.405667ms)
+✔ legacy names and occurrences use separate identities, native renames do not (0.193834ms)
+✔ unsupported or forged provenance cannot erase manual assignments (0.256708ms)
+✔ linked people and unused additions are explicitly validated (0.249292ms)
+✔ money stays exact across tiny values, adjustment ties and large four-decimal amounts (0.121416ms)
+✔ claim order cannot move a remainder penny on repeated application (0.416917ms)
+✔ exact minor-unit labels preserve cents and four decimal places without Number conversion (2.799292ms)
+✔ receipt totals use exact half-up currency units before participants exist (0.188291ms)
+✔ ordinary page resolves automatic currency consistently with sharing regardless of device locale (1.693667ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 23
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 67.190166
+
+✖ failing tests:
+
+test at test/browser-check-review.test.js:7:31
+✖ shared Android/browser fixture: maximum USD receipt has valid minor-unit weights (0.766083ms)
+  AssertionError [ERR_ASSERTION]: [{"subject":"amounts","message":"Split weights are out of range."}]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/browser-check-review.test.js:9:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/browser-check-review.test.js:7:31
+✖ shared Android/browser fixture: large CLF receipt keeps the last minor unit (0.14375ms)
+  AssertionError [ERR_ASSERTION]: [{"subject":"amounts","message":"Split weights are out of range."}]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/browser-check-review.test.js:9:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/browser-check-review.test.js:7:31
+✖ shared Android/browser fixture: large CLF positive adjustment tie (0.120916ms)
+  AssertionError [ERR_ASSERTION]: [{"subject":"amounts","message":"Split weights are out of range."}]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/browser-check-review.test.js:9:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/browser-check-review.test.js:7:31
+✖ shared Android/browser fixture: large CLF credit adjustment tie (0.124458ms)
+  AssertionError [ERR_ASSERTION]: [{"subject":"amounts","message":"Split weights are out of range."}]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/Users/mportelos/Documents/GitHub/BillHive/Web_App/test/browser-check-review.test.js:9:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

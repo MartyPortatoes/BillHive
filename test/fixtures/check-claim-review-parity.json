@@ -837,6 +837,197 @@
         "clearedPaid": [],
         "clearedRequests": []
       }
+    },
+    {
+      "name": "maximum USD receipt has valid minor-unit weights",
+      "currency": "USD",
+      "check": {
+        "id": "large",
+        "name": "Large receipt",
+        "participants": [
+          {
+            "id": "a",
+            "name": "A"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "1000000000000",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "paidParticipantIds": [],
+        "paymentRequestDates": {}
+      },
+      "sources": [],
+      "sourceIds": [],
+      "plan": {
+        "choices": {},
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "expected": {
+        "totals": {
+          "a": "100000000000000"
+        },
+        "grandTotal": "100000000000000",
+        "assignments": {
+          "meal": [
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "large CLF receipt keeps the last minor unit",
+      "currency": "CLF",
+      "check": {
+        "id": "large",
+        "name": "Large receipt",
+        "participants": [
+          {
+            "id": "a",
+            "name": "A"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "999999999999",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "taxAmount": "0.0003",
+        "paidParticipantIds": [],
+        "paymentRequestDates": {}
+      },
+      "sources": [],
+      "sourceIds": [],
+      "plan": {
+        "choices": {},
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "expected": {
+        "totals": {
+          "a": "9999999999990003"
+        },
+        "grandTotal": "9999999999990003",
+        "assignments": {
+          "meal": [
+            "a"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "large CLF positive adjustment tie",
+      "currency": "CLF",
+      "check": {
+        "id": "large",
+        "name": "Large receipt",
+        "participants": [
+          {
+            "id": "a",
+            "name": "A"
+          },
+          {
+            "id": "b",
+            "name": "B"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "999999999999",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "taxAmount": "0.0001",
+        "paidParticipantIds": [],
+        "paymentRequestDates": {}
+      },
+      "sources": [],
+      "sourceIds": [],
+      "plan": {
+        "choices": {},
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "expected": {
+        "totals": {
+          "a": "4999999999995001",
+          "b": "4999999999995000"
+        },
+        "grandTotal": "9999999999990001",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
+    },
+    {
+      "name": "large CLF credit adjustment tie",
+      "currency": "CLF",
+      "check": {
+        "id": "large",
+        "name": "Large receipt",
+        "participants": [
+          {
+            "id": "a",
+            "name": "A"
+          },
+          {
+            "id": "b",
+            "name": "B"
+          }
+        ],
+        "items": [
+          {
+            "id": "meal",
+            "name": "Meal",
+            "price": "999999999999",
+            "sharedByParticipantIds": []
+          }
+        ],
+        "discountAmount": "0.0003",
+        "paidParticipantIds": [],
+        "paymentRequestDates": {}
+      },
+      "sources": [],
+      "sourceIds": [],
+      "plan": {
+        "choices": {},
+        "manualByItem": {},
+        "newParticipants": []
+      },
+      "expected": {
+        "totals": {
+          "a": "4999999999994998",
+          "b": "4999999999994999"
+        },
+        "grandTotal": "9999999999989997",
+        "assignments": {
+          "meal": [
+            "a",
+            "b"
+          ]
+        },
+        "clearedPaid": [],
+        "clearedRequests": []
+      }
     }
   ]
 }

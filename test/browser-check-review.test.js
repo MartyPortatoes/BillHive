@@ -63,7 +63,7 @@ test('money stays exact across tiny values, adjustment ties and large four-decim
   const c={...base,items:[{id:'meal',price:'0.005',sharedByParticipantIds:[]}]};assert.equal(R.breakdown(c).grandTotal,'1');
   c.items[0].price='0.0000000000000000001';assert.equal(R.breakdown(c).grandTotal,'0');
   c.items[0].price='200000000';assert.equal(R.breakdown(c,'CLF').grandTotal,'2000000000000');
-  c.items[0].price='200000000.0001';assert.throws(()=>R.breakdown(c,'CLF'),/out of range/);
+  c.items[0].price='200000000.0001';assert.equal(R.breakdown(c,'CLF').grandTotal,'2000000000001');
   c.items[0].price='1000000000000';c.taxAmount='1';assert.throws(()=>R.breakdown(c),/out of range/);c.items[0].price=-1;assert.throws(()=>R.breakdown(c));
 });
 test('claim order cannot move a remainder penny on repeated application',()=>{

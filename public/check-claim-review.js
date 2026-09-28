@@ -83,7 +83,7 @@
     requireValue(ids(keys),'Duplicate or invalid split participants.');
     if(!keys.length){requireValue(total===0n,'Assign a participant before splitting this item.');return {};}
     const sign=total<0n?-1n:1n,magnitude=total*sign,values=keys.map(k=>weights?.[k]||0n),sum=values.reduce((a,b)=>a+b,0n);
-    requireValue(values.every(v=>v>=0n&&v<=1000000000000n),'Split weights are out of range.');
+    requireValue(values.every(v=>v>=0n&&v<=9223372036854775807n),'Split weights are out of range.');
     if(sum===0n)return Object.fromEntries(keys.map((k,i)=>[k,sign*(magnitude/BigInt(keys.length)+(BigInt(i)<magnitude%BigInt(keys.length)?1n:0n))]));
     const bases=values.map(v=>v*magnitude/sum),remainders=values.map(v=>v*magnitude%sum);
     const remaining=Number(magnitude-bases.reduce((a,b)=>a+b,0n));

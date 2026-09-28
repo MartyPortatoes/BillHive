@@ -1,0 +1,25 @@
+PASS rapid manual checkbox edits preserve every choice before asynchronous previews finish
+PASS actual host controls explicitly map same-name guests, preserve raw names and preview manual shares and payment resets
+PASS payment-reset confirmation waits for the current saved and calculated preview
+PASS startup recovery reopens raw host choices after actual browser process loss
+PASS failed local storage preserves visible raw choices and downloadable recovery until explicit reload
+PASS two browser tabs cannot silently overwrite each other’s host-review choices
+PASS keyboard navigation and space toggles retain focus through review rerenders
+PASS changed selections require visible comparison before and after a definite server rejection
+PASS lost-response retry survives restart, applies once and preserves unrelated unsaved ordinary edits
+PASS withdrawal keeps prior charges until the owner explicitly reviews and applies the empty selection
+PASS saved reviews reopen offline inside the already authenticated owner page
+PASS phone review keeps its primary action visible with doubled rendered text
+PASS the primary action stays visible in a short phone viewport with doubled rendered text
+PASS completed checks retain saved-review recovery while blocking new financial application
+PASS removed checks remain reachable through startup recovery and retain exportable review choices
+PASS account switching clears the visible review while preserving its original account journal
+PASS corrupt review storage is surfaced at startup and retained after a retry
+PASS ordinary Checks participant displays agree with the reviewed penny allocation
+PASS rendered ordinary check currency automatic USD agrees with exact split and receipt totals
+PASS rendered ordinary check currency JPY agrees with exact split and receipt totals
+PASS rendered ordinary check currency KWD agrees with exact split and receipt totals
+PASS rendered ordinary check currency CLF agrees with exact split and receipt totals
+PASS rendered large CLF receipt and participant share preserve the final minor unit
+All 23 actual host-review UI checks passed.
+Owned browser/server processes exited; proxy and disposable data cleaned up.

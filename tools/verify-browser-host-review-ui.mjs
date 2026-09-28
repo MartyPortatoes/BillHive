@@ -181,6 +181,7 @@ try{
   check('corrupt review storage is surfaced at startup and retained after a retry',()=>{});
   assert.deepEqual(await cdp.evaluate(tab,"(()=>{const check={participants:[{id:'a'},{id:'b'},{id:'c'}],items:[{id:'penny',price:'0.01',sharedByParticipantIds:[]}]};const amounts=checkExactAmounts(check);return check.participants.map(p=>checkShareAmount(amounts,p.id));})()"),['EUR 0.01','EUR 0.00','EUR 0.00']);
   check('ordinary Checks participant displays agree with the reviewed penny allocation',()=>{});
+  await cdp.click(tab,'.tab[data-page="checks"]');
   await cdp.send('Emulation.setLocaleOverride',{locale:'ja-JP'},tab.session);
   for(const [currency,price,expected] of [['','10.005','USD 10.01'],['JPY','10.5','JPY 11'],['KWD','0.003','KWD 0.003'],['CLF','0.0003','CLF 0.0003']]) {
     const display=await cdp.evaluate(tab,`(()=>{S.settings.currencyCode=${JSON.stringify(currency)};_currFmt=null;
@@ -191,6 +192,19 @@ try{
     if(currency==='CLF')assert.ok(display.body.includes('CLF 0.0001'),display.body);
     check('rendered ordinary check currency '+(currency||'automatic USD')+' agrees with exact split and receipt totals',()=>{});
   }
+  const largeDisplay=await cdp.evaluate(tab,`(()=>{S.settings.currencyCode='CLF';_currFmt=null;
+    S.checks={checks:[{id:'large-currency-check',name:'Large currency receipt',taxAmount:'0.0003',participants:[{id:'a',name:'Alex'}],items:[{id:'meal',name:'Meal',price:'999999999999',sharedByParticipantIds:[]}]}]};
+    renderChecks();return {header:document.querySelector('#checksOverview .mode-money')?.textContent,body:document.querySelector('#checksOverview')?.textContent};})()`);
+  assert.equal(largeDisplay.header,'CLF 999,999,999,999.0003',JSON.stringify(largeDisplay));
+  assert.ok(largeDisplay.body.includes('Alex'),largeDisplay.body);
+  assert.ok(largeDisplay.body.split('CLF 999,999,999,999.0003').length>=3,largeDisplay.body);
+  await cdp.evaluate(tab,"document.querySelector('#checksOverview').scrollIntoView({block:'start'})");
+  await screen(tab,'large-currency-ordinary-check');
+  const largeBounds=await cdp.evaluate(tab,`[...document.querySelectorAll('#checksOverview .mode-money,#checksOverview .mode-stat-val,#checksOverview .mode-row-val')].map(e=>{
+    const b=e.getBoundingClientRect(),p=e.closest('.mode-card,.mode-stat').getBoundingClientRect();
+    return {text:e.textContent,visible:e.getClientRects().length>0,fits:e.scrollWidth<=e.clientWidth+1&&b.left>=p.left&&b.right<=p.right};})`);
+  assert.ok(largeBounds.length>0 && largeBounds.every(e=>e.visible&&e.fits),JSON.stringify(largeBounds));
+  check('rendered large CLF receipt and participant share preserve the final minor unit',()=>{});
   assert.equal(failures.length,0,failures.join('\n'));
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({passed:passes.length,checks:passes,browser:browserVersion,runtimeErrors:failures,limits:'Desktop Chrome mobile emulation, injected large text, synthetic authenticated proxy, isolated data. Physical-device and other-browser acceptance remain.'},null,2)+'\n');
   console.log('All '+passes.length+' actual host-review UI checks passed.');

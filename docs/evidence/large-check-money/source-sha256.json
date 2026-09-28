@@ -1,0 +1,6 @@
+{
+  "public/check-claim-review.js": "097fbc033bf4733e194aeb6f1052849cab1593e9eb8cd9bb9a561097ae066b61",
+  "test/browser-check-review.test.js": "5ae84423961f3bc45335bf14d9ce5b8c00f426007dab7e1bdce090f57c4d27c5",
+  "test/fixtures/check-claim-review-parity.json": "e0ac51c522228c73dafd4d36f6547d4e9a3615f56979f50736d2ecedfd695e44",
+  "tools/verify-browser-host-review-ui.mjs": "5475862f7c33be6fd9dec6c714ab6e96eb6c2166bf2518ca7dc067ab5fbb678a"
+}

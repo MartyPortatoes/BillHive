@@ -1,0 +1,31 @@
+{
+  "passed": 23,
+  "checks": [
+    "rapid manual checkbox edits preserve every choice before asynchronous previews finish",
+    "actual host controls explicitly map same-name guests, preserve raw names and preview manual shares and payment resets",
+    "payment-reset confirmation waits for the current saved and calculated preview",
+    "startup recovery reopens raw host choices after actual browser process loss",
+    "failed local storage preserves visible raw choices and downloadable recovery until explicit reload",
+    "two browser tabs cannot silently overwrite each other’s host-review choices",
+    "keyboard navigation and space toggles retain focus through review rerenders",
+    "changed selections require visible comparison before and after a definite server rejection",
+    "lost-response retry survives restart, applies once and preserves unrelated unsaved ordinary edits",
+    "withdrawal keeps prior charges until the owner explicitly reviews and applies the empty selection",
+    "saved reviews reopen offline inside the already authenticated owner page",
+    "phone review keeps its primary action visible with doubled rendered text",
+    "the primary action stays visible in a short phone viewport with doubled rendered text",
+    "completed checks retain saved-review recovery while blocking new financial application",
+    "removed checks remain reachable through startup recovery and retain exportable review choices",
+    "account switching clears the visible review while preserving its original account journal",
+    "corrupt review storage is surfaced at startup and retained after a retry",
+    "ordinary Checks participant displays agree with the reviewed penny allocation",
+    "rendered ordinary check currency automatic USD agrees with exact split and receipt totals",
+    "rendered ordinary check currency JPY agrees with exact split and receipt totals",
+    "rendered ordinary check currency KWD agrees with exact split and receipt totals",
+    "rendered ordinary check currency CLF agrees with exact split and receipt totals",
+    "rendered large CLF receipt and participant share preserve the final minor unit"
+  ],
+  "browser": "Chrome/151.0.7922.110",
+  "runtimeErrors": [],
+  "limits": "Desktop Chrome mobile emulation, injected large text, synthetic authenticated proxy, isolated data. Physical-device and other-browser acceptance remain."
+}
