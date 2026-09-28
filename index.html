@@ -967,6 +967,8 @@ button{min-width:44px;min-height:44px;}
 <script src="/check-review-client.js"></script>
 <script src="/check-review-session.js"></script>
 <script src="/check-review-page.js"></script>
+<script src="/check-removal-session.js"></script>
+<script src="/check-removal-page.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"
         integrity="sha512-SIMGYRUjwY8+gKg7nn9EItdD8LCADSDfJNutF9TPrvEo86sQmFMh6MyralfIyhADlajSxqc7G0gs7+MwWF/ogQ=="
         crossorigin="anonymous"></script>
@@ -1315,7 +1317,8 @@ let _revisionSync = false;
 let _ownerSharingSupported = false;
 let _accountChanged = false;
 let _hostReviewSupported = false;
-let hostReview = null, hostReviewPage = null;
+let hostReview = null, hostReviewPage = null, checkRemoval = null, checkRemovalPage = null;
+let _openingCheckAction = false;
 const revisionClient = new RevisionClient(async request => {
   const response = await fetch(`${API}/sync/commit`, {method:'POST', headers:{'Content-Type':'application/json','X-BillHive-User':_currentUser},body:JSON.stringify(request)});
   if (!response.ok) {
@@ -1433,6 +1436,7 @@ async function requireAccountReload() {
   _accountChanged = true;
   document.getElementById('app').hidden = true;
   await hostReview?.hydrate(null);
+  await checkRemoval?.hydrate(null);
   await ownerSharing.hydrate(null);
   document.getElementById('connection-panel').hidden = false;
   document.getElementById('connection-message').textContent = 'The signed-in account changed. Reload to open the current account. Saved check-sharing actions remain attached to their original account.';
@@ -1474,6 +1478,8 @@ async function load() {
   await ownerSharing.hydrate(_ownerSharingSupported ? snapshot : null);
   _hostReviewSupported = health.capabilities?.checkShareGuardProtocol === 1;
   await hostReview.hydrate(snapshot);
+  await checkRemoval.hydrate(snapshot);
+  await cleanupRemovedCheckSharing();
   return true;
 }
 
@@ -1526,7 +1532,7 @@ document.addEventListener('focusout', () => {
 // SSE alone is sufficient for cross-device sync.
 
 function isEditing() {
-  return !!hostReviewPage?.open || ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) || document.getElementById('app').inert;
+  return !!hostReviewPage?.open || !!checkRemovalPage?.open || ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName) || document.getElementById('app').inert;
 }
 async function _reloadFromServer() {
   if (_accountChanged) return;
@@ -1825,9 +1831,9 @@ hostReview = new BillHiveCheckReviewSession({
     const client = ownerSharing.client(id); await client.open();
     if (client.row.pending) throw new Error('Resolve the saved check-link action before applying guest selections.');
   },
-  committed: async snapshot => {
+  committed: async (snapshot,label='guest split') => {
     if (_stateDirty || writer.dirty || revisionClient.attempt) {
-      showBanner('The guest split is confirmed. Other unsaved household edits are kept here. Retry saving, or download your copy before reloading.', 'warning');
+      showBanner('The '+label+' is confirmed. Other unsaved household edits are kept here. Retry saving, or download your copy before reloading.', 'warning');
       return;
     }
     if (snapshot.revision < revisionClient.baseline.revision) { _pendingReload = true; return; }
@@ -1845,19 +1851,67 @@ hostReviewPage = new BillHiveCheckReviewPage.Page(hostReview, {closed: () => {
   _pendingReload = true;
   queueMicrotask(_reloadFromServer);
 }});
+checkRemoval = new BillHiveCheckRemovalSession({
+  owner: () => _loaded ? revisionClient.baseline : null,
+  accountChanged: requireAccountReload,
+  beforeApply: () => hostReview.beforeApply(),
+  checkLinks: id => hostReview.checkLinks(id),
+  committed: async snapshot => {
+    await hostReview.committed(snapshot,'check deletion');
+    await cleanupRemovedCheckSharing();
+  },
+  changed: () => { renderHostReviewAttention(); checkRemovalPage?.render(); }
+});
+checkRemovalPage = new BillHiveCheckRemovalPage(checkRemoval, {closed: () => {
+  _pendingReload = true; queueMicrotask(_reloadFromServer);
+}});
+function financialCheckRow() {
+  const scope=hostReview?.client?.scope;
+  return [hostReview?.client?.row,checkRemoval?.client?.row].filter(row=>row&&row.scope===scope).sort((a,b)=>b.generation-a.generation)[0];
+}
+async function cleanupRemovedCheckSharing() {
+  if(!_ownerSharingSupported)return;
+  const journal=[hostReview?.client,checkRemoval?.client].find(client=>client?.row===financialCheckRow());
+  if(!journal)return;
+  for(const [id,proof]of Object.entries(journal.row.removedSharing||{})){
+    try {
+      if(revisionClient.baseline.revision<proof.revision)continue;
+      if(!revisionClient.baseline.state.checks?.checks.some(c=>c.id===id)){
+        const client=ownerSharing.client(id);await client.open();ownerSharing.bound(client);
+        await client.forgetRemoved(proof);ownerSharing.bound(client);
+      }
+      await journal.finishSharingCleanup(id,proof);
+    } catch(error) {
+      showBanner('Deletion is confirmed. Saved sharing recovery was retained: '+error.message,'warning');
+    }
+  }
+  await ownerSharing.list();
+  renderHostReviewAttention();
+}
 function renderHostReviewAttention() {
   const element = document.getElementById('host-review-attention'); if (!element || !hostReview) return;
-  const row = hostReview.client?.row, entries = Object.entries(row?.drafts || {});
-  element.hidden = !entries.length && !hostReview.storageError;
-  const html = `<div class="mode-toolbar-copy">${esc(hostReview.storageError || (row?.pending ? 'A guest split save needs confirmation. Resolve it before saving other household changes.' : 'Saved guest split reviews'))}</div>
-    <div class="mode-actions">${hostReview.storageError?'<button type="button" class="btn btn-ghost" data-click="retryHostReviews()">Retry opening saved reviews</button>':''}${entries.map(([id,draft]) => `<button type="button" class="btn btn-ghost" data-click="openCheckGuestReview(${esc(JSON.stringify(id))})">${esc(draft.baseline.owner.state.checks.checks.find(c=>c.id===id)?.name || id)}${findCheck(id) ? '' : ' · Removed check'}</button>`).join('')}</div>`;
+  const row = financialCheckRow(), entries = Object.entries(row?.drafts || {}), removals=Object.entries(row?.removals||{}), error=hostReview.storageError||checkRemoval?.storageError;
+  const cleanup=Object.keys(row?.removedSharing||{}).length;
+  element.hidden = !entries.length && !removals.length && !error && !cleanup;
+  const html = `<div class="mode-toolbar-copy">${esc(error || (row?.pending ? 'A saved check action needs confirmation. Resolve it before saving other household changes.' : cleanup ? 'Confirmed deletion has saved sharing cleanup to retry.' : 'Saved check reviews'))}</div>
+    <div class="mode-actions">${error||cleanup?'<button type="button" class="btn btn-ghost" data-click="retryHostReviews()">Retry opening saved reviews</button>':''}${entries.map(([id,draft]) => `<button type="button" class="btn btn-ghost" data-click="openCheckGuestReview(${esc(JSON.stringify(id))})">${esc(draft.baseline.owner.state.checks.checks.find(c=>c.id===id)?.name || id)}${findCheck(id) ? '' : ' · Removed check'}</button>`).join('')}${removals.map(([id,draft])=>`<button type="button" class="btn btn-ghost" data-click="deleteCheck(${esc(JSON.stringify(id))})">Delete · ${esc(draft.baseline.owner.state.checks.checks.find(c=>c.id===id)?.name||id)}${findCheck(id)?'':' · Removed check'}</button>`).join('')}</div>`;
   if (element.innerHTML !== html) element.innerHTML = html;
 }
 async function openCheckGuestReview(id) {
-  if (!hostReview.client) { toast('Load the signed-in household before reviewing guest selections.'); return; }
-  await hostReviewPage.show(id);
+  return openFinancialCheck('split',id);
 }
-async function retryHostReviews() { if (_loaded) await hostReview.hydrate(revisionClient.baseline); }
+async function openFinancialCheck(kind,id) {
+  if(_openingCheckAction||hostReviewPage.open||checkRemovalPage.open)return;
+  if(!hostReview.client){toast('Load the signed-in household before reviewing check actions.');return;}
+  _openingCheckAction=true;
+  try {
+    await hostReview.client.open();hostReview.bound();const pending=hostReview.client.row.pending;
+    if(pending){id=pending.checkId;kind=pending.kind==='removal'?'removal':'split';}
+    await (kind==='removal'?checkRemovalPage:hostReviewPage).show(id);
+  } catch(error){hostReview.storageError=error.message;renderHostReviewAttention();toast(error.message);}
+  finally{_openingCheckAction=false;}
+}
+async function retryHostReviews() { if (_loaded) {await hostReview.hydrate(revisionClient.baseline);await checkRemoval.hydrate(revisionClient.baseline);await cleanupRemovedCheckSharing();renderHostReviewAttention();} }
 function renderOwnerSharingAttention() {
   const element = document.getElementById('owner-sharing-attention');
   if (!element) return;
@@ -2185,12 +2239,7 @@ function setCheckCompleted(checkId, completed) {
   save();
 }
 function deleteCheck(checkId) {
-  showConfirm('Delete this check?', ok => {
-    if (!ok) return;
-    S.checks.checks = checksList().filter(c => c.id !== checkId);
-    renderChecks();
-    save();
-  }, { okLabel:'Delete', danger:true });
+  return openFinancialCheck('removal',checkId);
 }
 function createCheckShareWeb(checkId, rotate = false) { return ownerSharing.change(checkId, rotate ? 'rotate' : 'create'); }
 function refreshCheckShareWeb(checkId) { return ownerSharing.refresh(checkId); }

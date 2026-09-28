@@ -1,0 +1,17 @@
+AssertionError [ERR_ASSERTION]: {"error":"","storageError":"","message":"","dirty":false,"busy":true,"calculating":false,"comparison":false,"activeId":null}
+    at open (file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:79:189)
+    at async file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:101:105
+{
+  "failures": [],
+  "state": {
+    "error": "",
+    "storageError": "",
+    "message": "Your choices are saved as you edit. Refresh checks for newer selections.",
+    "dirty": false,
+    "busy": false,
+    "calculating": false,
+    "comparison": false,
+    "activeId": "dinner"
+  },
+  "body": "SelfHive\nBILLS · CHECKS · TRIPS\nSaved\nowner-ui-test\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nBills\n0/0\nSummary\nPay & Collect\nChecks\n1\nTrips\n0\nTrends\nSettings\nSaved check reviews\nDinner\nChecks\nCreate, split, and collect restaurant checks synced with SelfHive.\nAdd people and receipt items, split the cost, and track who has paid.\n+ Add Check\nTOTAL CHECKS\n1\nOPEN\n1\nGRAND TOTAL\n€15.00\n🍽️ Dinner\nOPEN\nSep 27, 2026 · 1 item · 1 participant\n€15.00\nComplete\nDelete\nICON\nNAME\nDATE\nTAX\nTIP\nDISCOUNT\nSERVICE FEE\nNOTES\nSHARE LINK\n\nOpen saved details or refresh to load the current link. Saved actions stay available across browser restarts.\n\nRefresh\nReopen saved action\nGenerate Share Link\nReview guest split\nPARTICIPANTS\nHost\nGuest · EUR 15.00\nRequested\nPaid\n✕\nAdd household member\nHost\nAdd\nAdd Everyone\n+ Name\nITEMS\nEveryone\nHost\n✕\n+ Add Item\nSPLIT SUMMARY\nHost PAID\nEUR 12.00 subtotal share\nEUR 15.00\nReview split · Dinner\nClose\nGuests\nItems\nTotals\n\nYour choices are saved as you edit. Refresh checks for newer selections.\n\nRefresh / compare\nExport recovery copy\nReload saved choices\nDiscard saved review\nAlex\n\nGuest reference e682b9ec\n\nCurrent: Soup\n\nGuest choice\nChoose how to handle this guest\nUse current selection\nIgnore / remove contribution\nAlex\n\nGuest reference a6be1f09\n\nCurrent: Soup\n\nGuest choice\nChoose how to handle this guest\nUse current selection\nIgnore / remove contribution\nResolve before applying\nChoose how to handle Alex. Names do not identify participants.\nChoose how to handle Alex. Names do not identify participants.\n\nChoices saved\n\nReview totals"
+}

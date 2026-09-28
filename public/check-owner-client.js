@@ -178,6 +178,15 @@
       });return clone(receipt);
     }
     dismissRejected(){return this.update(row=>{requireValue(row.pending?.rejection,'Retry an uncertain action before clearing it.');row.pending=null;return row;});}
+    async forgetRemoved(receipt){
+      requireValue(same(account(receipt),this.owner)&&receipt.checkId===this.binding.checkId&&receipt.checkAbsent===true&&revision(receipt.committedRevision)&&revision(receipt.revision)&&receipt.revision>=receipt.committedRevision,'Invalid confirmed deletion.');
+      this.row=await this.store.transact(this.id,row=>{this.validate(row);
+        // Recovery intent, unreadable records and newer restored links are never
+        // cleared by an older financial receipt. Repeating cleanup is harmless.
+        if(row.pending||!row.snapshot||row.snapshot.revision>receipt.committedRevision)return row;
+        row.snapshot=null;row.receipt=null;row.generation++;return this.validate(row);
+      });return clone(this.row);
+    }
     recovery(){const r=this.row,s=r?.snapshot;return JSON.stringify({format:'billhive-owner-check-sharing-recovery',version:1,checkId:this.binding.checkId,
       serverInstanceId:this.owner.serverInstanceId,householdId:this.owner.householdId,revision:s?.revision,shareRevision:s?.shareRevision,checkExists:s?.checkExists,linkActive:!!s?.share,
       pendingRequest:r?.pending?JSON.parse(r.pending.payload):null,pendingRejection:r?.pending?.rejection||null,receipt:r?.receipt||null},null,2);}

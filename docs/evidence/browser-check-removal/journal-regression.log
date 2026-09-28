@@ -1,0 +1,8 @@
+PASS actual IndexedDB review and strict HTTP reject a newer guest selection without a financial write
+PASS explicit same-name mappings save guarded assignments, reset changed payment flags and keep private provenance out of public data
+PASS real Chrome process loss retries the exact financial request and retains newer server data without duplicating participants
+PASS unsubmitted raw review choices also survive complete browser process replacement
+PASS an account switch cannot apply or discard the original account financial request
+PASS corrupt saved review remains intact and cannot prepare a new financial request
+All 6 browser host-review checks passed.
+Owned browser/server processes exited; proxy and disposable data cleaned up.

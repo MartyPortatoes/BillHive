@@ -91,8 +91,10 @@ Its footer keeps the primary action visible at short viewport heights and with
 enlarged text. Ordinary Checks participant amounts now use the same exact
 minor-unit formatter and allocation engine as the review.
 
-Reviewed browser deletion, Swift sharing migration, physical-browser and deployed
-mixed-client acceptance remain open. This checkpoint does not enable enforcement.
+[Reviewed browser deletion](browser-check-removal.md) now shares the financial
+journal and retains unfinished split reviews after removal. Swift sharing
+migration, physical-browser and deployed mixed-client acceptance remain open.
+These changes do not enable enforcement.
 
 See [engine/journal verification](evidence/browser-host-check-review/verification.md)
 and [actual UI verification](evidence/browser-host-check-review-ui/verification.md).

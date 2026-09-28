@@ -1,0 +1,26 @@
+{
+  "passed": 18,
+  "checks": [
+    "actual Delete opens a detailed guarded review and closing preserves confirmation without deleting",
+    "saved deletion confirmation and unfinished split review survive actual browser process replacement",
+    "saved deletion can reopen offline inside an authenticated loaded page",
+    "changed check data and guest declarations require current comparison and renewed confirmation",
+    "failed confirmation storage preserves the working choice for export and explicit reload",
+    "two tabs cannot silently replace a newer deletion confirmation",
+    "native checkbox keyboard toggles retain focus and save in order",
+    "deletion primary action remains visible at doubled text in a short phone viewport",
+    "guest changes after preparation reject deletion and require a fresh review",
+    "reviewed deletion preserves unrelated newer records and permanently revokes the active link",
+    "exact deletion retry survives restart, routes recovery correctly and preserves ordinary edits and split drafts",
+    "confirmed deletion clears the eligible stale sharing cache on reload",
+    "replaying an older deletion never removes a newer restored check or its new link",
+    "failed sharing cleanup remains durably queued after deletion and retries on reload",
+    "completed checks can be explicitly reviewed and deleted",
+    "externally removed checks retain their saved deletion review and recovery export",
+    "account switching hides the deletion and keeps its original account journal",
+    "corrupt saved deletion stays visible for recovery and is never replaced"
+  ],
+  "browser": "Chrome/151.0.7922.110",
+  "runtimeErrors": [],
+  "limits": "Desktop Chrome with emulated phone/tablet viewport and injected doubled text; physical devices and other browsers remain unverified."
+}

@@ -1,0 +1,14 @@
+{
+  "passed": 6,
+  "checks": [
+    "actual IndexedDB review and strict HTTP reject a newer guest selection without a financial write",
+    "explicit same-name mappings save guarded assignments, reset changed payment flags and keep private provenance out of public data",
+    "real Chrome process loss retries the exact financial request and retains newer server data without duplicating participants",
+    "unsubmitted raw review choices also survive complete browser process replacement",
+    "an account switch cannot apply or discard the original account financial request",
+    "corrupt saved review remains intact and cannot prepare a new financial request"
+  ],
+  "browser": "Chrome/151.0.7922.110",
+  "runtimeErrors": [],
+  "limits": "Data modules loaded into the real owner page; no host-review controls integrated or exercised. Disposable strict server and proxy identities, not live authentication."
+}

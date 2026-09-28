@@ -1,0 +1,28 @@
+PASS actual Delete opens a detailed guarded review and closing preserves confirmation without deleting
+PASS saved deletion confirmation and unfinished split review survive actual browser process replacement
+PASS saved deletion can reopen offline inside an authenticated loaded page
+PASS changed check data and guest declarations require current comparison and renewed confirmation
+PASS failed confirmation storage preserves the working choice for export and explicit reload
+PASS two tabs cannot silently replace a newer deletion confirmation
+PASS native checkbox keyboard toggles retain focus and save in order
+PASS deletion primary action remains visible at doubled text in a short phone viewport
+PASS guest changes after preparation reject deletion and require a fresh review
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+410 !== 404
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-check-removal.mjs:122:419
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 410,
+  expected: 404,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

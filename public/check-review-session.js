@@ -36,7 +36,7 @@
     async restoreWorking(){this.working=this.draft?copy(this.draft.plan):null;this.dirty=false;this.version++;this.confirmPaymentResets=false;this.comparison=null;this.preview=null;this.storageError='';await this.calculateCurrent();}
     open(checkId){return this.run(async()=>{
       if(this.activeId&&this.dirty)throw new Error('Keep or export the current unsaved choices before opening another review.');
-      const client=this.client;await client.open();this.bound(client);checkId=client.row.pending?.checkId||checkId;this.activeId=checkId;
+      const client=this.client;await client.open();this.bound(client);if(client.row.pending?.kind==='removal')throw new Error('A check deletion is pending. Close and reopen its saved deletion review.');checkId=client.row.pending?.checkId||checkId;this.activeId=checkId;
       if(!client.row.drafts[checkId]){await this.beforeApply();await this.checkLinks(checkId);const fresh=await client.transport.load(checkId);this.bound(client);await client.start(fresh);}
       await this.restoreWorking();this.message=this.pending?'A saved split is awaiting confirmation.':'Your choices are saved as you edit. Refresh checks for newer selections.';
     });}
@@ -65,7 +65,7 @@
       await this.beforeApply();this.bound(client);await this.checkLinks(id);this.bound(client);const fresh=await client.transport.load(id);this.bound(client);if(!this.inspect(fresh))return;
       await client.prepare(id,fresh,this.preview,this.confirmPaymentResets);this.bound(client);this.changed();await this.submit();
     });}
-    async submit(){const client=this.client,result=await client.submit();this.bound(client);this.working=null;this.preview=null;this.dirty=false;this.message='Guest split confirmed.';await this.committed(result);}
+    async submit(){const client=this.client;if(client.row.pending?.kind==='removal')throw new Error('Open the saved deletion review instead.');const result=await client.submit();this.bound(client);this.working=null;this.preview=null;this.dirty=false;this.message='Guest split confirmed.';await this.committed(result);}
     retry(){return this.run(async()=>{await this.submit();});}
     discard(){return this.run(async()=>{const client=this.client;await client.discard(this.activeId);this.bound(client);this.working=null;this.preview=null;this.dirty=false;this.message='Saved review discarded.';});}
     export(){this.bound();return this.client.recovery(this.activeId,this.dirty?this.working:null);}

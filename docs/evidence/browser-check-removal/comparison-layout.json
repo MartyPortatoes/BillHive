@@ -1,0 +1,68 @@
+{
+  "display": "flex",
+  "wrap": "wrap",
+  "overflow": "visible",
+  "height": 148,
+  "items": [
+    {
+      "text": "Refresh / compare",
+      "rect": {
+        "x": 13,
+        "y": 134,
+        "width": 155.15625,
+        "height": 44,
+        "top": 134,
+        "right": 168.15625,
+        "bottom": 178,
+        "left": 13
+      },
+      "scrollWidth": 153,
+      "clientWidth": 153
+    },
+    {
+      "text": "Export recovery copy",
+      "rect": {
+        "x": 176.15625,
+        "y": 134,
+        "width": 175.515625,
+        "height": 44,
+        "top": 134,
+        "right": 351.671875,
+        "bottom": 178,
+        "left": 176.15625
+      },
+      "scrollWidth": 174,
+      "clientWidth": 174
+    },
+    {
+      "text": "Reload saved confirmation",
+      "rect": {
+        "x": 13,
+        "y": 186,
+        "width": 211.4375,
+        "height": 44,
+        "top": 186,
+        "right": 224.4375,
+        "bottom": 230,
+        "left": 13
+      },
+      "scrollWidth": 209,
+      "clientWidth": 209
+    },
+    {
+      "text": "Discard deletion review",
+      "rect": {
+        "x": 13,
+        "y": 238,
+        "width": 189.734375,
+        "height": 44,
+        "top": 238,
+        "right": 202.734375,
+        "bottom": 282,
+        "left": 13
+      },
+      "scrollWidth": 188,
+      "clientWidth": 188
+    }
+  ]
+}

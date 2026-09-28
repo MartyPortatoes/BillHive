@@ -1,0 +1,18 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+410 !== 404
+
+    at file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-check-removal.mjs:122:419
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+{
+  "failures": [],
+  "state": {
+    "error": "Failed to fetch",
+    "storageError": "",
+    "dirty": false,
+    "busy": false,
+    "activeId": "dinner",
+    "comparison": false
+  },
+  "body": "SelfHive\nBILLS · CHECKS · TRIPS\nSaved\nowner-ui-test\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember\nBills\n0/0\nSummary\nPay & Collect\nChecks\n1\nTrips\n0\nTrends\nSettings\nA saved check action needs confirmation. Resolve it before saving other household changes.\nDinner\nDelete · Dinner\nBills\nAdd your bills and let's figure out who owes what.\n📋\nNo bills yet\nAdd your first recurring household bill to start tracking who owes what each month.\n＋ Add Your First Bill\n＋ Add Bill\nDelete check · Dinner\nClose\n\nFailed to fetch\n\nRefresh / compare\nExport recovery copy\nReload saved confirmation\nDiscard deletion review\n\nSaved deletion: outcome uncertain; retry sends the original request. Confirmation is locked.\n\nCheck to delete\n\nDinner · Open · 2026-09-27\n\nNewer check notes\n\nCurrency: EUR\n\n1 items · 1 participants · 1 paid marks · 1 payment requests\n\nSoup: 12 · Host\n\ntax: 1 · tip: 2 · discount: 0 · comp: 0 · serviceFee: 0\n\nParticipants: Host\n\nPaid: Host\n\nRequested: Host · 2026-09-27T12:00:00Z\n\nThe active public link will be permanently revoked. 3 guest declarations.\n\nAlex · Soup · 2026-09-28T00:59:20Z\nAlex · Soup · 2026-09-28T00:59:22Z\nAlex · Soup · 2026-09-28T00:59:23Z\n\nDeleting removes this check and its payment tracking. Saved unfinished reviews remain available for recovery. Restoring the same check later will not reactivate its old public link.\n\nI reviewed this check and confirm deleting it and revoking its active public link.\n\nNeeds attention\n\nRetry saved deletion"
+}

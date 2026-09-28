@@ -49,7 +49,7 @@ class CDP {
   async click(tab,selector){const box=await this.evaluate(tab,`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e||e.disabled)throw Error('Unavailable control: '+${JSON.stringify(selector)});e.scrollIntoView({block:'center',behavior:'instant'});const b=e.getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2};})()`);
     await this.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...box},tab.session);await this.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...box},tab.session);}
   async name(tab,value){await this.evaluate(tab,`(()=>{const e=document.querySelector('#nameInput');e.scrollIntoView({block:'center',behavior:'instant'});e.focus();e.select();})()`);await this.send('Input.insertText',{text:value},tab.session);await this.idle(tab);}
-  async idle(tab){await until(()=>this.evaluate(tab,"!hostReview.busy && !hostReview.dirty && !hostReview.calculating"),'Claim action completion');}
+  async idle(tab){await until(()=>this.evaluate(tab,"!hostReview.busy && !hostReview.dirty && !hostReview.calculating && !_openingCheckAction"),'Claim action completion');}
   async screenshot(tab,name){await this.evaluate(tab,"(async()=>{document.querySelector('#owner-sharing-recovery .owner-check-sharing, .owner-check-sharing')?.scrollIntoView({block:'start'});await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));})()");const r=await this.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false},tab.session);await fs.writeFile(path.join(output,name+'.png'),Buffer.from(r.data,'base64'));}
 }
 async function launchChrome(){

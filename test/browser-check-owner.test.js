@@ -31,6 +31,23 @@ function server(){
 async function ready(options={}){const store=options.store||new Store(),transport=options.transport||server();const client=new Client({owner,checkId:'dinner',store,transport,...options});await client.open();await client.refresh(owner);return {client,store,transport};}
 async function prepare(client,kind='create',current=owner){await client.prepare(kind,clone(client.row.snapshot),current);return client.row.pending.payload;}
 
+test('confirmed deletion clears only eligible sharing cache and remains safe to repeat after restart',async()=>{
+  const {client,store,transport}=await ready();await prepare(client);await client.submit();const receipt={...owner,revision:3,committedRevision:2,checkId:'dinner',checkAbsent:true};
+  await client.forgetRemoved(receipt);assert.equal(client.row.snapshot,null);assert.equal(client.row.receipt,null);const saved=clone(client.row);
+  const reopened=new Client({owner,checkId:'dinner',store,transport});await reopened.open();await reopened.forgetRemoved(receipt);assert.deepEqual(reopened.row,saved);
+});
+test('deletion cleanup preserves pending, newer, restored and corrupt sharing records',async()=>{
+  for(const kind of ['pending','newer','restored','corrupt']){
+    const {client,store}=await ready();await prepare(client);await client.submit();const receipt={...owner,revision:3,committedRevision:2,checkId:'dinner',checkAbsent:true};
+    if(kind==='pending')await prepare(client,'rotate');
+    if(kind==='newer'){await client.update(row=>{row.snapshot.revision=4;return row;});}
+    if(kind==='restored')receipt.checkAbsent=false;
+    if(kind==='corrupt'){const r=clone(client.row);r.snapshot='corrupt';store.rows.set(client.id,r);}
+    const saved=clone(store.rows.get(client.id));if(kind==='restored'||kind==='corrupt')await assert.rejects(client.forgetRemoved(receipt));else await client.forgetRemoved(receipt);
+    assert.deepEqual(store.rows.get(client.id),saved);
+  }
+});
+
 test('owner records are partitioned by signed-in account, server, household and API prefix',async()=>{
   const {client,store,transport}=await ready();await prepare(client);
   for(const changes of [{owner:{...owner,userId:'Other'}},{owner:{...owner,serverInstanceId:'server-2'}},{owner:{...owner,householdId:'household-2'}},{apiBase:'/proxy/api'}]){

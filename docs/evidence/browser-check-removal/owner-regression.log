@@ -1,0 +1,15 @@
+PASS actual owner Generate control creates a protected link without changing household data
+PASS owner page displays same-name guest declarations independently
+PASS canceling replacement does not create or send a request
+PASS guest changes during replacement confirmation require a fresh review
+PASS reviewed replacement changes the active link through the actual controls
+PASS definite server rejection keeps its request until the user confirms clearing it
+PASS startup attention and actual retry recover process loss without resurrecting an old link
+PASS removed check keeps recovery navigation and acknowledges its earlier revoke
+PASS completed check cannot generate a new link
+PASS owner sharing controls remain within the phone viewport with doubled rendered text
+PASS unreadable sharing state stays visible in recovery and cannot create a replacement action
+PASS account change hides the old household and clears its visible sharing context
+PASS explicit reload opens the new account without exposing prior sharing records
+All 13 owner UI checks passed.
+Owned browser/server processes exited; proxy and disposable data cleaned up.

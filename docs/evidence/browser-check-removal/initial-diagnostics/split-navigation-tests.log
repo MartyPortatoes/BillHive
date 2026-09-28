@@ -1,0 +1,16 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"error":"","storageError":"","message":"","dirty":false,"busy":true,"calculating":false,"comparison":false,"activeId":null}
+    at open (file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:79:189)
+    at async file:///Users/mportelos/Documents/GitHub/BillHive/Web_App/tools/verify-browser-host-review-ui.mjs:101:105 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0

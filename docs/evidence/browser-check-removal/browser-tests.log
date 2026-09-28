@@ -1,0 +1,20 @@
+PASS actual Delete opens a detailed guarded review and closing preserves confirmation without deleting
+PASS saved deletion confirmation and unfinished split review survive actual browser process replacement
+PASS saved deletion can reopen offline inside an authenticated loaded page
+PASS changed check data and guest declarations require current comparison and renewed confirmation
+PASS failed confirmation storage preserves the working choice for export and explicit reload
+PASS two tabs cannot silently replace a newer deletion confirmation
+PASS native checkbox keyboard toggles retain focus and save in order
+PASS deletion primary action remains visible at doubled text in a short phone viewport
+PASS guest changes after preparation reject deletion and require a fresh review
+PASS reviewed deletion preserves unrelated newer records and permanently revokes the active link
+PASS exact deletion retry survives restart, routes recovery correctly and preserves ordinary edits and split drafts
+PASS confirmed deletion clears the eligible stale sharing cache on reload
+PASS replaying an older deletion never removes a newer restored check or its new link
+PASS failed sharing cleanup remains durably queued after deletion and retries on reload
+PASS completed checks can be explicitly reviewed and deleted
+PASS externally removed checks retain their saved deletion review and recovery export
+PASS account switching hides the deletion and keeps its original account journal
+PASS corrupt saved deletion stays visible for recovery and is never replaced
+All 18 actual deletion browser checks passed.
+Owned browser/server processes exited; proxy and disposable data cleaned up.

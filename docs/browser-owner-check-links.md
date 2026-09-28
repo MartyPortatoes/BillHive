@@ -59,8 +59,9 @@ control; original saved actions stay bound to their original account.
 Guest declarations are displayed independently, including identical names.
 **Review guest split** now provides explicit claimant mapping, provenance, split
 preview and an atomic household/share revision guard; see
-[host review](browser-host-check-review.md). Reviewed browser deletion and Swift
-sharing migration are still open.
+[host review](browser-host-check-review.md). [Reviewed browser deletion](browser-check-removal.md)
+now permanently revokes links and queues cleanup of eligible local sharing cache.
+Swift sharing migration remains open.
 No deployment enforcement is enabled at this checkpoint.
 
 See [journal verification](evidence/browser-owner-check-links/verification.md).
