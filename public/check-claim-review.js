@@ -91,17 +91,28 @@
     return Object.fromEntries(keys.map((k,i)=>[k,bases[i]*sign]));
   }
   function effective(check,item) {const known=check.participants.map(p=>p.id),explicit=unique((item.sharedByParticipantIds||[]).filter(k=>known.includes(k)));return explicit.length?explicit:known;}
-  function breakdown(check,currency='USD') {
+  function receiptAmounts(check,currency) {
     const places=digits(currency),amounts=[...check.items.map(item=>decimal(item.price??0)),...['taxAmount','tipAmount','serviceFeeAmount','discountAmount','compAmount'].map(k=>decimal(check[k]??0))];
     const precision=Math.max(places,...amounts.map(v=>v.places)),maximum=1000000000000n*10n**BigInt(precision),divisor=10n**BigInt(precision-places);
     const units=v=>(v+divisor/2n)/divisor,scaled=amounts.map(v=>v.value*10n**BigInt(precision-v.places));
-    const people=check.participants.map(p=>p.id);requireValue(ids(people),'Invalid check participants.');
-    const subtotals=Object.fromEntries(people.map(k=>[k,0n]));let subtotal=0n;
-    for(const [index,item]of check.items.entries()){const price=scaled[index];subtotal+=price;
-      for(const [k,v]of Object.entries(allocate(units(price),effective(check,item))))subtotals[k]+=v;}
+    const prices=scaled.slice(0,check.items.length),subtotal=prices.reduce((a,b)=>a+b,0n);
     const [tax,tip,fee,discount,comp]=scaled.slice(check.items.length);
     requireValue(subtotal+tax+tip+fee+discount+comp<=maximum,'Check amounts are out of range.');
-    const credit=discount+comp<subtotal?discount+comp:subtotal,grandTotal=units(subtotal-credit+tax+tip+fee),sum=Object.values(subtotals).reduce((a,b)=>a+b,0n);
+    const credit=discount+comp<subtotal?discount+comp:subtotal;
+    return {places,prices,units,grandTotal:units(subtotal-credit+tax+tip+fee)};
+  }
+  // A receipt total remains available before participants have been entered.
+  function receipt(check,currency='USD') {
+    const {places,grandTotal}=receiptAmounts(check,currency);
+    return {digits:places,grandTotal:String(grandTotal)};
+  }
+  function breakdown(check,currency='USD') {
+    const {places,prices,units,grandTotal}=receiptAmounts(check,currency);
+    const people=check.participants.map(p=>p.id);requireValue(ids(people),'Invalid check participants.');
+    const subtotals=Object.fromEntries(people.map(k=>[k,0n]));
+    for(const [index,item]of check.items.entries())
+      for(const [k,v]of Object.entries(allocate(units(prices[index]),effective(check,item))))subtotals[k]+=v;
+    const sum=Object.values(subtotals).reduce((a,b)=>a+b,0n);
     requireValue(sum!==0n||grandTotal===0n,'Add items before tax, tip or fees.');
     const adjustments=allocate(grandTotal-sum,[...people].sort(),subtotals);
     // Strings retain exact minor units even for four-decimal currencies beyond Number's safe range.
@@ -165,5 +176,5 @@
   }
   function confirmed(view,confirmPaymentResets=false){requireValue(view.ready&&view.proposal,'Review the selections before applying them.');requireValue(confirmPaymentResets||!view.clearedPaid.length&&!view.clearedRequests.length,'Confirm the payment statuses that will be cleared after these balance changes.');return copy(view.proposal);}
   function formatUnits(value,places,currency,locale){const units=BigInt(value),negative=units<0n,absolute=negative?-units:units,divisor=10n**BigInt(places),whole=new Intl.NumberFormat(locale).format(absolute/divisor),decimal=new Intl.NumberFormat(locale).formatToParts(1.1).find(p=>p.type==='decimal')?.value||'.';return `${currency} ${negative?'-':''}${whole}${places?decimal+String(absolute%divisor).padStart(places,'0'):''}`;}
-  return {instant,sourceId,sources,validateSource,ledger,validatePlan,seed,breakdown,preview,confirmed,formatUnits};
+  return {instant,sourceId,sources,validateSource,ledger,validatePlan,seed,receipt,breakdown,preview,confirmed,formatUnits};
 });

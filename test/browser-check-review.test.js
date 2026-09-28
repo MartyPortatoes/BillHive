@@ -73,3 +73,26 @@ test('claim order cannot move a remainder penny on repeated application',()=>{
 test('exact minor-unit labels preserve cents and four decimal places without Number conversion',()=>{
   assert.equal(R.formatUnits('1',2,'USD','en-US'),'USD 0.01');assert.equal(R.formatUnits('10000000000000001',4,'CLF','en-US'),'CLF 1,000,000,000,000.0001');assert.equal(R.formatUnits('10001',3,'KWD','de-DE'),'KWD 10,001');
 });
+
+test('receipt totals use exact half-up currency units before participants exist',()=>{
+  const check={items:[{id:'meal',price:'1.005'}],participants:[]};
+  assert.deepEqual(R.receipt(check,'USD'),{digits:2,grandTotal:'101'});
+  assert.throws(()=>R.breakdown(check,'USD'),/participant/);
+  for(const [currency,price,units] of [['JPY','10.5','11'],['KWD','0.003','3'],['CLF','0.0003','3']]) {
+    check.items[0].price=price;assert.equal(R.receipt(check,currency).grandTotal,units);
+  }
+  check.items[0].price='1000000000001';assert.throws(()=>R.receipt(check,'USD'),/range/);
+});
+test('ordinary page resolves automatic currency consistently with sharing regardless of device locale',()=>{
+  const fs=require('node:fs'),vm=require('node:vm'),page=fs.readFileSync(require.resolve('../index.html'),'utf8');
+  const names=['getResolvedCurrency','checkExactReceipt','checkReceiptAmount','checkExactAmounts','checkShareAmount'];
+  const code=names.map(name=>{const start=page.indexOf('function '+name+'(');assert.ok(start>=0);const end=page.indexOf('\n}',start);assert.ok(end>start);return page.slice(start,end+2);}).join('\n');
+  const context=vm.createContext({S:{settings:{currencyCode:''}},BillHiveCheckReview:R,navigator:{language:'ja-JP'},detectCurrency:()=> 'JPY'});
+  vm.runInContext(code,context);assert.equal(context.getResolvedCurrency(),'USD');
+  const check={items:[{id:'meal',price:'10.005',sharedByParticipantIds:[]}],participants:[{id:'a'},{id:'b'}]};
+  assert.equal(context.checkReceiptAmount(context.checkExactReceipt(check)),'USD 10.01');
+  context.S.settings.currencyCode='KWD';check.items[0].price='0.003';
+  const split=context.checkExactAmounts(check);assert.equal(context.checkShareAmount(split,'b'),'KWD 0.001');
+  assert.equal(context.checkReceiptAmount(context.checkExactReceipt(check)),'KWD 0.003');
+  assert.equal(context.S.settings.currencyCode,'KWD');
+});

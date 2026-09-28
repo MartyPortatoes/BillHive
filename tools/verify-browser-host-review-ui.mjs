@@ -181,6 +181,16 @@ try{
   check('corrupt review storage is surfaced at startup and retained after a retry',()=>{});
   assert.deepEqual(await cdp.evaluate(tab,"(()=>{const check={participants:[{id:'a'},{id:'b'},{id:'c'}],items:[{id:'penny',price:'0.01',sharedByParticipantIds:[]}]};const amounts=checkExactAmounts(check);return check.participants.map(p=>checkShareAmount(amounts,p.id));})()"),['EUR 0.01','EUR 0.00','EUR 0.00']);
   check('ordinary Checks participant displays agree with the reviewed penny allocation',()=>{});
+  await cdp.send('Emulation.setLocaleOverride',{locale:'ja-JP'},tab.session);
+  for(const [currency,price,expected] of [['','10.005','USD 10.01'],['JPY','10.5','JPY 11'],['KWD','0.003','KWD 0.003'],['CLF','0.0003','CLF 0.0003']]) {
+    const display=await cdp.evaluate(tab,`(()=>{S.settings.currencyCode=${JSON.stringify(currency)};_currFmt=null;
+      S.checks={checks:[{id:'currency-check',name:'Currency receipt',participants:[{id:'a',name:'A'},{id:'b',name:'B'}],items:[{id:'meal',name:'Meal',price:${JSON.stringify(price)},sharedByParticipantIds:[]}]}]};
+      renderChecks();return {header:document.querySelector('#checksOverview .mode-money')?.textContent,body:document.querySelector('#checksOverview')?.textContent,code:getResolvedCurrency()};})()`);
+    assert.equal(display.header,expected,JSON.stringify(display));
+    if(currency==='KWD')assert.ok(display.body.includes('KWD 0.001'),display.body);
+    if(currency==='CLF')assert.ok(display.body.includes('CLF 0.0001'),display.body);
+    check('rendered ordinary check currency '+(currency||'automatic USD')+' agrees with exact split and receipt totals',()=>{});
+  }
   assert.equal(failures.length,0,failures.join('\n'));
   await fs.writeFile(path.join(output,'results.json'),JSON.stringify({passed:passes.length,checks:passes,browser:browserVersion,runtimeErrors:failures,limits:'Desktop Chrome mobile emulation, injected large text, synthetic authenticated proxy, isolated data. Physical-device and other-browser acceptance remain.'},null,2)+'\n');
   console.log('All '+passes.length+' actual host-review UI checks passed.');

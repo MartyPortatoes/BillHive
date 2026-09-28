@@ -2045,8 +2045,14 @@ function checkCreditAmount(check) {
 function checkAdjustmentTotal(check) {
   return asNumber(check?.taxAmount) + asNumber(check?.tipAmount) + asNumber(check?.serviceFeeAmount) - checkCreditAmount(check);
 }
-function checkGrandTotal(check) {
-  return Math.max(0, checkSubtotal(check) + checkAdjustmentTotal(check));
+function checkExactReceipt(check) {
+  const currency = getResolvedCurrency();
+  try { return {...BillHiveCheckReview.receipt(check,currency),currency}; }
+  catch (error) { return {error:error.message}; }
+}
+function checkReceiptAmount(amounts) {
+  if (amounts.error) return 'Unavailable — review check amounts';
+  return BillHiveCheckReview.formatUnits(amounts.grandTotal,amounts.digits,amounts.currency,navigator.language);
 }
 function checkItemAssigneeIds(check, item) {
   const explicit = asList(item?.sharedByParticipantIds);
@@ -2054,7 +2060,7 @@ function checkItemAssigneeIds(check, item) {
   return checkParticipants(check).map(p => p.id);
 }
 function checkExactAmounts(check) {
-  const currency = S.settings.currencyCode || 'USD';
+  const currency = getResolvedCurrency();
   try { return {...BillHiveCheckReview.breakdown(check,currency),currency}; }
   catch (error) { return {error:error.message}; }
 }
@@ -2331,7 +2337,7 @@ function renderCheckEditor(check) {
     <div class="mode-detail-row">
       <input type="text" value="${esc(item.name || '')}" placeholder="Item"
              data-input="updateCheckItemField('${check.id}','${item.id}','name',this.value)" data-change="renderChecks();save()">
-      <input type="number" min="0" step="0.01" value="${asNumber(item.price ?? item.amount) || ''}" placeholder="0.00"
+      <input type="number" min="0" step="any" value="${asNumber(item.price ?? item.amount) || ''}" placeholder="0.00"
              data-input="updateCheckItemField('${check.id}','${item.id}','price',this.value)" data-change="renderChecks();save()">
       ${renderCheckAssigneeChips(check, item)}
       <button class="remove-line" aria-label="Remove item" data-click="removeCheckItem('${check.id}','${item.id}')">✕</button>
@@ -2356,10 +2362,10 @@ function renderCheckEditor(check) {
         </div>
       </div>
       <div class="mode-mini-grid">
-        <div class="mode-field"><label>Tax</label><input aria-label="Tax" type="number" min="0" step="0.01" value="${asNumber(check.taxAmount) || ''}" data-input="updateCheckNumberField('${check.id}','taxAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Tip</label><input aria-label="Tip" type="number" min="0" step="0.01" value="${asNumber(check.tipAmount) || ''}" data-input="updateCheckNumberField('${check.id}','tipAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Discount</label><input aria-label="Discount" type="number" min="0" step="0.01" value="${asNumber(check.discountAmount) || ''}" data-input="updateCheckNumberField('${check.id}','discountAmount',this.value)" data-change="renderChecks();save()"></div>
-        <div class="mode-field"><label>Service Fee</label><input aria-label="Service Fee" type="number" min="0" step="0.01" value="${asNumber(check.serviceFeeAmount) || ''}" data-input="updateCheckNumberField('${check.id}','serviceFeeAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Tax</label><input aria-label="Tax" type="number" min="0" step="any" value="${asNumber(check.taxAmount) || ''}" data-input="updateCheckNumberField('${check.id}','taxAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Tip</label><input aria-label="Tip" type="number" min="0" step="any" value="${asNumber(check.tipAmount) || ''}" data-input="updateCheckNumberField('${check.id}','tipAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Discount</label><input aria-label="Discount" type="number" min="0" step="any" value="${asNumber(check.discountAmount) || ''}" data-input="updateCheckNumberField('${check.id}','discountAmount',this.value)" data-change="renderChecks();save()"></div>
+        <div class="mode-field"><label>Service Fee</label><input aria-label="Service Fee" type="number" min="0" step="any" value="${asNumber(check.serviceFeeAmount) || ''}" data-input="updateCheckNumberField('${check.id}','serviceFeeAmount',this.value)" data-change="renderChecks();save()"></div>
       </div>
       <div class="mode-field">
         <label>Notes</label>
@@ -2416,11 +2422,13 @@ function renderChecks() {
   }
 
   const active = checks.filter(c => !c.isCompleted).length;
-  const total = checks.reduce((sum, check) => sum + checkGrandTotal(check), 0);
+  const receipts = checks.map(checkExactReceipt);
+  const total = receipts.some(value => value.error) ? 'Unavailable — review check amounts'
+    : checkReceiptAmount({...receipts[0],grandTotal:String(receipts.reduce((sum,value)=>sum+BigInt(value.grandTotal),0n))});
   const stats = `<div class="mode-stats">
     <div class="mode-stat"><div class="mode-stat-label">Total Checks</div><div class="mode-stat-val">${checks.length}</div></div>
     <div class="mode-stat"><div class="mode-stat-label">Open</div><div class="mode-stat-val">${active}</div></div>
-    <div class="mode-stat"><div class="mode-stat-label">Grand Total</div><div class="mode-stat-val">${fmtCurrency(total)}</div></div>
+    <div class="mode-stat"><div class="mode-stat-label">Grand Total</div><div class="mode-stat-val">${esc(total)}</div></div>
   </div>`;
 
   const cards = checks.map(check => {
@@ -2443,7 +2451,7 @@ function renderChecks() {
         </div>
         <div class="mode-row-val">${esc(amount)}</div>
       </div>`;
-    }).join('') : `<div class="mode-row"><div class="mode-row-name">No participants</div><div class="mode-row-val">${fmtCurrency(checkGrandTotal(check))}</div></div>`;
+    }).join('') : `<div class="mode-row"><div class="mode-row-name">No participants</div><div class="mode-row-val">${esc(checkReceiptAmount(checkExactReceipt(check)))}</div></div>`;
 
     const metaBits = [
       shortDate(check.dateISO),
@@ -2463,7 +2471,7 @@ function renderChecks() {
           <div class="mode-meta">${esc(metaBits.join(' · '))}</div>
         </div>
         <div class="mode-row-actions">
-          <div class="mode-money">${fmtCurrency(checkGrandTotal(check))}</div>
+          <div class="mode-money">${esc(checkReceiptAmount(checkExactReceipt(check)))}</div>
           <button class="btn btn-ghost btn-xs" data-click="setCheckCompleted('${check.id}',${check.isCompleted ? 'false' : 'true'})">${check.isCompleted ? 'Reopen' : 'Complete'}</button>
           <button class="btn btn-danger btn-xs" data-click="deleteCheck('${check.id}')">Delete</button>
         </div>
@@ -5479,7 +5487,8 @@ function detectCurrency() {
 }
 let _currFmt = null;
 function getResolvedCurrency() {
-  return (S.settings.currencyCode || detectCurrency());
+  // Shared household amounts must not change currency with the viewer's locale.
+  return S.settings.currencyCode || 'USD';
 }
 function buildCurrFmt() {
   _currFmt = new Intl.NumberFormat(navigator.language || 'en-US', { style:'currency', currency:getResolvedCurrency() });
@@ -5497,7 +5506,7 @@ function setCurrencyCode(code) {
   S.settings.currencyCode = code;
   _currFmt = null;
   save();
-  renderBills(); renderSummary(); renderSendPay();
+  renderBills(); renderSummary(); renderSendPay(); renderChecks();
 }
 const POPULAR_CURRENCIES = ['USD','EUR','GBP','CAD','AUD','JPY','CHF','CNY','INR','MXN','BRL','KRW','SGD','HKD','NZD','SEK','NOK','DKK'];
 function currencyName(code) {
@@ -5507,7 +5516,7 @@ function populateCurrencySelect() {
   const sel = document.getElementById('currencySelect');
   if (!sel) return;
   const current = S.settings.currencyCode || '';
-  const auto = detectCurrency();
+  const auto = 'USD';
   let html = `<option value=""${current===''?' selected':''}>Auto (${auto})</option>`;
   html += '<optgroup label="Popular">';
   POPULAR_CURRENCIES.forEach(c => { html += `<option value="${c}"${current===c?' selected':''}>${c} — ${currencyName(c)}</option>`; });
