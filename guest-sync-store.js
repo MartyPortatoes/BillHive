@@ -16,6 +16,10 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 function fields(value, allowed) { return record(value) && Object.keys(value).every(key => allowed.has(key)); }
+function expenseFinance(expense, members) {
+  return canonical([expense.amount, expense.paidByAmounts,
+    [...new Set(expense.splitBetweenIds?.length ? expense.splitBetweenIds : [...members])].sort()]);
+}
 function amountText(amount, currency) {
   if (!amount) return '';
   if (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) return String(amount);
@@ -152,12 +156,16 @@ class GuestTripSync {
       // Public clients cannot replace host attachments/import metadata or future private fields.
       if (index >= 0) expenses[index] = {...expenses[index], ...expense}; else expenses.unshift(expense);
       trip.expenses = expenses;
+      if (!before || expenseFinance(before, members) !== expenseFinance(expenses[index], members)) {
+        if (record(trip.paymentRequestDates)) trip.paymentRequestDates = {};
+      }
       if (before && canonical(before) === canonical(expenses[index])) return null;
       return {kind:before ? 'expenseUpdated' : 'expenseAdded', subjectId:expense.id, subjectName:expense.name,
         amountText:amountText(expense.amount, trip.currency), detail:''};
     } else if (operation.kind === 'deleteExpense') {
       const removed = (trip.expenses || []).find(item => item.id === operation.expenseId);
       trip.expenses = (trip.expenses || []).filter(item => item.id !== operation.expenseId);
+      if (removed && record(trip.paymentRequestDates)) trip.paymentRequestDates = {};
       return removed ? {kind:'expenseDeleted', subjectId:removed.id, subjectName:removed.name || '',
         amountText:amountText(removed.amount, trip.currency), detail:''} : null;
     } else {
@@ -168,6 +176,7 @@ class GuestTripSync {
       if (existing && canonical(existing) !== canonical(settlement)) fail(409, 'SETTLEMENT_ID_REUSED', 'This settlement ID already exists.');
       if (!existing) settlements.push(settlement);
       trip.settlements = settlements;
+      if (!existing && record(trip.paymentRequestDates)) delete trip.paymentRequestDates[settlement.fromMemberId + '_' + settlement.toMemberId];
       const from = trip.members.find(member => member.id === settlement.fromMemberId).name || 'Trip member';
       const to = trip.members.find(member => member.id === settlement.toMemberId).name || 'Trip member';
       return existing ? null : {kind:'settlementRecorded', subjectId:settlement.id, subjectName:'', amountText:'',

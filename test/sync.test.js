@@ -72,6 +72,23 @@ function guestBody(snapshot, operation, mutationId=crypto.randomUUID()) {
 }
 const guestExpense = {id:'expense',name:'Guest renamed train',amount:24,paidByAmounts:{host:24},splitBetweenIds:['host','guest']};
 
+test('guest financial edits invalidate dated requests while notes and other settlement pairs survive', () => {
+  const seed = () => ({currency:'USD', members:[{id:'host',name:'Host'},{id:'guest',name:'Guest'}],
+    expenses:[{...guestExpense,splitBetweenIds:[]}],settlements:[],paymentRequestDates:{guest_host:'2026-10-02',other_pair:'2026-10-01'}});
+  const apply = (trip, operation) => GuestTripSync.prototype.apply.call({},trip,operation);
+  const notes = seed(); apply(notes,{kind:'upsertExpense',expense:{...guestExpense,notes:'Note only'}});
+  assert.deepEqual(notes.paymentRequestDates,seed().paymentRequestDates);
+  for (const edit of [{...guestExpense,amount:30}, {...guestExpense,paidByAmounts:{guest:24}}, {...guestExpense,splitBetweenIds:['guest']}]) {
+    const trip=seed(); apply(trip,{kind:'upsertExpense',expense:edit}); assert.deepEqual(trip.paymentRequestDates,{});
+  }
+  const removed=seed(); apply(removed,{kind:'deleteExpense',expenseId:'expense'}); assert.deepEqual(removed.paymentRequestDates,{});
+  const settled=seed(); apply(settled,{kind:'recordSettlement',settlement:{id:'settled',fromMemberId:'guest',toMemberId:'host',amount:12}});
+  assert.deepEqual(settled.paymentRequestDates,{other_pair:'2026-10-01'});
+  settled.paymentRequestDates.guest_host='2026-10-03';
+  apply(settled,{kind:'recordSettlement',settlement:settled.settlements[0]});
+  assert.equal(settled.paymentRequestDates.guest_host,'2026-10-03');
+});
+
 test('guest commits preserve host-only fields, return only public trip data and block stale owners',async()=>{
   const fixture = await guestFixture(); const baseline = await fixture.read(); const owner = await snapshot(fixture.headers);
   assert.equal(baseline.protocolVersion,1);assert.equal(baseline.revisionPreconditionsRequired,true);
