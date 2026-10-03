@@ -34,6 +34,8 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 
 const Data = require('./public/data-contract.js');
 const { SyncStore, SyncError } = require('./sync-store');
+const Decimal = require('./decimal-json');
+const BillsInviteMoney = require('./bills-invite-money');
 const { GuestTripSync } = require('./guest-sync-store');
 const { CheckShareSync } = require('./check-share-store');
 const { AttachmentStore } = require('./attachment-store');
@@ -405,8 +407,8 @@ app.use(limiter);
 // 2 MB limit is generous enough for large bill configs + monthly data imports
 // while protecting against accidental mega-payloads.
 // A portable restore allows 8 MiB of records plus the pinned commit envelope.
-app.use(['/api/sync/commit', '/api/sync/restore/validate'], express.json({ limit: '10mb' }));
-app.use(express.json({ limit: '2mb' }));
+app.use(['/api/sync/commit', '/api/sync/restore/validate'], express.json({ limit: '10mb', reviver:Decimal.revive }));
+app.use(express.json({ limit: '2mb', reviver:Decimal.revive }));
 
 // ── Auth resolution ──────────────────────────────────────────────────────────
 // Three trusted identity signals, in order of preference:
@@ -569,7 +571,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, decimalJSONProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -647,7 +649,7 @@ function getTripFromState(ownerUserId, tripId) {
   const row = stmts.getState.get(ownerUserId, 'trips');
   if (!row) return null;
   try {
-    const tripsState = JSON.parse(row.value);
+    const tripsState = Decimal.parse(row.value);
     const trips = tripsState.trips || [];
     return trips.find(t => t.id === tripId) || null;
   } catch { return null; }
@@ -699,7 +701,7 @@ function publicTripShape(trip) {
 // compute the guest's current read-only snapshot instead of storing a stale copy.
 
 function parseJSONValue(value, fallback) {
-  try { return JSON.parse(value); } catch { return fallback; }
+  try { return Decimal.parse(value); } catch { return fallback; }
 }
 
 function getStateJSON(userId, key, fallback) {
@@ -717,130 +719,6 @@ function getMonthJSON(userId, key) {
   return row ? parseJSONValue(row.data, { totals: {}, amounts: {} }) : { totals: {}, amounts: {} };
 }
 
-function finiteNumber(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function billLines(bill) {
-  return Array.isArray(bill?.lines) ? bill.lines : [];
-}
-
-function evenCentAmounts(lines, totalCents) {
-  if (!lines.length) return {};
-  const baseCents = Math.floor(totalCents / lines.length);
-  const remainder = totalCents % lines.length;
-  const extraStart = lines.length - remainder;
-  const amounts = {};
-  lines.forEach((line, index) => {
-    const cents = baseCents + (index >= extraStart ? 1 : 0);
-    amounts[line.id] = cents / 100;
-  });
-  return amounts;
-}
-
-function isAutoEvenPctDistribution(lines) {
-  const count = lines.length;
-  if (!count) return false;
-  const exactShare = 100 / count;
-  if (lines.every(line => Math.abs(finiteNumber(line.value) - exactShare) < 0.000001)) {
-    return true;
-  }
-  const roundedShare = Math.round(exactShare * 100) / 100;
-  const lastShare = 100 - (roundedShare * (count - 1));
-  return lines.every((line, index) => {
-    const expected = index === count - 1 ? lastShare : roundedShare;
-    return Math.abs(finiteNumber(line.value) - expected) < 0.005001;
-  });
-}
-
-function pctLineAmounts(bill, total) {
-  const lines = billLines(bill);
-  const totalCents = Math.max(0, Math.round(finiteNumber(total) * 100));
-  if (!lines.length) return {};
-  if (isAutoEvenPctDistribution(lines)) return evenCentAmounts(lines, totalCents);
-
-  const amounts = {};
-  let allocatedCents = 0;
-  lines.slice(0, -1).forEach(line => {
-    const cents = Math.max(0, Math.round(totalCents * finiteNumber(line.value) / 100));
-    amounts[line.id] = cents / 100;
-    allocatedCents += cents;
-  });
-  const last = lines[lines.length - 1];
-  amounts[last.id] = Math.max(0, totalCents - allocatedCents) / 100;
-  return amounts;
-}
-
-function billLineShares(bill, monthData) {
-  const lines = billLines(bill);
-  const amountMap = monthData?.amounts?.[bill.id] || {};
-  const nonRemainderTotal = lines.reduce((total, line) => (
-    line.id === bill.remainderLineId ? total : total + finiteNumber(amountMap[line.id])
-  ), 0);
-  const totals = monthData?.totals || {};
-  const hasTotal = Object.prototype.hasOwnProperty.call(totals, bill.id);
-  const billTotal = hasTotal ? finiteNumber(totals[bill.id]) : nonRemainderTotal;
-  const pctAmounts = bill.splitType === 'pct' ? pctLineAmounts(bill, billTotal) : {};
-
-  return lines.map(line => {
-    let amount = 0;
-    if (bill.splitType === 'pct') {
-      amount = pctAmounts[line.id] || 0;
-    } else if (line.id === bill.remainderLineId) {
-      amount = Math.max(0, billTotal - nonRemainderTotal);
-    } else {
-      amount = finiteNumber(amountMap[line.id]);
-    }
-    return {
-      line,
-      payerId: line.coveredById || line.personId,
-      amount,
-    };
-  });
-}
-
-function computeBillsPersonOwes(people, bills, monthData) {
-  const byPerson = {};
-  for (const bill of Array.isArray(bills) ? bills : []) {
-    const billPayer = bill.paidById || 'me';
-    for (const share of billLineShares(bill, monthData)) {
-      const { line, payerId, amount } = share;
-      if (amount <= 0) continue;
-
-      if (billPayer === 'me') {
-        if (payerId === 'me') continue;
-        if (!byPerson[payerId]) byPerson[payerId] = { total: 0, bills: [] };
-        let billName = bill.name || '';
-        if (line.coveredById && line.coveredById !== line.personId) {
-          const covered = people.find(person => person.id === line.personId);
-          if (covered) billName += ` (covers ${covered.name})`;
-        }
-        byPerson[payerId].total += amount;
-        byPerson[payerId].bills.push({ billId: bill.id, billName, amount });
-      } else if (payerId === 'me') {
-        if (!byPerson[billPayer]) byPerson[billPayer] = { total: 0, bills: [] };
-        byPerson[billPayer].total -= amount;
-        byPerson[billPayer].bills.push({ billId: bill.id, billName: bill.name || '', amount: -amount });
-      }
-    }
-  }
-
-  Object.values(byPerson).forEach(entry => {
-    const consolidated = new Map();
-    entry.bills.forEach(item => {
-      const existing = consolidated.get(item.billId);
-      if (existing) {
-        existing.amount += item.amount;
-      } else {
-        consolidated.set(item.billId, { ...item });
-      }
-    });
-    entry.bills = Array.from(consolidated.values()).sort((a, b) => a.billName.localeCompare(b.billName));
-  });
-  return byPerson;
-}
-
 function buildBillsInvitePayload(ownerUserId, personId) {
   const rawPeople = getStateJSON(ownerUserId, 'people', []);
   const people = Array.isArray(rawPeople) ? rawPeople : [];
@@ -851,7 +729,8 @@ function buildBillsInvitePayload(ownerUserId, personId) {
   const monthKey = currentMonthKey();
   const monthData = getMonthJSON(ownerUserId, monthKey);
   const ownerName = (people.find(p => p.id === 'me') || {}).name || 'Host';
-  const owes = computeBillsPersonOwes(people, bills, monthData);
+  const settings = getStateJSON(ownerUserId, 'settings', {});
+  const owes = BillsInviteMoney.owes(people, bills, monthData, settings.currencyCode || 'USD');
   const personOwes = owes[personId] || { total: 0, bills: [] };
 
   return {
@@ -859,10 +738,11 @@ function buildBillsInvitePayload(ownerUserId, personId) {
     personId,
     personName: person.name || '',
     monthKey,
-    totalOwed: finiteNumber(personOwes.total),
+    currencyCode: settings.currencyCode || 'USD',
+    totalOwed: personOwes.total,
     bills: personOwes.bills.map(item => ({
       name: item.billName,
-      amount: finiteNumber(item.amount),
+      amount: item.amount,
     })),
     payMethod: person.payMethod || 'none',
     payId: person.payId || '',
@@ -888,6 +768,7 @@ function billsInvitePreviewResponse(invite, payload) {
     createdAt: invite.created_at,
     monthSummary: {
       monthKey: payload.monthKey,
+      currencyCode: payload.currencyCode,
       totalOwed: payload.totalOwed,
       bills: payload.bills,
     },
@@ -899,6 +780,7 @@ function sharedBillsDataResponse(payload) {
     ownerName: payload.ownerName,
     personName: payload.personName,
     monthKey: payload.monthKey,
+    currencyCode: payload.currencyCode,
     totalOwed: payload.totalOwed,
     bills: payload.bills,
     payMethod: payload.payMethod,
@@ -945,7 +827,7 @@ app.get('/public/trip/invite/:token/sync/snapshot', publicLimiter, (req, res) =>
   res.json(snapshot);
 });
 app.post('/public/trip/invite/:token/sync/commit', publicLimiter, (req, res) => {
-  const result = guestSync.commit(req.params.token, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
+  const result = guestSync.commit(req.params.token, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1', decimalClient:req.get('X-BillHive-Decimal-JSON') === '1'});
   if (result.response.snapshot) res.setHeader('ETag', sync.etag(result.response.snapshot));
   res.json(result.response);
   if (!result.response.replayed) broadcastChange(result.userId);
@@ -964,7 +846,7 @@ function guestTripWrite(req, res, update) {
     if (!current.joined_at) throw new SyncError(403, 'INVITE_NOT_JOINED', 'Invite not yet accepted');
     const row = stmts.getState.get(current.owner_user_id, 'trips');
     if (!row) throw new SyncError(404, 'TRIP_NOT_FOUND', 'Trip not found');
-    const tripsState = JSON.parse(row.value);
+    const tripsState = Decimal.parse(row.value);
     const trip = (tripsState.trips || []).find(item => item.id === current.trip_id);
     if (!trip) throw new SyncError(404, 'TRIP_NOT_FOUND', 'Trip not found');
     if (trip.isArchived) throw new SyncError(409, 'TRIP_ARCHIVED', 'This trip is archived');
@@ -1076,7 +958,7 @@ app.get('/api/sync/snapshot', (req, res) => {
   res.json(snapshot);
 });
 app.post('/api/sync/commit', (req, res) => {
-  const result = sync.commit(req.userId, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1'});
+  const result = sync.commit(req.userId, req.body, {requireProtection:req.get('X-BillHive-Require-Protection') === '1', decimalClient:req.get('X-BillHive-Decimal-JSON') === '1'});
   res.setHeader('ETag', sync.etag(result));
   res.json(result);
   if (!result.replayed) broadcastChange(req.userId);
@@ -1086,7 +968,7 @@ app.post('/api/sync/restore/validate', (req,res) => {
 });
 
 function legacyWrite(req, res, operation, userId = req.userId) {
-  const result = sync.write(userId, req.get('If-Match'), operation);
+  const result = sync.write(userId, req.get('If-Match'), operation, {decimalClient:req.get('X-BillHive-Decimal-JSON') === '1', input:req.body});
   res.setHeader('ETag', sync.etag(result.metadata));
   res.json(result.value ?? {ok:true});
   broadcastChange(userId);

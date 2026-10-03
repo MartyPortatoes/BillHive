@@ -2,17 +2,24 @@
 
 const crypto = require('node:crypto');
 const Data = require('./public/data-contract');
+const Decimal = require('./decimal-json');
 
 class SyncError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 const fail = (status, code, message) => { throw new SyncError(status, code, message); };
-const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const record = Decimal.record;
 const identifier = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) && !['__proto__','constructor','prototype'].includes(value);
-function canonical(value) {
-  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
-  if (record(value)) return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
-  return JSON.stringify(value);
+const canonical = Decimal.canonical;
+const requestHash = value => crypto.createHash('sha256').update(value).digest('hex');
+function verifyReceipt(receipt, input, hash) {
+  if (receipt.hash_version === 1 && Decimal.legacyReceiptRisk(input)) {
+    // Old hashes discarded these digits. They cannot prove which original
+    // decimal request committed, so leave the client's immutable journal intact.
+    fail(409, 'LEGACY_DECIMAL_RECEIPT_AMBIGUOUS', 'This older receipt cannot verify the original decimal values. Review the saved data before resolving this draft.');
+  }
+  const expected = receipt.hash_version === 1 ? requestHash(Decimal.legacyCanonical(input)) : hash;
+  if (receipt.request_hash !== expected) fail(409, 'MUTATION_ID_REUSED', 'This mutation ID was already used with different data.');
 }
 
 /** One revision stream per authenticated household. Triggers cover every JSON writer, including guests and older clients. */
@@ -40,6 +47,8 @@ class SyncStore {
           PRIMARY KEY(user_id, mutation_id)
         );
       `);
+      if (!db.prepare('PRAGMA table_info(sync_receipts)').all().some(column => column.name === 'hash_version'))
+        db.exec('ALTER TABLE sync_receipts ADD COLUMN hash_version INTEGER NOT NULL DEFAULT 1');
       db.prepare('INSERT OR IGNORE INTO app_settings (key,value) VALUES (?,?)').run('syncInstanceId', crypto.randomUUID());
       // Revisions are opaque monotonically increasing tokens, not counts of API calls.
       // A multi-row transaction may advance several times; readers only see its final revision.
@@ -62,8 +71,8 @@ class SyncStore {
     this.setMonth = db.prepare('INSERT INTO monthly_data(user_id,month_key,data) VALUES (?,?,?) ON CONFLICT(user_id,month_key) DO UPDATE SET data=excluded.data,updated_at=unixepoch() WHERE data != excluded.data');
     this.deleteState = db.prepare('DELETE FROM user_state WHERE user_id=? AND key=?');
     this.deleteMonth = db.prepare('DELETE FROM monthly_data WHERE user_id=? AND month_key=?');
-    this.receipt = db.prepare('SELECT request_hash,revision FROM sync_receipts WHERE user_id=? AND mutation_id=?');
-    this.saveReceipt = db.prepare('INSERT INTO sync_receipts(user_id,mutation_id,request_hash,revision) VALUES (?,?,?,?)');
+    this.receipt = db.prepare('SELECT request_hash,revision,hash_version FROM sync_receipts WHERE user_id=? AND mutation_id=?');
+    this.saveReceipt = db.prepare('INSERT INTO sync_receipts(user_id,mutation_id,request_hash,revision,hash_version) VALUES (?,?,?,?,2)');
   }
 
   metadata(userId) {
@@ -73,19 +82,20 @@ class SyncStore {
   }
   etag(metadata) { return `"bh1:${metadata.serverInstanceId}:${metadata.householdId}:${metadata.revision}"`; }
   snapshotInside(userId) {
-    const state = Object.fromEntries(this.readState.all(userId).map(row => [row.key, JSON.parse(row.value)]));
-    const monthly = Object.fromEntries(this.readMonths.all(userId).map(row => [row.month_key, JSON.parse(row.data)]));
+    const state = Object.fromEntries(this.readState.all(userId).map(row => [row.key, Decimal.parse(row.value)]));
+    const monthly = Object.fromEntries(this.readMonths.all(userId).map(row => [row.month_key, Decimal.parse(row.data)]));
     Data.state(state); Data.months(monthly);
-    return {protocolVersion:1, userId, ...this.metadata(userId), state, monthly};
+    return {protocolVersion:1, decimalJSONProtocol:1, requiresDecimalClient:Decimal.legacyReceiptRisk({state,monthly}), userId, ...this.metadata(userId), state, monthly};
   }
   snapshot(userId) { return this.db.transaction(() => this.snapshotInside(userId)).immediate(); }
 
   /** Used by existing routes; check and write share a SQLite write transaction. */
-  write(userId, ifMatch, operation) {
+  write(userId, ifMatch, operation, {decimalClient=false, input=null}={}) {
     return this.db.transaction(() => {
       const metadata = this.metadata(userId);
       if (!ifMatch && this.requirePreconditions) fail(428, 'PRECONDITION_REQUIRED', 'Refresh with a compatible client before saving.');
       if (ifMatch && ifMatch !== this.etag(metadata)) fail(409, 'REVISION_CONFLICT', 'The household changed. Your edits were not applied.');
+      this.requireDecimalClient(userId, input, decimalClient);
       const value = operation();
       if (value && typeof value.then === 'function') throw new Error('Sync transactions must be synchronous');
       this.validateReferences(userId);
@@ -93,10 +103,16 @@ class SyncStore {
     }).immediate();
   }
 
+  requireDecimalClient(userId, input, supported) {
+    if (!supported && (Decimal.legacyReceiptRisk(input) || this.snapshotInside(userId).requiresDecimalClient))
+      fail(428, 'DECIMAL_CLIENT_REQUIRED', 'Use a client with exact decimal support to save this household. Your server data has been kept.');
+  }
+
   validateCommit(body) {
     if (!record(body)) fail(400, 'INVALID_COMMIT', 'Expected a sync commit object.');
-    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths','checkSharePreconditions']);
+    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths','checkSharePreconditions','decimalJSONProtocol']);
     if (Object.keys(body).some(key => !allowed.has(key))) fail(400, 'INVALID_COMMIT', 'Unknown sync commit field.');
+    if (Object.hasOwn(body,'decimalJSONProtocol') && body.decimalJSONProtocol !== 1) fail(400,'INVALID_COMMIT','Unsupported decimal protocol.');
     if (!identifier(body.serverInstanceId) || !identifier(body.householdId) || !identifier(body.mutationId) || body.mutationId.length < 16 ||
         !Number.isSafeInteger(body.baseRevision) || body.baseRevision < 0) fail(400, 'INVALID_COMMIT', 'Invalid sync identity, revision or mutation ID.');
     try { Data.state(body.state); Data.months(body.monthly); }
@@ -120,9 +136,9 @@ class SyncStore {
     return {...body, deleteStateKeys, deleteMonths};
   }
 
-  commit(userId, body, {requireProtection=false}={}) {
+  commit(userId, body, {requireProtection=false, decimalClient=false}={}) {
     const input = this.validateCommit(body);
-    const hash = crypto.createHash('sha256').update(canonical(input)).digest('hex');
+    const hash = requestHash(canonical(input));
     return this.db.transaction(() => {
       const metadata = this.metadata(userId);
       if (input.serverInstanceId !== metadata.serverInstanceId || input.householdId !== metadata.householdId) {
@@ -130,13 +146,14 @@ class SyncStore {
       }
       const receipt = this.receipt.get(userId, input.mutationId);
       if (receipt) {
-        if (receipt.request_hash !== hash) fail(409, 'MUTATION_ID_REUSED', 'This mutation ID was already used with different data.');
+        verifyReceipt(receipt, input, hash);
         return {...this.snapshotInside(userId), mutationId:input.mutationId, committedRevision:receipt.revision, replayed:true};
       }
       // A persisted receipt acknowledges an earlier write even after protection
       // is disabled. Only new requests depend on the current protection policy.
       if (requireProtection && !this.requirePreconditions) fail(428, 'PROTECTION_DISABLED', 'Enable server revision protection before saving with this client.');
       if (input.baseRevision !== metadata.revision) fail(409, 'REVISION_CONFLICT', 'The household changed. Your edits were not applied.');
+      this.requireDecimalClient(userId, input, decimalClient);
       // Shares advance independently of household JSON. Guard both streams while
       // holding the same write transaction, after exact-request receipt lookup.
       this.validateCheckSharePreconditions(userId,input.checkSharePreconditions);
@@ -174,4 +191,4 @@ class SyncStore {
     }).immediate();
   }
 }
-module.exports = {SyncStore, SyncError};
+module.exports = {SyncStore, SyncError, verifyReceipt};

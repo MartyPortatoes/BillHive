@@ -1,13 +1,15 @@
 /* Shared, fail-closed validation for editable web state and server writes. */
 (function (root) {
   'use strict';
-  const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const Decimal = typeof module !== 'undefined' && module.exports ? require('../decimal-json') : null;
+  const record = value => value !== null && typeof value === 'object' && !Array.isArray(value) && !Decimal?.exact(value);
+  const number = value => Decimal ? Decimal.number(value) : typeof value === 'number' && Number.isFinite(value);
   const monthKey = key => /^\d{4}-(0[1-9]|1[0-2])$/.test(key);
   const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value);
   function assert(ok, message) { if (!ok) throw new Error(message); }
   function tree(value, depth = 0) {
     assert(depth < 40, 'Data is nested too deeply');
-    if (!value || typeof value !== 'object') return;
+    if (!value || typeof value !== 'object' || Decimal?.exact(value)) return;
     for (const [key, item] of Object.entries(value)) {
       assert(!['__proto__', 'constructor', 'prototype'].includes(key), 'Unsafe data key');
       if (key === 'id' || ['personId','coveredById','paidById','remainderLineId','memberId','tripId','expenseId','eventId','linkedPersonId','fromId','toId','participantId','fromMemberId','toMemberId'].includes(key)) {
@@ -49,10 +51,10 @@
   function month(value) {
     assert(record(value), 'Month must be an object'); tree(value);
     for (const key of ['totals', 'amounts']) if (key in value) assert(record(value[key]), key + ' must be an object');
-    for (const n of Object.values(value.totals || {})) assert(typeof n === 'number' && Number.isFinite(n), 'Invalid bill amount');
+    for (const n of Object.values(value.totals || {})) assert(number(n), 'Invalid bill amount');
     for (const amounts of Object.values(value.amounts || {})) {
       assert(record(amounts), 'Invalid line amounts');
-      for (const n of Object.values(amounts)) assert(typeof n === 'number' && Number.isFinite(n), 'Invalid line amount');
+      for (const n of Object.values(amounts)) assert(number(n), 'Invalid line amount');
     }
     return value;
   }

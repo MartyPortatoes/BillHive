@@ -144,6 +144,10 @@ See [revision protocol and staged rollout](docs/sync-protocol.md) for its contra
 coverage limits and client compatibility requirements. Strict preconditions are
 off by default; keep them off in production until the rollout gates are met.
 
+The local Android continuation adds [exact decimal JSON compatibility](docs/decimal-json-protocol.md),
+including lossless numeric storage/hashes and guards for older clients. Deploying
+this companion change and qualifying mixed clients remain separate rollout gates.
+
 SQLite lives in a named Docker volume at `/data/billhive.db`.
 
 **Host-mounted path** (easier backups):

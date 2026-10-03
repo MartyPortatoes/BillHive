@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto');
 const Data = require('./public/data-contract');
+const Decimal = require('./decimal-json');
 const {SyncError} = require('./sync-store');
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const identifier = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) && !['__proto__','constructor','prototype'].includes(value);
@@ -99,16 +100,16 @@ class CheckShareSync {
   check(userId, checkId) {
     const row = this.readState.get(userId,'checks');
     if (!row) return null;
-    const value = JSON.parse(row.value); Data.state({checks:value});
+    const value = Decimal.parse(row.value); Data.state({checks:value});
     return (value.checks || []).find(check => check.id === checkId) || null;
   }
   currency(userId) {
     const row = this.readState.get(userId,'settings');
-    const value = row ? JSON.parse(row.value) : {};
+    const value = row ? Decimal.parse(row.value) : {};
     Data.state({settings:value}); return value.currencyCode || 'USD';
   }
   claims(share) {
-    const values = JSON.parse(share.claims); Data.tree(values);
+    const values = Decimal.parse(share.claims); Data.tree(values);
     if (!Array.isArray(values) || values.some(c => !record(c) || typeof c.claimerName !== 'string' ||
         !Array.isArray(c.itemIds) || c.itemIds.some(id => typeof id !== 'string') || typeof c.claimedAt !== 'string')) {
       fail(409,'INVALID_STORED_CLAIMS','Repair the stored claims before changing this share.');

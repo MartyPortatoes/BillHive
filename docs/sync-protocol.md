@@ -1,5 +1,10 @@
 # SelfHive revision protocol, version 1
 
+The Android continuation now also requires the compatible
+[exact decimal JSON protocol](decimal-json-protocol.md) for new financial writes
+and frozen-request submission. That document covers capability negotiation,
+versioned receipt hashes, older-client guards and migration limits.
+
 This protocol supports the separate native Android app while retaining the
 existing Swift and web clients. It covers the household JSON in `user_state`
 and `monthly_data`. It is an additive local implementation, not a production

@@ -11,6 +11,7 @@
   function validate(snapshot) {
     if (snapshot?.protocolVersion !== 1 || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 ||
         !snapshot.serverInstanceId || !snapshot.householdId || !snapshot.userId) throw failure('INVALID_SNAPSHOT','The server returned an incompatible snapshot.');
+    if (snapshot.requiresDecimalClient === true) throw failure('DECIMAL_CLIENT_REQUIRED','This household contains precise amounts or rates that this web client cannot safely edit. Open it in an app with exact decimal support. Your server data has been kept.');
     Data.state(snapshot.state);Data.months(snapshot.monthly);return snapshot;
   }
   class RevisionClient {

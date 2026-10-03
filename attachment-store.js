@@ -1,4 +1,5 @@
 'use strict';
+const Decimal = require('./decimal-json');
 
 const crypto = require('node:crypto');
 const {SyncError} = require('./sync-store');
@@ -40,7 +41,7 @@ class AttachmentStore {
   }
   trips(userId) {
     const row = this.readTrips.get(userId);
-    return row ? JSON.parse(row.value).trips : [];
+    return row ? Decimal.parse(row.value).trips : [];
   }
   parent(userId, scope) {
     const trip = this.trips(userId).find(trip => trip.id === scope[1]);
