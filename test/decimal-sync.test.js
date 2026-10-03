@@ -154,9 +154,11 @@ test('public Bills and Check sharing projections retain large four-digit money a
   const state = Decimal.parse('{"settings":{"currencyCode":"CLF"},"people":[{"id":"me","name":"Host"},{"id":"guest","name":"Guest"}],"bills":[{"id":"rent","name":"Rent","splitType":"fixed","paidById":"me","remainderLineId":"host-line","lines":[{"id":"host-line","personId":"me"},{"id":"guest-line","personId":"guest"}]}],"checks":{"checks":[{"id":"dinner","name":"Dinner","items":[{"id":"item","name":"Dinner","price":999999999999.0003}],"participants":[]}]}}');
   const monthly = {[month]:Decimal.parse('{"totals":{"rent":999999999999.0003},"amounts":{"rent":{"guest-line":999999999999.0003}}}')};
   assert.equal((await commit(commitBody(first.data,{state,monthly}),headers)).status,200);
-  const inviteResponse = await request('/api/bills/invite',{method:'POST',headers,body:{personId:'guest'}}); assert.equal(inviteResponse.status,200);
+  const inviteBaseline = await request('/api/bills/invite/guest/sync/snapshot',{headers});
+  const inviteResponse = await request('/api/bills/invite',{method:'POST',headers:{...headers,'If-Match':inviteBaseline.headers.get('etag')},body:{personId:'guest'}}); assert.equal(inviteResponse.status,200);
   const invite = await inviteResponse.json();
-  assert.equal((await request(`/public/bills/invite/${invite.token}/join`,{method:'POST',headers:{}})).status,200);
+  const preview = await request(`/public/bills/invite/${invite.token}`,{headers:{}});
+  assert.equal((await request(`/public/bills/invite/${invite.token}/join`,{method:'POST',headers:{'If-Match':preview.headers.get('etag')}})).status,200);
   const billsResponse = await request(`/public/bills/invite/${invite.token}/data`,{headers:{}}); assert.equal(billsResponse.status,200);
   const bills = Decimal.parse(await billsResponse.text());
   assert.equal(bills.currencyCode,'CLF');

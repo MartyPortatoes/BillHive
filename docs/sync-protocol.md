@@ -10,6 +10,11 @@ existing Swift and web clients. It covers the household JSON in `user_state`
 and `monthly_data`. It is an additive local implementation, not a production
 rollout approval or proof that every server feature is revision-protected.
 
+[Bills invitations](bills-invite-protocol.md) now have their own revision stream,
+protected owner/acceptance commands and receipts. They do not mutate household
+financial state. Native UI/journals and older strict-mode Bills clients remain
+separate implementation/rollout work.
+
 ## Capability and identity
 
 `GET /api/health` returns `capabilities.syncProtocol: 1` and

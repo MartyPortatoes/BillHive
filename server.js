@@ -38,6 +38,7 @@ const Decimal = require('./decimal-json');
 const BillsInviteMoney = require('./bills-invite-money');
 const { GuestTripSync } = require('./guest-sync-store');
 const { CheckShareSync } = require('./check-share-store');
+const { BillsInviteSync } = require('./bills-invite-store');
 const { AttachmentStore } = require('./attachment-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -176,6 +177,7 @@ db.exec(`
 const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
 const guestSync = new GuestTripSync(db, sync, publicTripShape);
 const checkSync = new CheckShareSync(db, sync, publicCheckShape);
+const billsSync = new BillsInviteSync(db, sync, nativeBillsInvitePayload);
 const attachments = new AttachmentStore(db, sync);
 sync.validateReferences = userId => attachments.validateReferences(userId);
 
@@ -214,12 +216,7 @@ const stmts = {
   revokeAllTripInvites:       db.prepare('UPDATE trip_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND trip_id = ? AND revoked_at IS NULL'),
 
   // Bills invites
-  findBillsInviteByToken:      db.prepare('SELECT * FROM bills_invites WHERE token = ?'),
-  findActiveBillsInviteForPerson: db.prepare('SELECT * FROM bills_invites WHERE owner_user_id = ? AND person_id = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1'),
   listBillsInvitesForOwner:    db.prepare('SELECT * FROM bills_invites WHERE owner_user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC'),
-  insertBillsInvite:           db.prepare('INSERT INTO bills_invites (token, owner_user_id, person_id) VALUES (?, ?, ?)'),
-  markBillsInviteJoined:       db.prepare('UPDATE bills_invites SET joined_at = unixepoch() WHERE token = ? AND revoked_at IS NULL'),
-  revokeBillsInvite:           db.prepare('UPDATE bills_invites SET revoked_at = unixepoch() WHERE owner_user_id = ? AND person_id = ? AND revoked_at IS NULL'),
 };
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
@@ -571,7 +568,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, decimalJSONProtocol: 1, guestSyncProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, decimalJSONProtocol: 1, guestSyncProtocol: 1, billsInviteProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -759,6 +756,23 @@ function billsInviteInfoResponse(invite) {
   };
 }
 
+function nativeBillsInvitePayload(ownerUserId,personId) {
+  const payload=buildBillsInvitePayload(ownerUserId,personId);
+  if(!payload) return null;
+  const owner=getStateJSON(ownerUserId,'people',[]).find(person=>person.id==='me');
+  const checklist=getStateJSON(ownerUserId,'checklist',{});
+  const dates=getStateJSON(ownerUserId,'requestDates',{});
+  const month=getMonthJSON(ownerUserId,payload.monthKey);
+  return {ownerName:payload.ownerName,personName:payload.personName,monthKey:payload.monthKey,currencyCode:payload.currencyCode,
+    totalOwed:payload.totalOwed,bills:payload.bills,
+    // The debtor's payment profile is a request destination. A guest payment
+    // must instead identify the host. Preserve the legacy data route separately.
+    ownerPayment:{name:payload.ownerName,method:owner?.payMethod || 'none',id:owner?.payId || '',zelleUrl:owner?.zelleUrl || null},
+    received:(Object.hasOwn(checklist[payload.monthKey] || {},`received_${personId}`)
+      ? checklist[payload.monthKey][`received_${personId}`] : month.received?.[personId]) === true,
+    requestedAt:typeof dates[payload.monthKey]?.[personId]==='string'?dates[payload.monthKey][personId]:null};
+}
+
 function billsInvitePreviewResponse(invite, payload) {
   return {
     ownerName: payload.ownerName,
@@ -891,30 +905,27 @@ app.post('/public/trip/invite/:token/settlement', publicLimiter, (req, res) => {
 // one invited person and authorizes read-only access to that person's snapshot.
 
 // GET /public/bills/invite/:token — preview the invite before joining.
+app.get('/public/bills/invite/:token/sync/snapshot', publicLimiter, (req,res)=>{
+  const snapshot=billsSync.publicSnapshot(req.params.token);
+  res.setHeader('ETag',billsSync.etag(snapshot)); res.json(snapshot);
+});
+app.post('/public/bills/invite/:token/sync/accept', publicLimiter, (req,res)=>{
+  const receipt=billsSync.accept(req.params.token,req.body);
+  if(receipt.snapshot) res.setHeader('ETag',billsSync.etag(receipt.snapshot));
+  res.json(receipt);
+  if(!receipt.replayed) broadcastChange(billsSync.find.get(req.params.token).owner_user_id);
+});
 app.get('/public/bills/invite/:token', publicLimiter, (req, res) => {
-  const invite = stmts.findBillsInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-
-  const payload = buildBillsInvitePayload(invite.owner_user_id, invite.person_id);
-  if (!payload) return res.status(404).json({ error: 'Person not found' });
-  res.json(billsInvitePreviewResponse(invite, payload));
+  const snapshot=billsSync.publicSnapshot(req.params.token);
+  res.setHeader('ETag',billsSync.etag(snapshot));
+  res.json(billsInvitePreviewResponse({joined_at:snapshot.joinedAt,created_at:snapshot.createdAt},snapshot));
 });
 
 // POST /public/bills/invite/:token/join — claim the invite. Idempotent.
 app.post('/public/bills/invite/:token/join', publicLimiter, (req, res) => {
-  const invite = stmts.findBillsInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-
-  if (!invite.joined_at) {
-    stmts.markBillsInviteJoined.run(req.params.token);
-  }
-
-  const updatedInvite = stmts.findBillsInviteByToken.get(req.params.token) || invite;
-  const payload = buildBillsInvitePayload(updatedInvite.owner_user_id, updatedInvite.person_id);
-  if (!payload) return res.status(404).json({ error: 'Person not found' });
-  broadcastChange(updatedInvite.owner_user_id);
+  const payload=billsSync.acceptLegacy(req.params.token,req.get('If-Match'));
+  res.setHeader('ETag',billsSync.etag(payload));
+  broadcastChange(billsSync.find.get(req.params.token).owner_user_id);
   res.json({
     ok: true,
     personId: payload.personId,
@@ -923,15 +934,13 @@ app.post('/public/bills/invite/:token/join', publicLimiter, (req, res) => {
   });
 });
 
-// GET /public/bills/invite/:token/data — read the joined person's bill snapshot.
+// Legacy bearer-authorized data route; preview access predates acceptance.
 app.get('/public/bills/invite/:token/data', publicLimiter, (req, res) => {
-  const invite = stmts.findBillsInviteByToken.get(req.params.token);
-  if (!invite) return res.status(404).json({ error: 'Invite not found' });
-  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
-
-  const payload = buildBillsInvitePayload(invite.owner_user_id, invite.person_id);
-  if (!payload) return res.status(404).json({ error: 'Person not found' });
-  res.json(sharedBillsDataResponse(payload));
+  const payload=db.transaction(()=>{
+    const context=billsSync.context(req.params.token);billsSync.requireAccess(context);
+    return sharedBillsDataResponse(buildBillsInvitePayload(context.invite.owner_user_id,context.invite.person_id));
+  }).immediate();
+  res.json(payload);
 });
 
 // GET /share/:token — serves the static claim page. Has to be registered
@@ -1204,6 +1213,20 @@ app.delete('/api/trips/:tripId/invites', (req, res) => {
 // ── Bills invite links (AUTH) ────────────────────────────────────────────────
 // Host-side endpoints for managing per-person household bills invites.
 
+function ownerBillsInviteResponse(snapshot,req) {
+  return {...snapshot,inviteUrl:snapshot.invite?`${publicBaseURL(req)}/public/bills/invite/${snapshot.invite.token}`:null};
+}
+app.get('/api/bills/invite/:personId/sync/snapshot',(req,res)=>{
+  const snapshot=billsSync.ownerSnapshot(req.userId,req.params.personId);
+  res.setHeader('ETag',billsSync.etag(snapshot)); res.json(ownerBillsInviteResponse(snapshot,req));
+});
+app.post('/api/bills/invite/:personId/sync/commit',(req,res)=>{
+  const receipt=billsSync.ownerCommit(req.userId,req.params.personId,req.body);
+  res.setHeader('ETag',billsSync.etag(receipt.snapshot));
+  res.json({...receipt,snapshot:ownerBillsInviteResponse(receipt.snapshot,req)});
+  if(!receipt.replayed) broadcastChange(req.userId);
+});
+
 // POST /api/bills/invite — create a per-person invite link.
 // Body: { personId }. Idempotent if an active invite already exists for
 // this person. Pass ?rotate=1 to revoke any prior invite and mint a fresh one.
@@ -1211,21 +1234,10 @@ app.post('/api/bills/invite', (req, res) => {
   const { personId } = req.body || {};
   if (!personId) return res.status(400).json({ error: 'personId is required' });
 
-  const payload = buildBillsInvitePayload(req.userId, personId);
-  if (!payload) return res.status(404).json({ error: 'Person not found' });
-
   const rotate = req.query.rotate === '1' || req.query.rotate === 'true';
-  if (!rotate) {
-    const existing = stmts.findActiveBillsInviteForPerson.get(req.userId, personId);
-    if (existing) return res.json(billsInviteInfoResponse(existing));
-  } else {
-    stmts.revokeBillsInvite.run(req.userId, personId);
-  }
-
-  const token = crypto.randomBytes(24).toString('base64url');
-  stmts.insertBillsInvite.run(token, req.userId, personId);
-  const invite = stmts.findBillsInviteByToken.get(token);
-  res.json(billsInviteInfoResponse(invite));
+  const result=billsSync.ownerLegacy(req.userId,personId,rotate?'rotate':'create',req.get('If-Match'));
+  res.setHeader('ETag',billsSync.etag(result.snapshot)); res.json(billsInviteInfoResponse(result.invite));
+  broadcastChange(req.userId);
 });
 
 // GET /api/bills/invites — list all active household bills invites.
@@ -1236,8 +1248,9 @@ app.get('/api/bills/invites', (req, res) => {
 
 // DELETE /api/bills/invite/:personId — revoke an invite for one person.
 app.delete('/api/bills/invite/:personId', (req, res) => {
-  stmts.revokeBillsInvite.run(req.userId, req.params.personId);
-  res.json({ ok: true });
+  const result=billsSync.ownerLegacy(req.userId,req.params.personId,'revoke',req.get('If-Match'));
+  res.setHeader('ETag',billsSync.etag(result.snapshot)); res.json({ ok: true });
+  broadcastChange(req.userId);
 });
 
 

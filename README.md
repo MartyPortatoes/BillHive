@@ -148,6 +148,11 @@ The local Android continuation adds [exact decimal JSON compatibility](docs/deci
 including lossless numeric storage/hashes and guards for older clients. Deploying
 this companion change and qualifying mixed clients remain separate rollout gates.
 
+[Bills invitation protocol](docs/bills-invite-protocol.md) adds protected native
+create/rotate/revoke and read-only guest acceptance with exact projections and
+durable receipts. Legacy invitation writers require current ETags in strict mode;
+their unmodified Swift migration remains part of mixed-client qualification.
+
 SQLite lives in a named Docker volume at `/data/billhive.db`.
 
 **Host-mounted path** (easier backups):
