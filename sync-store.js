@@ -27,6 +27,7 @@ class SyncStore {
   constructor(db, {requirePreconditions = false} = {}) {
     this.db = db;
     this.requirePreconditions = requirePreconditions;
+    this.householdReset = null;
     this.validateReferences = () => {};
     this.validateCheckSharePreconditions = (_userId, guards) => {
       if (guards) fail(428, 'CHECK_SHARE_GUARD_UNSUPPORTED', 'Update the server before applying reviewed check claims.');
@@ -110,13 +111,17 @@ class SyncStore {
 
   validateCommit(body) {
     if (!record(body)) fail(400, 'INVALID_COMMIT', 'Expected a sync commit object.');
-    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths','checkSharePreconditions','decimalJSONProtocol']);
+    const allowed = new Set(['serverInstanceId','householdId','baseRevision','mutationId','state','monthly','deleteStateKeys','deleteMonths','checkSharePreconditions','decimalJSONProtocol','householdReset']);
     if (Object.keys(body).some(key => !allowed.has(key))) fail(400, 'INVALID_COMMIT', 'Unknown sync commit field.');
     if (Object.hasOwn(body,'decimalJSONProtocol') && body.decimalJSONProtocol !== 1) fail(400,'INVALID_COMMIT','Unsupported decimal protocol.');
     if (!identifier(body.serverInstanceId) || !identifier(body.householdId) || !identifier(body.mutationId) || body.mutationId.length < 16 ||
         !Number.isSafeInteger(body.baseRevision) || body.baseRevision < 0) fail(400, 'INVALID_COMMIT', 'Invalid sync identity, revision or mutation ID.');
     try { Data.state(body.state); Data.months(body.monthly); }
     catch (_) { fail(400, 'INVALID_COMMIT', 'Invalid household state or monthly data.'); }
+    if (Object.hasOwn(body,'householdReset')) {
+      if (!this.householdReset) fail(428,'RESET_UNSUPPORTED','Update this server before resetting a household.');
+      this.householdReset.validateInput(body);
+    }
     if (Object.hasOwn(body,'checkSharePreconditions')) {
       const guards = body.checkSharePreconditions;
       if (!Array.isArray(guards) || guards.length < 1 || guards.length > 100 || guards.some(guard =>
@@ -147,7 +152,8 @@ class SyncStore {
       const receipt = this.receipt.get(userId, input.mutationId);
       if (receipt) {
         verifyReceipt(receipt, input, hash);
-        return {...this.snapshotInside(userId), mutationId:input.mutationId, committedRevision:receipt.revision, replayed:true};
+        return {...this.snapshotInside(userId), mutationId:input.mutationId, committedRevision:receipt.revision, replayed:true,
+          ...(input.householdReset ? {householdReset:this.householdReset.receipt(userId,input.mutationId)} : {})};
       }
       // A persisted receipt acknowledges an earlier write even after protection
       // is disabled. Only new requests depend on the current protection policy.
@@ -158,21 +164,25 @@ class SyncStore {
       // holding the same write transaction, after exact-request receipt lookup.
       this.validateCheckSharePreconditions(userId,input.checkSharePreconditions);
       // Fail closed on corrupt persisted data before any overwrite, including unknown fields.
-      this.snapshotInside(userId);
+      const current = this.snapshotInside(userId);
+      const reset = input.householdReset ? this.householdReset.prepare(userId,input,current) : null;
       for (const [key,value] of Object.entries(input.state)) this.setState.run(userId,key,JSON.stringify(value));
       for (const [key,value] of Object.entries(input.monthly)) this.setMonth.run(userId,key,JSON.stringify(value));
       for (const key of input.deleteStateKeys) this.deleteState.run(userId,key);
       for (const key of input.deleteMonths) this.deleteMonth.run(userId,key);
+      if (reset) this.householdReset.apply(userId,input,reset);
       this.validateReferences(userId);
       const snapshot = this.snapshotInside(userId);
       this.saveReceipt.run(userId,input.mutationId,hash,snapshot.revision);
-      return {...snapshot, mutationId:input.mutationId, committedRevision:snapshot.revision, replayed:false};
+      return {...snapshot, mutationId:input.mutationId, committedRevision:snapshot.revision, replayed:false,
+        ...(reset ? {householdReset:this.householdReset.receipt(userId,input.mutationId)} : {})};
     }).immediate();
   }
 
   /** Read-only preflight of a complete replacement. The eventual commit still checks its revision. */
   validateRestore(userId, body, inspectFiles) {
     const input = this.validateCommit(body);
+    if (input.householdReset) fail(400,'INVALID_RESTORE','Review household resets through the reset preview.');
     return this.db.transaction(() => {
       if (!this.requirePreconditions) fail(428, 'PROTECTION_DISABLED', 'Enable revision protection before restoring.');
       const current = this.snapshotInside(userId);

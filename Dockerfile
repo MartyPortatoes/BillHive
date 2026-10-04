@@ -10,9 +10,13 @@ RUN npm ci --omit=dev
 
 COPY server.js .
 COPY sync-store.js .
+COPY decimal-json.js .
 COPY guest-sync-store.js .
 COPY check-share-store.js .
+COPY bills-invite-money.js .
+COPY bills-invite-store.js .
 COPY attachment-store.js .
+COPY household-reset-store.js .
 COPY email.js .
 COPY emailTemplate.js .
 COPY index.html ./public/

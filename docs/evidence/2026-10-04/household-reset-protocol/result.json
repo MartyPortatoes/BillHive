@@ -1,0 +1,7 @@
+{
+  "exitCode": 0,
+  "inputsUnchanged": true,
+  "inputCount": 73,
+  "node": "v24.19.0",
+  "scope": "entire server suite, sequential; staged Docker COPY runtime uses local Node/native dependencies, no Docker/Alpine certification"
+}

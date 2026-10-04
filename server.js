@@ -40,6 +40,7 @@ const { GuestTripSync } = require('./guest-sync-store');
 const { CheckShareSync } = require('./check-share-store');
 const { BillsInviteSync } = require('./bills-invite-store');
 const { AttachmentStore } = require('./attachment-store');
+const { HouseholdResetStore } = require('./household-reset-store');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -180,6 +181,7 @@ const checkSync = new CheckShareSync(db, sync, publicCheckShape);
 const billsSync = new BillsInviteSync(db, sync, nativeBillsInvitePayload);
 const attachments = new AttachmentStore(db, sync);
 sync.validateReferences = userId => attachments.validateReferences(userId);
+const householdReset = new HouseholdResetStore(db, sync, attachments, dataDir);
 
 // Prepared statements — better-sqlite3 compiles these once at startup for
 // significantly faster repeated execution. All are synchronous (.get / .run / .all).
@@ -568,7 +570,7 @@ app.get('/api/health', (req, res) => {
     user: req.userId,
     authMethod: req.authMethod,
     requireDeviceKeys: getRequireDeviceKeys(),
-    capabilities: {syncProtocol: 1, decimalJSONProtocol: 1, guestSyncProtocol: 1, billsInviteProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
+    capabilities: {syncProtocol: 1, decimalJSONProtocol: 1, guestSyncProtocol: 1, billsInviteProtocol: 1, checkShareProtocol: 1, checkShareGuardProtocol: 1, attachmentProtocol: 1, backupRestoreProtocol: 1, householdResetProtocol: 1, revisionPreconditionsRequired: sync.requirePreconditions},
     ts: Date.now(),
   });
 });
@@ -974,6 +976,14 @@ app.post('/api/sync/commit', (req, res) => {
 });
 app.post('/api/sync/restore/validate', (req,res) => {
   res.json(sync.validateRestore(req.userId,req.body,state => attachments.missingForRestore(req.userId,state)));
+});
+app.get('/api/sync/reset/preview', (req,res) => {
+  const preview=householdReset.preview(req.userId);
+  res.setHeader('ETag',sync.etag(preview)); res.json(preview);
+});
+app.post('/api/sync/reset/:mutationId/cleanup', (req,res) => {
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(req.params.mutationId)) throw new SyncError(400,'INVALID_RESET','Invalid reset receipt.');
+  res.json(householdReset.cleanup(req.userId,req.params.mutationId,attachmentIdentity(req)));
 });
 
 function legacyWrite(req, res, operation, userId = req.userId) {
@@ -1458,9 +1468,11 @@ function sendManagedAttachment(res, row) {
   res.send(row.bytes);
 }
 app.put('/api/sync/attachments/:kind/:tripId/:recordId/:filename', express.raw({type:'application/octet-stream',limit:'10mb'}), (req,res) => {
+  const revision=req.get('X-BillHive-Revision');
+  if (revision != null && (!/^(0|[1-9][0-9]*)$/.test(revision) || !Number.isSafeInteger(Number(revision)))) throw new SyncError(400,'INVALID_ATTACHMENT','Invalid attachment review revision.');
   const scope = attachments.scope(req.params.kind,req.params.tripId,req.params.recordId,req.params.filename);
   res.json(attachments.upload(req.userId,scope,attachmentIdentity(req),
-    {id:req.get('X-Attachment-Id'),mimeType:req.get('X-Attachment-Type'),sha256:req.get('X-Attachment-SHA256')},req.body));
+    {id:req.get('X-Attachment-Id'),mimeType:req.get('X-Attachment-Type'),sha256:req.get('X-Attachment-SHA256')},req.body,null,revision==null?null:Number(revision)));
 });
 app.put('/api/sync/restore/attachments/:kind/:tripId/:recordId/:filename', express.raw({type:'application/octet-stream',limit:'10mb'}), (req,res) => {
   const revision = req.get('X-BillHive-Revision');
@@ -1504,19 +1516,6 @@ function sanitizePathSegment(seg) {
   return cleaned;
 }
 
-// Resolves the receipts directory for a given user + expense, creating it lazily.
-function receiptsDir(userId, expenseId) {
-  const dir = path.join(dataDir, 'trip-receipts', userId, expenseId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function itineraryAttachmentsDir(userId, eventId) {
-  const dir = path.join(dataDir, 'trip-itinerary-attachments', userId, eventId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 // POST /api/trips/:tripId/expenses/:expenseId/attachments
 // Upload a JPEG receipt image. The attachmentId is passed via the
 // X-Attachment-Id header (the iOS client generates the UUID). The raw
@@ -1536,12 +1535,11 @@ app.post('/api/trips/:tripId/expenses/:expenseId/attachments',
 
     const filename = `${attachmentId}.jpg`;
     if (attachments.isManagedLegacyPath(req.userId,'expenses',expenseId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Managed attachment content cannot be overwritten.');
-    const dir = receiptsDir(req.userId, expenseId);
-    const filePath = path.join(dir, filename);
-
     try {
-      fs.writeFileSync(filePath, req.body);
+      householdReset.legacyWrite(req.userId,'expenses',req.params.tripId,expenseId,filename,req.get('If-Match'),
+        () => householdReset.writeLegacy(req.userId,'expenses',expenseId,filename,req.body));
     } catch (e) {
+      if (e instanceof SyncError) throw e;
       console.error('Attachment write failed:', e.message);
       return res.status(500).json({ error: 'Failed to save attachment' });
     }
@@ -1563,8 +1561,8 @@ app.get('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req, re
     return sendManagedAttachment(res,attachments.download(req.userId,attachments.scope('expenses',req.params.tripId,expenseId,filename)));
   }
 
-  const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
+  const filePath = householdReset.legacyReadPath(req.userId,'expenses',req.params.tripId,expenseId,filename);
+  if (!filePath) return res.status(404).json({ error: 'Attachment not found' });
 
   res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
   res.attachment(filename);
@@ -1583,10 +1581,11 @@ app.delete('/api/trips/:tripId/expenses/:expenseId/attachments/:filename', (req,
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
   if (attachments.isManagedLegacyPath(req.userId,'expenses',expenseId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Remove the attachment reference with a revision-checked household save.');
 
-  const filePath = path.join(dataDir, 'trip-receipts', req.userId, expenseId, filename);
   try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    householdReset.legacyWrite(req.userId,'expenses',req.params.tripId,expenseId,filename,req.get('If-Match'),
+      () => householdReset.deleteLegacy(req.userId,'expenses',expenseId,filename));
   } catch (e) {
+    if (e instanceof SyncError) throw e;
     console.error('Attachment delete failed:', e.message);
     return res.status(500).json({ error: 'Failed to delete attachment' });
   }
@@ -1614,12 +1613,11 @@ app.post('/api/trips/:tripId/itinerary/:eventId/attachments',
       return res.status(400).json({ error: 'Empty body — expected attachment data' });
     }
 
-    const dir = itineraryAttachmentsDir(req.userId, eventId);
-    const filePath = path.join(dir, filename);
-
     try {
-      fs.writeFileSync(filePath, req.body);
+      householdReset.legacyWrite(req.userId,'itinerary',req.params.tripId,eventId,filename,req.get('If-Match'),
+        () => householdReset.writeLegacy(req.userId,'itinerary',eventId,filename,req.body));
     } catch (e) {
+      if (e instanceof SyncError) throw e;
       console.error('Itinerary attachment write failed:', e.message);
       return res.status(500).json({ error: 'Failed to save attachment' });
     }
@@ -1640,8 +1638,8 @@ app.get('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, res
     return sendManagedAttachment(res,attachments.download(req.userId,attachments.scope('itinerary',req.params.tripId,eventId,filename)));
   }
 
-  const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' });
+  const filePath = householdReset.legacyReadPath(req.userId,'itinerary',req.params.tripId,eventId,filename);
+  if (!filePath) return res.status(404).json({ error: 'Attachment not found' });
 
   res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; frame-ancestors 'none'");
   res.attachment(filename);
@@ -1658,10 +1656,11 @@ app.delete('/api/trips/:tripId/itinerary/:eventId/attachments/:filename', (req, 
   if (!filename) return res.status(400).json({ error: 'Invalid filename' });
   if (attachments.isManagedLegacyPath(req.userId,'itinerary',eventId,filename)) throw new SyncError(409,'IMMUTABLE_ATTACHMENT','Remove the attachment reference with a revision-checked household save.');
 
-  const filePath = path.join(dataDir, 'trip-itinerary-attachments', req.userId, eventId, filename);
   try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    householdReset.legacyWrite(req.userId,'itinerary',req.params.tripId,eventId,filename,req.get('If-Match'),
+      () => householdReset.deleteLegacy(req.userId,'itinerary',eventId,filename));
   } catch (e) {
+    if (e instanceof SyncError) throw e;
     console.error('Itinerary attachment delete failed:', e.message);
     return res.status(500).json({ error: 'Failed to delete attachment' });
   }

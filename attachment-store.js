@@ -12,6 +12,7 @@ const filename = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._
 class AttachmentStore {
   constructor(db, sync) {
     this.db = db; this.sync = sync;
+    this.requiresResetRevision = () => false;
     db.exec(`CREATE TABLE IF NOT EXISTS trip_attachment_blobs (
       user_id TEXT NOT NULL, kind TEXT NOT NULL, trip_id TEXT NOT NULL, record_id TEXT NOT NULL,
       filename TEXT NOT NULL, attachment_id TEXT NOT NULL, mime_type TEXT NOT NULL,
@@ -20,13 +21,17 @@ class AttachmentStore {
       PRIMARY KEY(user_id, kind, trip_id, record_id, filename),
       UNIQUE(user_id, kind, trip_id, record_id, attachment_id)
     )`);
+    if (!db.prepare('PRAGMA table_info(trip_attachment_blobs)').all().some(column => column.name === 'purged_at'))
+      db.exec('ALTER TABLE trip_attachment_blobs ADD COLUMN purged_at INTEGER');
     this.find = db.prepare('SELECT * FROM trip_attachment_blobs WHERE user_id=? AND kind=? AND trip_id=? AND record_id=? AND filename=?');
-    this.findMetadata = db.prepare('SELECT attachment_id,filename,mime_type,sha256,size_bytes FROM trip_attachment_blobs WHERE user_id=? AND kind=? AND trip_id=? AND record_id=? AND filename=?');
+    this.findMetadata = db.prepare('SELECT attachment_id,filename,mime_type,sha256,size_bytes,purged_at FROM trip_attachment_blobs WHERE user_id=? AND kind=? AND trip_id=? AND record_id=? AND filename=?');
     this.readTrips = db.prepare("SELECT value FROM user_state WHERE user_id=? AND key='trips'");
     this.findId = db.prepare('SELECT filename FROM trip_attachment_blobs WHERE user_id=? AND kind=? AND trip_id=? AND record_id=? AND attachment_id=?');
     this.legacyPath = db.prepare('SELECT 1 FROM trip_attachment_blobs WHERE user_id=? AND kind=? AND record_id=? AND filename=? LIMIT 1');
     this.insert = db.prepare('INSERT INTO trip_attachment_blobs(user_id,kind,trip_id,record_id,filename,attachment_id,mime_type,sha256,size_bytes,bytes) VALUES (?,?,?,?,?,?,?,?,?,?)');
-    this.usage = db.prepare('SELECT COALESCE(SUM(size_bytes),0) AS bytes FROM trip_attachment_blobs WHERE user_id=?');
+    this.usage = db.prepare('SELECT COALESCE(SUM(size_bytes),0) AS bytes FROM trip_attachment_blobs WHERE user_id=? AND purged_at IS NULL');
+    this.rehydrate = db.prepare('UPDATE trip_attachment_blobs SET bytes=?,purged_at=NULL WHERE user_id=? AND kind=? AND trip_id=? AND record_id=? AND filename=? AND purged_at IS NOT NULL');
+    this.purge = db.prepare("UPDATE trip_attachment_blobs SET bytes=x'',purged_at=unixepoch() WHERE user_id=? AND purged_at IS NULL");
   }
   scope(kind, tripId, recordId, name) {
     if (!['expenses','itinerary'].includes(kind) || !segment(tripId) || !segment(recordId) || !filename(name)) fail(400,'INVALID_ATTACHMENT','Invalid attachment location.');
@@ -57,7 +62,7 @@ class AttachmentStore {
       (descriptor.storageVersion == null && descriptor.sha256 == null && descriptor.sizeBytes == null ||
         descriptor.storageVersion === 1 && descriptor.sha256 === row.sha256 && descriptor.sizeBytes === row.size_bytes);
   }
-  upload(userId, scope, expected, descriptor, bytes, restoreRevision = null) {
+  upload(userId, scope, expected, descriptor, bytes, restoreRevision = null, uploadRevision = null) {
     const limit = scope[0] === 'expenses' ? 2 * 1024 * 1024 : 10 * 1024 * 1024;
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > limit || !segment(descriptor.id) ||
         !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(descriptor.mimeType || '') || descriptor.mimeType.length > 128 ||
@@ -72,12 +77,27 @@ class AttachmentStore {
       if (restoreRevision !== null && (!Number.isSafeInteger(restoreRevision) || restoreRevision < 0)) fail(400,'INVALID_RESTORE','Invalid restore revision.');
       const old = this.find.get(userId,...scope);
       if (old) {
-        if (old.attachment_id !== descriptor.id || old.mime_type !== descriptor.mimeType || old.sha256 !== descriptor.sha256 || !old.bytes.equals(bytes)) {
+        if (old.attachment_id !== descriptor.id || old.mime_type !== descriptor.mimeType || old.sha256 !== descriptor.sha256 || old.size_bytes !== bytes.length ||
+            old.purged_at == null && !old.bytes.equals(bytes)) {
           fail(409,'ATTACHMENT_ID_REUSED','This attachment name already identifies different content.');
         }
-        return {...identity,...this.descriptor(old),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:true};
+        if (old.purged_at == null) return {...identity,...this.descriptor(old),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:true};
+        // A reset retains the immutable reservation, not its bytes. A stale
+        // upload cannot rehydrate a removed parent. Explicit restore staging
+        // pins the current revision and can supply the original verified bytes.
+        if (restoreRevision === null) {
+          this.validateUploadRevision(userId,uploadRevision);
+          const {trip} = this.parent(userId,scope);
+          if (trip.isArchived) fail(409,'TRIP_ARCHIVED','Reopen the trip before adding attachments.');
+        } else if (this.sync.metadata(userId).revision !== restoreRevision) {
+          fail(409,'REVISION_CONFLICT','The household changed. Review the restore again.');
+        }
+        if (this.usage.get(userId).bytes + bytes.length > 256 * 1024 * 1024) fail(413,'ATTACHMENT_QUOTA','The household attachment storage limit has been reached.');
+        if (this.rehydrate.run(bytes,userId,...scope).changes !== 1) throw new Error('Attachment reservation changed');
+        return {...identity,...this.descriptor(old),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:false};
       }
       if (restoreRevision === null) {
+        this.validateUploadRevision(userId,uploadRevision);
         const {trip,record} = this.parent(userId,scope);
         if (trip.isArchived) fail(409,'TRIP_ARCHIVED','Reopen the trip before adding attachments.');
         if (Array.isArray(record.attachments) && record.attachments.some(item => item?.filename === scope[3] || item?.id === descriptor.id)) {
@@ -92,6 +112,12 @@ class AttachmentStore {
       this.insert.run(userId,...scope,descriptor.id,descriptor.mimeType,descriptor.sha256,bytes.length,bytes);
       return {...identity,...this.descriptor(this.find.get(userId,...scope)),kind:scope[0],tripId:scope[1],recordId:scope[2],replayed:false};
     }).immediate();
+  }
+  validateUploadRevision(userId, revision) {
+    if (!this.requiresResetRevision(userId)) return;
+    if (revision == null) fail(428,'PRECONDITION_REQUIRED','Refresh with a compatible client before uploading after household reset.');
+    if (!Number.isSafeInteger(revision) || revision<0) fail(400,'INVALID_ATTACHMENT','Invalid attachment review revision.');
+    if (this.sync.metadata(userId).revision !== revision) fail(409,'REVISION_CONFLICT','The household changed. This attachment upload was not applied.');
   }
   /** Inspect managed references in prospective restore JSON without publishing records or bytes. */
   missingForRestore(userId, state) {
@@ -112,6 +138,7 @@ class AttachmentStore {
         const declared = ['storageVersion','sha256','sizeBytes'].some(key => Object.hasOwn(item,key));
         if (!declared) {
           if (row && !this.matches(row,item) || registeredId && registeredId.filename !== item.filename) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity already belongs to another file.');
+          if (row?.purged_at != null) fail(409,'ATTACHMENT_NOT_READY','This attachment was purged. Restore a backup containing its exact content identity and bytes.');
           continue; // Records-only legacy references make no promise of available bytes.
         }
         if (item.storageVersion !== 1 || !/^[a-f0-9]{64}$/.test(item.sha256 || '') ||
@@ -121,7 +148,7 @@ class AttachmentStore {
           fail(400,'INVALID_ATTACHMENT','Invalid restore attachment content identity.');
         }
         if (row && !this.matches(row,item) || registeredId && registeredId.filename !== item.filename) fail(409,'ATTACHMENT_ID_REUSED','This attachment identity already belongs to another file.');
-        if (!row) {
+        if (!row || row.purged_at != null) {
           requiredBytes += item.sizeBytes;
           missing.push({kind,tripId:trip.id,recordId:record.id,id:item.id,filename:item.filename,mimeType:item.mimeType,
             storageVersion:1,sha256:item.sha256,sizeBytes:item.sizeBytes});
@@ -149,7 +176,7 @@ class AttachmentStore {
           fail(400,'INVALID_ATTACHMENT','Invalid or repeated attachment reference.');
         }
         ids.add(item.id); names.add(item.filename);
-        if (!row || !this.matches(row,item)) {
+        if (!row || row.purged_at != null || !this.matches(row,item)) {
           fail(409,'ATTACHMENT_NOT_READY','Upload the exact attachment content before saving its reference.');
         }
       }
@@ -160,6 +187,7 @@ class AttachmentStore {
       if (expected) this.identity(userId,expected);
       const row = this.find.get(userId,...scope);
       if (!row) fail(404,'ATTACHMENT_NOT_FOUND','The attachment is unavailable.');
+      if (row.purged_at != null) fail(410,'ATTACHMENT_PURGED','Restore the exact attachment bytes before opening it.');
       const {record} = this.parent(userId,scope);
       if (!Array.isArray(record.attachments) || !record.attachments.some(item => item?.filename === scope[3] && this.matches(row,item))) fail(404,'ATTACHMENT_NOT_FOUND','The attachment is no longer referenced.');
       if (hash(row.bytes) !== row.sha256 || row.bytes.length !== row.size_bytes) fail(500,'ATTACHMENT_CORRUPT','Stored attachment verification failed.');
