@@ -179,6 +179,11 @@ docker exec billhive sqlite3 /data/billhive.db .dump > backup.sql
 
 ## Environment Variables
 
+The optional official Android Play merchant is disabled by default and separate
+from household authentication. See [merchant configuration and qualification
+limits](docs/play-merchant.md) before enabling it. No Google credentials are
+required for ordinary SelfHive operation.
+
 | Variable | Default | Description |
 |---|---|---|
 | `HOST` | `0.0.0.0` | Bind address; use `127.0.0.1` for local-only development |

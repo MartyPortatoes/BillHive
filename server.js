@@ -41,6 +41,7 @@ const { CheckShareSync } = require('./check-share-store');
 const { BillsInviteSync } = require('./bills-invite-store');
 const { AttachmentStore } = require('./attachment-store');
 const { HouseholdResetStore } = require('./household-reset-store');
+const { configuredPlayVerifier, mountPlayVerification } = require('./play-verification');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -67,6 +68,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+const playVerifier = configuredPlayVerifier(process.env, db);
 
 // Schema: three tables, all keyed by user_id for multi-tenant isolation.
 //
@@ -407,6 +409,7 @@ app.use(limiter);
 // while protecting against accidental mega-payloads.
 // A portable restore allows 8 MiB of records plus the pinned commit envelope.
 app.use(['/api/sync/commit', '/api/sync/restore/validate'], express.json({ limit: '10mb', reviver:Decimal.revive }));
+app.use('/api/play/verify', express.json({limit:'32kb'}));
 app.use(express.json({ limit: '2mb', reviver:Decimal.revive }));
 
 // ── Auth resolution ──────────────────────────────────────────────────────────
@@ -953,6 +956,9 @@ app.get('/share/:token', publicLimiter, (req, res) => {
 
 // ── Enforce auth on the rest of /api/* ────────────────────────────────────────
 // Anything below this line requires authentication when the toggle is on.
+// Public merchant verification uses a purchase bearer, never household keys/roles.
+mountPlayVerification(app, playVerifier, rateLimit({windowMs:60000,max:30,standardHeaders:'draft-7',legacyHeaders:false,
+  message:{code:'PLAY_CHECK_UNAVAILABLE'}}));
 app.use('/api', requireAuth);
 
 // ── State API ─────────────────────────────────────────────────────────────────
