@@ -18,6 +18,7 @@ COPY bills-invite-store.js .
 COPY attachment-store.js .
 COPY household-reset-store.js .
 COPY play-verification.js .
+COPY tripSharing.js .
 COPY email.js .
 COPY emailTemplate.js .
 COPY index.html ./public/

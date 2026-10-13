@@ -215,6 +215,8 @@ Auth: every `/api/*` request must authenticate via one of: `Authorization: Beare
 | GET | `/public/bills/invite/:token` | Preview a household bills invite *(public)* |
 | POST | `/public/bills/invite/:token/join` | Join a household bills invite *(public)* |
 | GET | `/public/bills/invite/:token/data` | Read the joined person's bills snapshot *(public)* |
+| GET | `/public/trip/invite/:token/trip` | Read a joined trip using its active invite token |
+| PUT | `/public/trip/invite/:token/trip` | Merge participant trip edits (`base` and `trip`) without replacing concurrent changes |
 | GET | `/api/export` | Download full JSON backup |
 | POST | `/api/import` | Restore from JSON backup |
 | GET | `/api/email/config` | Get email config (secrets masked) |
@@ -297,3 +299,14 @@ The root `index.html` and `public/` assets are served directly in development. R
 - Browser appearance is stored in `webPreferences`, separately from mobile settings, so native saves do not erase it.
 
 See [the parity review and screenshots](docs/parity/REVIEW.md) for implemented changes, verification, and remaining deployment checks.
+
+### Joined-trip collaboration continuation (October 12, 2026)
+
+Full participant edits now use the owner's existing revision transaction and
+retain exact decimal values. The native client supplies an ETag; strict servers
+reject missing or stale preconditions. Private attachment/provenance/activity
+fields are preserved in canonical state, and durable deleted-ID records prevent
+lost-response retries from recreating deleted records. Full-trip financial changes
+clear dated payment requests; unchanged retries preserve newer request status.
+`npm test` passes 250 tests. See `../iOS_App/docs/trip-sharing-collaboration.md`
+for the three-repository implementation and remaining hosted/native acceptance gates.

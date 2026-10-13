@@ -173,3 +173,75 @@ test('compatibility mode keeps older clients working but refuses clients requiri
   assert.equal((await request('/api/state',{method:'PUT',headers,body:{settings:{currencyCode:'USD'}}})).status,200);
   const stale=await request('/api/sync/commit',{method:'POST',headers,body});assert.equal(stale.status,409);
 });
+
+test('joined trip participants edit full details without overwriting other participants or owner data', async () => {
+  const owner = {'remote-user':'trip-owner'};
+  const original = {
+    id:'collaborative-trip', name:'Zion', icon:'✈️', currency:'USD', notes:'original', ownerId:'owner-device',
+    members:[{id:'host',name:'Brother',linkedPersonId:'me'},{id:'guest',name:'Matt',linkedPersonId:'matt'}],
+    expenses:[{id:'hotel',name:'Hotel',amount:200,notes:'',paidByAmounts:{host:200},splitBetweenIds:[]}],
+    settlements:[], itinerary:[{id:'hike',title:'Hike',dayISO:'2026-10-15',notes:''}], activity:[],
+    paymentRequestDates:{}, checklistItems:[],
+  };
+  const untouched = {id:'private-trip',name:'Private',members:[],expenses:[]};
+  await request('/api/state',{method:'PUT',headers:owner,body:{trips:{trips:[original,untouched],sharedTrips:[]}}});
+  const invite = await (await request('/api/trips/'+original.id+'/invite', {method:'POST',headers:owner,body:{memberId:'guest'}})).json();
+  const path = '/public/trip/invite/'+invite.token;
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base:original,trip:original}})).status,403);
+  const joined = await (await request(path+'/join',{method:'POST'})).json();
+  const base = joined.trip;
+  assert.equal(base.itinerary[0].id,'hike');
+  assert.equal(base.members[0].linkedPersonId,undefined);
+  const edited = structuredClone(base);
+  edited.name='Zion National Park'; edited.notes='Bring water'; edited.icon='🏞️';
+  edited.expenses[0].amount=225;
+  edited.expenses.push({id:'dinner',name:'Dinner',amount:80,paidByAmounts:{guest:80},splitBetweenIds:[]});
+  edited.itinerary[0].title='Sunrise hike';
+  edited.settlements.push({id:'paid',fromMemberId:'guest',toMemberId:'host',amount:40});
+  edited.activity=[{id:'guest-event',kind:'expenseAdded',actorName:'Matt',actorMemberId:'guest'}];
+  edited.ownerId='attacker'; edited.members[0].linkedPersonId='attacker';
+  // An independent edit arrives after the participant loaded the trip.
+  const concurrent = structuredClone(original);
+  concurrent.expenses[0].notes='Booked by host';
+  concurrent.expenses.push({id:'car',name:'Rental car',amount:491.27,paidByAmounts:{host:491.27},splitBetweenIds:[]});
+  concurrent.itinerary[0].notes='Meet at 6am';
+  concurrent.paymentRequestDates.host_guest='2026-10-13';
+  await request('/api/state',{method:'PUT',headers:owner,body:{trips:{trips:[concurrent,untouched],sharedTrips:[]}}});
+  const response = await request(path+'/trip',{method:'PUT',body:{base,trip:edited}});
+  assert.equal(response.status,200);
+  const updated = (await response.json()).trip;
+  assert.equal(updated.name,'Zion National Park');
+  assert.equal(updated.expenses.find(e=>e.id==='hotel').amount,225);
+  assert.equal(updated.expenses.find(e=>e.id==='hotel').notes,'Booked by host');
+  assert.deepEqual(new Set(updated.expenses.map(e=>e.id)),new Set(['hotel','car','dinner']));
+  assert.equal(updated.itinerary[0].title,'Sunrise hike');
+  assert.equal(updated.itinerary[0].notes,'Meet at 6am');
+  assert.equal(updated.settlements.length,1);
+  assert.equal(updated.activity,undefined,'owner activity is private');
+  const savedState = await (await request('/api/state',{headers:owner})).json();
+  assert.deepEqual(savedState.trips.trips[1],untouched);
+  assert.equal(savedState.trips.trips[0].ownerId,'owner-device');
+  assert.equal(savedState.trips.trips[0].members[0].linkedPersonId,'me');
+  assert.equal(savedState.trips.trips[0].members[1].linkedPersonId,'matt');
+  // A stale retry is idempotent, and another invited member sees the same canonical trip.
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base,trip:edited}})).status,200);
+  const reread = (await (await request(path+'/trip')).json()).trip;
+  assert.equal(reread.expenses.filter(e=>e.id==='dinner').length,1);
+  const other = await (await request('/api/trips/'+original.id+'/invite',{method:'POST',headers:owner,body:{memberId:'host'}})).json();
+  const otherJoined = await (await request('/public/trip/invite/'+other.token+'/join',{method:'POST'})).json();
+  assert.equal(otherJoined.trip.name,'Zion National Park');
+  assert.equal(otherJoined.trip.expenses.length,3);
+  // Explicit participant deletions remove records without resurrecting stale owner data.
+  const removal = structuredClone(reread);
+  removal.expenses=removal.expenses.filter(e=>e.id!=='dinner'); removal.settlements=[]; removal.itinerary=[];
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base:reread,trip:removal}})).status,200);
+  const removed = (await (await request(path+'/trip')).json()).trip;
+  assert.ok(!removed.expenses.some(e=>e.id==='dinner'));
+  assert.deepEqual(removed.settlements,[]); assert.deepEqual(removed.itinerary,[]);
+  // The invite cannot target another trip, accept malformed data, or survive revocation.
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base,trip:{...edited,id:'private-trip'}}})).status,400);
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base,trip:{...edited,expenses:null}}})).status,400);
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base,trip:JSON.parse('{"id":"collaborative-trip","__proto__":{"admin":true}}')}})).status,400);
+  await request('/api/trips/'+original.id+'/invite/guest',{method:'DELETE',headers:owner});
+  assert.equal((await request(path+'/trip',{method:'PUT',body:{base:reread,trip:removal}})).status,410);
+});

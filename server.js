@@ -44,6 +44,7 @@ const { HouseholdResetStore } = require('./household-reset-store');
 const { configuredPlayVerifier, mountPlayVerification } = require('./play-verification');
 const app = express();
 const PORT = process.env.PORT || 8080;
+const {mergeChanges, validateTrip, TripDeletionHistory} = require('./tripSharing');
 const HOST = process.env.HOST || '0.0.0.0';
 const AUTH_ADMIN_USERS = new Set((process.env.AUTH_ADMIN_USERS ?? 'local').split(',').map(value => value.trim()).filter(Boolean));
 const INDEX_PATH = fs.existsSync(path.join(__dirname, 'index.html')) ? path.join(__dirname, 'index.html') : path.join(__dirname, 'public', 'index.html');
@@ -66,6 +67,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 // performance when multiple SSE clients are polling alongside state saves.
 // Foreign keys are enabled for future schema extensions but not currently used.
 const db = new Database(DB_PATH);
+const tripDeletions = new TripDeletionHistory(db);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 const playVerifier = configuredPlayVerifier(process.env, db);
@@ -661,6 +663,7 @@ function getTripFromState(ownerUserId, tripId) {
 function publicTripShape(trip) {
   return {
     id: trip.id,
+    icon: trip.icon || '✈️',
     name: trip.name || '',
     startDateISO: trip.startDateISO || '',
     endDateISO: trip.endDateISO || '',
@@ -695,6 +698,9 @@ function publicTripShape(trip) {
       ...(s.sourceActionId ? {sourceActionId:s.sourceActionId} : {})})),
     checklistItems: (trip.checklistItems || []).map(item => ({id:item.id,label:item.label || '',
       isDone:!!item.isDone,createdAtISO:item.createdAtISO || ''})),
+    itinerary: (trip.itinerary || []).map(e => ({id:e.id, dayISO:e.dayISO || '', time:e.time || '',
+      title:e.title || '', location:e.location || '', notes:e.notes || ''})),
+    paymentRequestDates: trip.paymentRequestDates || {},
   };
 }
 
@@ -850,6 +856,40 @@ app.post('/public/trip/invite/:token/sync/commit', publicLimiter, (req, res) => 
   if (result.response.snapshot) res.setHeader('ETag', sync.etag(result.response.snapshot));
   res.json(result.response);
   if (!result.response.replayed) broadcastChange(result.userId);
+});
+
+// A joined participant can edit the trip through the same screens as its owner.
+// Merge a three-way edit into the owner's canonical trip, scoped to this invite.
+app.put('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({error:'Invite not found'});
+  const {base, trip: edited} = req.body || {};
+  try { validateTrip(base, invite.trip_id); validateTrip(edited, invite.trip_id); }
+  catch (error) { return res.status(400).json({error:error.message}); }
+  legacyWrite(req, res, () => {
+    const current = guestSync.invite(req.params.token);
+    const context = guestSync.context(current);
+    guestSync.requireAccess(context);
+    const original = context.trip;
+    const merged = mergeChanges(publicTripShape(base), publicTripShape(edited), publicTripShape(original));
+    tripDeletions.apply(current.owner_user_id,current.trip_id,original,merged);
+    // Only the original owner can assign private household links.
+    merged.members = merged.members.map(member => ({...member,
+      linkedPersonId:(original.members || []).find(previous => previous.id === member.id)?.linkedPersonId ?? null}));
+    for (const key of ['expenses','itinerary','settlements','checklistItems']) {
+      merged[key] = (merged[key] || []).map(row => ({...(original[key] || []).find(old => old.id === row.id), ...row}));
+    }
+    const updated = {...original, ...merged, id:original.id, ownerId:original.ownerId};
+    // A changed balance invalidates dated requests; a retry of an unchanged merge does not.
+    const finance = trip => Decimal.canonical([trip.currency, trip.members.map(member => member.id).sort(),
+      trip.expenses.map(e => [e.id,e.amount,e.paidByAmounts,e.splitBetweenIds]).sort((a,b) => a[0].localeCompare(b[0])), trip.settlements]);
+    if (finance(original) !== finance(updated)) updated.paymentRequestDates = {};
+    validateTrip(updated, current.trip_id);
+    context.trips.trips[context.trips.trips.findIndex(trip => trip.id === current.trip_id)] = updated;
+    Data.state({trips:context.trips});
+    stmts.setState.run(current.owner_user_id,'trips',JSON.stringify(context.trips));
+    return {trip:publicTripShape(updated)};
+  }, invite.owner_user_id);
 });
 
 // POST /public/trip/invite/:token/expense — add or update an expense on
