@@ -44,7 +44,7 @@ const { HouseholdResetStore } = require('./household-reset-store');
 const { configuredPlayVerifier, mountPlayVerification } = require('./play-verification');
 const app = express();
 const PORT = process.env.PORT || 8080;
-const {mergeChanges, validateTrip, TripDeletionHistory} = require('./tripSharing');
+const {mergeChanges, validateTrip, TripDeletionHistory, creatorMemberId} = require('./tripSharing');
 const HOST = process.env.HOST || '0.0.0.0';
 const AUTH_ADMIN_USERS = new Set((process.env.AUTH_ADMIN_USERS ?? 'local').split(',').map(value => value.trim()).filter(Boolean));
 const INDEX_PATH = fs.existsSync(path.join(__dirname, 'index.html')) ? path.join(__dirname, 'index.html') : path.join(__dirname, 'public', 'index.html');
@@ -663,6 +663,7 @@ function getTripFromState(ownerUserId, tripId) {
 function publicTripShape(trip) {
   return {
     id: trip.id,
+    creatorMemberId: creatorMemberId(trip),
     icon: trip.icon || '✈️',
     name: trip.name || '',
     startDateISO: trip.startDateISO || '',
@@ -872,6 +873,13 @@ app.put('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
     guestSync.requireAccess(context);
     const original = context.trip;
     const merged = mergeChanges(publicTripShape(base), publicTripShape(edited), publicTripShape(original));
+    const creator = creatorMemberId(original);
+    if (edited.creatorMemberId && edited.creatorMemberId !== creator || !merged.members.some(member => member.id === creator))
+      throw new SyncError(403,'TRIP_CREATOR_PROTECTED','The trip creator cannot be removed or replaced.');
+    if (!merged.members.some(member => member.id === current.member_id))
+      throw new SyncError(403,'TRIP_SELF_PROTECTED','Your invited participant cannot be removed. Use Leave Trip to leave.');
+    merged.creatorMemberId = creator;
+    merged.members = merged.members.map(member => member.id === creator ? {...original.members.find(old => old.id === creator)} : member);
     tripDeletions.apply(current.owner_user_id,current.trip_id,original,merged);
     // Only the original owner can assign private household links.
     merged.members = merged.members.map(member => ({...member,

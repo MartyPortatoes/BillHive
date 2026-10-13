@@ -84,3 +84,18 @@ test('a lost-response retry cannot recreate a settlement deleted by another part
   const removed=structuredClone(accepted);removed.settlements=[];await write(accepted,removed);
   const replayed=await write(first.trip,added);assert.deepEqual(replayed.settlements,[]);
 });
+
+
+test('invited writers cannot remove or replace the creator or delete their own participant',async()=>{
+  const f=await guestFixture();
+  const r=await request(f.prefix+'/trip',{headers:{}}),base=(await r.json()).trip,etag=r.headers.get('etag');
+  assert.equal(base.creatorMemberId,'host');
+  const send=trip=>request(f.prefix+'/trip',{method:'PUT',headers:{'If-Match':etag},body:{base,trip}});
+  for(const target of ['host','guest']) {
+    const edited=structuredClone(base);edited.members=edited.members.filter(m=>m.id!==target);edited.expenses=[];
+    assert.equal((await send(edited)).status,403);
+  }
+  assert.equal((await send({...base,creatorMemberId:'guest'})).status,403);
+  const current=(await (await request(f.prefix+'/trip',{headers:{}})).json()).trip;
+  assert.deepEqual(current,base);
+});

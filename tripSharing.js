@@ -35,6 +35,10 @@ function mergeChanges(base, edited, latest) {
   return clone(edited);
 }
 
+function creatorMemberId(trip) {
+  return trip.creatorMemberId || trip.members?.find(member => member.linkedPersonId === 'me')?.id || trip.members?.[0]?.id || '';
+}
+
 function validateTrip(trip, tripId) {
   if (!record(trip) || trip.id !== tripId) throw new Error('Trip does not match invite');
   Data.state({trips:{trips:[trip]}});
@@ -82,4 +86,4 @@ class TripDeletionHistory {
   }
 }
 
-module.exports = {mergeChanges, validateTrip, TripDeletionHistory};
+module.exports = {mergeChanges, validateTrip, TripDeletionHistory, creatorMemberId};
