@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY server.js .
+COPY tripSharing.js .
 COPY email.js .
 COPY emailTemplate.js .
 COPY index.html ./public/

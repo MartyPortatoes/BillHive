@@ -35,6 +35,7 @@ const { buildEmailHtml } = require('./emailTemplate.js');
 const Data = require('./public/data-contract.js');
 const app = express();
 const PORT = process.env.PORT || 8080;
+const {mergeChanges} = require('./tripSharing');
 const HOST = process.env.HOST || '0.0.0.0';
 const AUTH_ADMIN_USERS = new Set((process.env.AUTH_ADMIN_USERS ?? 'local').split(',').map(value => value.trim()).filter(Boolean));
 const INDEX_PATH = fs.existsSync(path.join(__dirname, 'index.html')) ? path.join(__dirname, 'index.html') : path.join(__dirname, 'public', 'index.html');
@@ -693,6 +694,7 @@ function getTripFromState(ownerUserId, tripId) {
 function publicTripShape(trip) {
   return {
     id: trip.id,
+    icon: trip.icon || '✈️',
     name: trip.name || '',
     startDateISO: trip.startDateISO || '',
     endDateISO: trip.endDateISO || '',
@@ -710,15 +712,25 @@ function publicTripShape(trip) {
       dateISO: e.dateISO || '',
       category: e.category || 'other',
       customCategoryName: e.customCategoryName || '',
+      customCategoryIconName: e.customCategoryIconName || '',
       sourceAmount: e.sourceAmount || 0,
       sourceCurrency: e.sourceCurrency || '',
       exchangeRate: e.exchangeRate || 1,
+      exchangeRateDateISO: e.exchangeRateDateISO || '',
+      exchangeRateSource: e.exchangeRateSource || '',
       notes: e.notes || '',
+      attachments: e.attachments || [],
+      importSource: e.importSource || '',
+      importFingerprint: e.importFingerprint || '',
+      importedAtISO: e.importedAtISO || '',
     })),
     notes: trip.notes || '',
     isArchived: trip.isArchived || false,
     settlements: trip.settlements || [],
     checklistItems: trip.checklistItems || [],
+    itinerary: trip.itinerary || [],
+    paymentRequestDates: trip.paymentRequestDates || {},
+    activity: trip.activity || [],
   };
 }
 
@@ -989,6 +1001,58 @@ app.get('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
   const trip = getTripFromState(invite.owner_user_id, invite.trip_id);
   if (!trip) return res.status(404).json({ error: 'Trip not found' });
   res.json({ trip: publicTripShape(trip) });
+});
+
+// A joined participant can edit the trip through the same screens as its owner.
+// Merge a three-way edit into the owner's canonical trip, scoped to this invite.
+app.put('/public/trip/invite/:token/trip', publicLimiter, (req, res) => {
+  const invite = stmts.findTripInviteByToken.get(req.params.token);
+  if (!invite) return res.status(404).json({ error: 'Invite not found' });
+  if (invite.revoked_at) return res.status(410).json({ error: 'This invite has been revoked' });
+  if (!invite.joined_at) return res.status(403).json({ error: 'Invite not yet accepted' });
+  const {base, trip: edited} = req.body || {};
+  try {
+    Data.state({trips: {trips: [base, edited].map((trip, index) => {
+      if (!trip || trip.id !== invite.trip_id) throw new Error('Trip does not match invite');
+      return {...trip, id: `validation_${index}`};
+    })}});
+    for (const trip of [base, edited]) {
+      for (const key of ['name','icon','startDateISO','endDateISO','currency','notes']) {
+        if (trip[key] !== undefined && typeof trip[key] !== 'string') throw new Error(`Invalid ${key}`);
+      }
+      if (trip.isArchived !== undefined && typeof trip.isArchived !== 'boolean') throw new Error('Invalid archive flag');
+      for (const expense of trip.expenses || []) {
+        if (typeof expense.name !== 'string' || typeof expense.amount !== 'number' || !Number.isFinite(expense.amount)) {
+          throw new Error('Invalid expense');
+        }
+      }
+      if (trip.settlements !== undefined && (!Array.isArray(trip.settlements) ||
+          trip.settlements.some(row => !row || typeof row.id !== 'string'))) {
+        throw new Error('Invalid settlements');
+      }
+    }
+  } catch (error) { return res.status(400).json({ error: error.message }); }
+  const stateRow = stmts.getState.get(invite.owner_user_id, 'trips');
+  if (!stateRow) return res.status(404).json({ error: 'Trip not found' });
+  let tripsState;
+  try { tripsState = JSON.parse(stateRow.value); }
+  catch { return res.status(500).json({ error: 'Corrupt trip state' }); }
+  const index = (tripsState.trips || []).findIndex(trip => trip.id === invite.trip_id);
+  if (index < 0) return res.status(404).json({ error: 'Trip not found' });
+  const original = tripsState.trips[index];
+  const merged = mergeChanges(publicTripShape(base), publicTripShape(edited), publicTripShape(original));
+  // Preserve ownership and device-local household links, which are not shared credentials.
+  merged.members = merged.members.map(member => ({
+    ...member,
+    ...(original.members || []).find(previous => previous.id === member.id),
+    name: member.name,
+  }));
+  tripsState.trips[index] = {...original, ...merged, id: original.id, ownerId: original.ownerId};
+  try { Data.state({trips: tripsState}); }
+  catch (error) { return res.status(400).json({ error: error.message }); }
+  stmts.setState.run(invite.owner_user_id, 'trips', JSON.stringify(tripsState));
+  broadcastChange(invite.owner_user_id);
+  res.json({trip: publicTripShape(tripsState.trips[index])});
 });
 
 // POST /public/trip/invite/:token/expense — add or update an expense on

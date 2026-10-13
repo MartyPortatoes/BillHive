@@ -196,6 +196,8 @@ Auth: every `/api/*` request must authenticate via one of: `Authorization: Beare
 | GET | `/public/bills/invite/:token` | Preview a household bills invite *(public)* |
 | POST | `/public/bills/invite/:token/join` | Join a household bills invite *(public)* |
 | GET | `/public/bills/invite/:token/data` | Read the joined person's bills snapshot *(public)* |
+| GET | `/public/trip/invite/:token/trip` | Read a joined trip using its active invite token |
+| PUT | `/public/trip/invite/:token/trip` | Merge participant trip edits (`base` and `trip`) without replacing concurrent changes |
 | GET | `/api/export` | Download full JSON backup |
 | POST | `/api/import` | Restore from JSON backup |
 | GET | `/api/email/config` | Get email config (secrets masked) |
