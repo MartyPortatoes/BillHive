@@ -67,7 +67,6 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 // performance when multiple SSE clients are polling alongside state saves.
 // Foreign keys are enabled for future schema extensions but not currently used.
 const db = new Database(DB_PATH);
-const tripDeletions = new TripDeletionHistory(db);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 const playVerifier = configuredPlayVerifier(process.env, db);
@@ -180,6 +179,7 @@ db.exec(`
 `);
 
 const sync = new SyncStore(db, {requirePreconditions: process.env.SYNC_REQUIRE_PRECONDITIONS === '1'});
+const tripDeletions = new TripDeletionHistory(db);
 const guestSync = new GuestTripSync(db, sync, publicTripShape);
 const checkSync = new CheckShareSync(db, sync, publicCheckShape);
 const billsSync = new BillsInviteSync(db, sync, nativeBillsInvitePayload);

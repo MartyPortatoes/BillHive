@@ -74,6 +74,30 @@ class TripDeletionHistory {
       PRIMARY KEY(owner_id,trip_id,collection,record_id))`);
     this.read = db.prepare('SELECT record_id FROM trip_collaboration_deletions WHERE owner_id=? AND trip_id=? AND collection=?');
     this.remember = db.prepare('INSERT OR IGNORE INTO trip_collaboration_deletions VALUES(?,?,?,?)');
+    // The canonical state is also written by owner sync and older routes.
+    // Remember their removals in the same transaction as the canonical write.
+    for (const [event,suffix,remaining] of [['UPDATE OF value','update','new.value'],['DELETE','delete',"'{\"trips\":[]}'"]]) {
+      db.exec(`CREATE TRIGGER IF NOT EXISTS trip_deletions_${suffix} AFTER ${event} ON user_state
+        WHEN old.key='trips' BEGIN
+        INSERT OR IGNORE INTO trip_collaboration_deletions(owner_id,trip_id,collection,record_id)
+        SELECT old.user_id,json_extract(t.value,'$.id'),c.value,json_extract(r.value,'$.id')
+        FROM json_each(old.value,'$.trips') t,
+          json_each('["expenses","settlements","itinerary","members","checklistItems"]') c,
+          json_each(t.value,'$.'||c.value) r
+        WHERE NOT EXISTS (
+          SELECT 1 FROM json_each(${remaining},'$.trips') n,json_each(n.value,'$.'||c.value) v
+          WHERE json_extract(n.value,'$.id')=json_extract(t.value,'$.id')
+            AND json_extract(v.value,'$.id')=json_extract(r.value,'$.id'));
+        END`);
+    }
+  }
+  hasDeletedAddition(owner, tripId, original, proposed) {
+    for (const key of ['expenses','settlements','itinerary','members','checklistItems']) {
+      const current=new Set((original[key] || []).map(row=>row.id));
+      const deleted=new Set(this.read.all(owner,tripId,key).map(row=>row.record_id));
+      if ((proposed[key] || []).some(row=>!current.has(row.id) && deleted.has(row.id))) return true;
+    }
+    return false;
   }
   apply(owner, tripId, original, merged) {
     for (const key of ['expenses','settlements','itinerary','members','checklistItems']) {

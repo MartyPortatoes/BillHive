@@ -58,6 +58,35 @@ function guestBody(snapshot, operation, mutationId=crypto.randomUUID()) {
 }
 const guestExpense = {id:'expense',name:'Guest renamed train',amount:24,paidByAmounts:{host:24},splitBetweenIds:['host','guest']};
 
+test('one guest document commit saves the complete proposal and replay acknowledges history without overwriting newer work',async()=>{
+  const f=await guestFixture(), first=await f.read();
+  const proposed=structuredClone(first.trip);
+  proposed.notes='Bring water';
+  proposed.expenses[0].name='Express train';
+  proposed.expenses.push({...guestExpense,id:'lunch',name:'Lunch'});
+  proposed.checklistItems=[{id:'water',label:'Pack water',isDone:false,createdAtISO:''}];
+  const body={...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1};
+  const response=await f.send(body);
+  assert.equal(response.status,200,await response.clone().text());
+  const accepted=await response.json();
+  assert.equal(accepted.snapshot.guestDocumentProtocol,1);
+  assert.equal(accepted.snapshot.trip.notes,'Bring water');
+  assert.equal(accepted.snapshot.trip.expenses.length,2);
+  assert.equal(accepted.snapshot.trip.checklistItems[0].label,'Pack water');
+  const owner=await snapshot(f.headers),trip=owner.data.state.trips.trips[0];
+  assert.deepEqual(trip.expenses.find(e=>e.id==='expense').attachments,[{id:'receipt',filename:'private.jpg'}]);
+  assert.equal(trip.futureTripField,'keep');
+  trip.notes='Owner packed water';
+  assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),f.headers)).status,200);
+  const replay=await f.send(body);
+  assert.equal(replay.status,200);
+  const receipt=await replay.json();
+  assert.equal(receipt.replayed,true);
+  assert.equal(receipt.committedRevision,accepted.committedRevision);
+  assert.ok(receipt.snapshot.revision>receipt.committedRevision);
+  assert.equal(receipt.snapshot.trip.notes,'Owner packed water');
+});
+
 test('full trip collaboration uses the owner revision, refuses stale writes and protects private records',async()=>{
   const f=await guestFixture();const owner=await snapshot(f.headers);
   const read=await request(f.prefix+'/trip',{headers:{}});const baseline=await read.json();
@@ -73,6 +102,87 @@ test('full trip collaboration uses the owner revision, refuses stale writes and 
   bad.settlements=[{id:'bad',fromMemberId:'guest',toMemberId:'host',amount:'20'}];
   assert.equal((await write({base:baseline.trip,trip:bad},latest.headers.get('etag'))).status,400);
   assert.deepEqual((await snapshot(f.headers)).data,current.data);
+});
+
+test('a document edit can fill projected defaults without dropping private expense data',async()=>{
+  const f=await guestFixture(), first=await f.read(), proposed=structuredClone(first.trip);
+  proposed.expenses[0].notes='Window seat';
+  proposed.expenses[0].category='transport';
+  const response=await f.send({...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1});
+  assert.equal(response.status,200,await response.clone().text());
+  const saved=(await response.json()).snapshot.trip.expenses[0];
+  assert.equal(saved.notes,'Window seat');
+  assert.equal(saved.category,'transport');
+  const expense=(await snapshot(f.headers)).data.state.trips.trips[0].expenses[0];
+  assert.equal(expense.importFingerprint,'private-import');
+  assert.deepEqual(expense.futureHostOnly,{keep:true});
+});
+
+test('an invalid complete proposal applies nothing, and correction uses the same unconsumed mutation',async()=>{
+  const f=await guestFixture(), first=await f.read(), proposed=structuredClone(first.trip);
+  proposed.expenses[0].amount=24; proposed.expenses[0].paidByAmounts={host:24};
+  proposed.checklistItems=[{id:'pack',label:42,isDone:false,createdAtISO:''}];
+  const body={...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1};
+  assert.equal((await f.send(body)).status,400);
+  assert.deepEqual(await f.read(),first);
+  proposed.checklistItems[0].label='Pack';
+  assert.equal((await f.send(body)).status,200);
+});
+
+test('a complete proposal cannot resurrect an expense removed through the owner writer',async()=>{
+  const f=await guestFixture(), first=await f.read(), owner=await snapshot(f.headers);
+  owner.data.state.trips.trips[0].expenses=[];
+  assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),f.headers)).status,200);
+  const latest=await f.read(), proposed=structuredClone(latest.trip);
+  proposed.expenses=first.trip.expenses;
+  const response=await f.send({...guestBody(latest,{kind:'updateTrip',base:latest.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1});
+  assert.equal(response.status,409);
+  assert.deepEqual((await f.read()).trip.expenses,[]);
+});
+
+test('document financial edits require exact currency precision and balanced payers',async()=>{
+  const f=await guestFixture(), first=await f.read();
+  for (const [amount,paid] of [[1.001,1.001],[24,23]]) {
+    const proposed=structuredClone(first.trip);
+    proposed.expenses[0].amount=amount; proposed.expenses[0].paidByAmounts={host:paid};
+    assert.equal((await f.send({...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1})).status,400);
+    assert.deepEqual(await f.read(),first);
+  }
+});
+
+test('a document conversion must explain the edited amount',async()=>{
+  const f=await guestFixture(), first=await f.read(), proposed=structuredClone(first.trip);
+  Object.assign(proposed.expenses[0],{sourceAmount:10,sourceCurrency:'EUR',exchangeRate:3,exchangeRateTargetCurrency:'USD'});
+  const body={...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1};
+  assert.equal((await f.send(body)).status,400);
+  assert.deepEqual(await f.read(),first);
+  proposed.expenses[0].exchangeRate=2;
+  assert.equal((await f.send(body)).status,200);
+});
+
+test('changing document currency validates the precision of existing settlements',async()=>{
+  const f=await guestFixture(), owner=await snapshot(f.headers);
+  owner.data.state.trips.trips[0].settlements=[{id:'already-paid',fromMemberId:'guest',toMemberId:'host',amount:0.25,settledAtISO:'',notes:''}];
+  assert.equal((await commit(commitBody(owner.data,{state:{trips:owner.data.state.trips}}),f.headers)).status,200);
+  const first=await f.read(), proposed=structuredClone(first.trip);
+  proposed.currency='JPY';
+  const response=await f.send({...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:[]}),decimalJSONProtocol:1});
+  assert.equal(response.status,400,'A quarter yen cannot become a valid settlement by changing only the currency');
+  assert.deepEqual(await f.read(),first);
+});
+
+test('distinct-transfer confirmation cannot reuse one settlement action identity',async()=>{
+  const f=await guestFixture(), first=await f.read(), proposed=structuredClone(first.trip);
+  const payment={id:'payment-one',fromMemberId:'guest',toMemberId:'host',amount:5,settledAtISO:'',notes:'',sourceActionId:'one-action'};
+  proposed.settlements=[payment,{...payment,id:'payment-two'}];
+  const body={...guestBody(first,{kind:'updateTrip',base:first.trip,trip:proposed,confirmedSettlementIds:['payment-one','payment-two']}),decimalJSONProtocol:1};
+  assert.equal((await f.send(body)).status,409);
+  assert.deepEqual(await f.read(),first);
+  proposed.settlements[1].sourceActionId='second-action';
+  body.operation.confirmedSettlementIds=[];
+  assert.equal((await f.send(body)).status,409);
+  body.operation.confirmedSettlementIds=['payment-one','payment-two'];
+  assert.equal((await f.send(body)).status,200);
 });
 
 test('a lost-response retry cannot recreate a settlement deleted by another participant',async()=>{

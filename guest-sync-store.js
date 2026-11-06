@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const Data = require('./public/data-contract');
 const Decimal = require('./decimal-json');
 const {SyncError, verifyReceipt} = require('./sync-store');
+const {validateTrip, TripDeletionHistory} = require('./tripSharing');
 const record = Decimal.record;
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) && !['__proto__','constructor','prototype'].includes(value);
 const fail = (status, code, message) => { throw new SyncError(status, code, message); };
@@ -11,11 +12,44 @@ const expenseFields = new Set(['id','name','amount','paidByAmounts','splitBetwee
   'customCategoryName','customCategoryIconName','sourceAmount','sourceCurrency','exchangeRate',
   'exchangeRateTargetCurrency','exchangeRateIsLocked','exchangeRateDateISO','exchangeRateSource','notes']);
 const settlementFields = new Set(['id','fromMemberId','toMemberId','amount','settledAtISO','notes','sourceActionId']);
+const conversionFields = ['sourceAmount','sourceCurrency','exchangeRate','exchangeRateTargetCurrency','exchangeRateIsLocked','exchangeRateDateISO','exchangeRateSource'];
 const canonical = Decimal.canonical;
 function fields(value, allowed) { return record(value) && Object.keys(value).every(key => allowed.has(key)); }
+function hasUnsharedFields(value, projected) {
+  if (Array.isArray(value)) return value.some((row,index)=>hasUnsharedFields(row,projected?.[index]));
+  if (!record(value)) return false;
+  return Object.keys(value).some(key=>!Object.hasOwn(projected || {},key) || hasUnsharedFields(value[key],projected[key]));
+}
+// The version and baseline have already been checked. Apply only the public
+// proposal, keeping private fields and unchanged exact numeric wire values.
+function applyProposal(original, baseline, proposed) {
+  if (canonical(baseline)===canonical(proposed)) return original;
+  if (record(baseline) && record(proposed)) {
+    const result={...original};
+    for (const key of new Set([...Object.keys(baseline),...Object.keys(proposed)])) {
+      if (!Object.hasOwn(proposed,key)) delete result[key];
+      else {
+        const value=applyProposal(original?.[key],baseline[key],proposed[key]);
+        if (value===undefined) delete result[key]; else result[key]=value;
+      }
+    }
+    return result;
+  }
+  if (Array.isArray(baseline) && Array.isArray(proposed) && proposed.every(row=>record(row) && id(row.id))) {
+    return proposed.map(row=>applyProposal(original?.find(item=>item.id===row.id),baseline.find(item=>item.id===row.id),row));
+  }
+  return proposed;
+}
 function expenseFinance(expense, members) {
   return canonical([expense.amount, expense.paidByAmounts,
     [...new Set(expense.splitBetweenIds?.length ? expense.splitBetweenIds : [...members])].sort()]);
+}
+function exactUnits(amount,currency) {
+  if (typeof currency!=='string' || !/^[A-Z]{3}$/.test(currency) || !Decimal.amount(amount)) fail(400,'INVALID_GUEST_COMMIT','Invalid currency amount.');
+  const digits=new Intl.NumberFormat('en',{style:'currency',currency}).resolvedOptions().maximumFractionDigits;
+  const units=Decimal.units(amount,digits);
+  if (Decimal.compare(amount,Decimal.fromUnits(units,digits))!==0) fail(400,'INVALID_GUEST_COMMIT','Use the exact currency precision.');
+  return units;
 }
 function amountText(amount, currency) {
   if (!Decimal.number(amount) || Decimal.compare(amount, 0) === 0) return '';
@@ -45,6 +79,7 @@ function recordGuestActivity(trip, change, invite, mutationId, now = new Date())
 class GuestTripSync {
   constructor(db, sync, projectTrip) {
     this.db = db; this.sync = sync; this.projectTrip = projectTrip;
+    this.deletions = new TripDeletionHistory(db);
     db.transaction(() => {
     db.exec(`CREATE TABLE IF NOT EXISTS sync_guest_receipts (
       token_hash TEXT NOT NULL, mutation_id TEXT NOT NULL, request_hash TEXT NOT NULL,
@@ -89,7 +124,7 @@ class GuestTripSync {
   }
   snapshotInside(invite, context) {
     this.requireAccess(context);
-    return {protocolVersion:1, decimalJSONProtocol:1, ...this.sync.metadata(invite.owner_user_id),
+    return {protocolVersion:1, decimalJSONProtocol:1, guestDocumentProtocol:1, ...this.sync.metadata(invite.owner_user_id),
       invitationId:crypto.createHash('sha256').update(invite.token).digest('hex'),
       tripId:invite.trip_id, memberId:invite.member_id,
       revisionPreconditionsRequired:this.sync.requirePreconditions, trip:this.projectTrip(context.trip)};
@@ -111,7 +146,26 @@ class GuestTripSync {
     try { Data.tree(body); } catch (_) { fail(400, 'INVALID_GUEST_COMMIT', 'Invalid guest commit.'); }
     const operation = body.operation;
     if (!record(operation)) fail(400, 'INVALID_GUEST_COMMIT', 'Expected a guest operation.');
-    if (operation.kind === 'upsertExpense') {
+    if (operation.kind === 'updateTrip') {
+      if (body.decimalJSONProtocol !== 1 || !fields(operation,new Set(['kind','base','trip','confirmedSettlementIds'])) ||
+          !Array.isArray(operation.confirmedSettlementIds) || operation.confirmedSettlementIds.some(value=>!id(value)) ||
+          new Set(operation.confirmedSettlementIds).size !== operation.confirmedSettlementIds.length) {
+        fail(400,'INVALID_GUEST_COMMIT','Invalid complete Trip proposal.');
+      }
+      try { validateTrip(operation.base,body.tripId); validateTrip(operation.trip,body.tripId); }
+      catch (_) { fail(400,'INVALID_GUEST_COMMIT','Invalid complete Trip proposal.'); }
+      for (const key of ['members','expenses','settlements','itinerary','checklistItems']) {
+        const rows=operation.trip[key];
+        if (!Array.isArray(rows) || rows.some(row=>!record(row) || !id(row.id)) || new Set(rows.map(row=>row.id)).size!==rows.length)
+          fail(400,'INVALID_GUEST_COMMIT','Invalid Trip entries.');
+      }
+      for (const [key,textFields] of [['itinerary',['dayISO','time','title','location','notes']],['checklistItems',['label','createdAtISO']]]) {
+        for (const row of operation.trip[key]) {
+          if (textFields.some(field=>field in row && (typeof row[field]!=='string' || row[field].length>10000)) ||
+              key==='checklistItems' && typeof row.isDone!=='boolean') fail(400,'INVALID_GUEST_COMMIT','Invalid Trip entry.');
+        }
+      }
+    } else if (operation.kind === 'upsertExpense') {
       const expense = operation.expense;
       if (!fields(operation, new Set(['kind','expense'])) || !fields(expense, expenseFields) || !id(expense.id) ||
           typeof expense.name !== 'string' || expense.name.length > 512 ||
@@ -144,12 +198,76 @@ class GuestTripSync {
     return body;
   }
 
-  apply(trip, operation) {
+  applyDocument(context, operation, invite, mutationId) {
+    const original=context.trip, publicTrip=this.projectTrip(original), proposed=operation.trip;
+    if (canonical(operation.base)!==canonical(publicTrip)) fail(409,'BASE_CONFLICT','The proposal baseline is not the current Trip.');
+    // A complete proposal is validated before any part is persisted. Owner-only
+    // data is retained by applying the public delta to the original wire tree.
+    if (hasUnsharedFields(proposed,this.projectTrip(proposed))) fail(400,'INVALID_GUEST_COMMIT','Unsupported Trip fields.');
+    for (const key of ['id','creatorMemberId','members','isArchived']) {
+      if (canonical(publicTrip[key])!==canonical(proposed[key])) fail(403,'OWNER_ONLY_CHANGE','Only the Trip owner can make this change.');
+    }
+    for (const key of ['expenses','settlements']) {
+      for (const row of publicTrip[key]) {
+        const next=proposed[key].find(item=>item.id===row.id);
+        if (!next || key==='settlements' && canonical(next)!==canonical(row)) fail(403,'OWNER_ONLY_CHANGE','Keep existing financial history.');
+      }
+    }
+    if (this.deletions.hasDeletedAddition(invite.owner_user_id,invite.trip_id,original,proposed)) fail(409,'DELETED_ENTRY','A removed Trip entry cannot be restored by a guest.');
+    const merged=applyProposal(original,publicTrip,proposed);
+    const members=new Set(proposed.members.map(member=>member.id));
+    for (const expense of proposed.expenses) {
+      const before=publicTrip.expenses.find(row=>row.id===expense.id);
+      if (canonical(before)===canonical(expense) && publicTrip.currency===proposed.currency) continue;
+      this.validate({serverInstanceId:'validation',householdId:'validation',invitationId:'validation',tripId:original.id,
+        memberId:invite.member_id,baseRevision:0,mutationId,operation:{kind:'upsertExpense',expense}});
+      if (!before || publicTrip.currency!==proposed.currency || expenseFinance(before,members)!==expenseFinance(expense,members)) {
+        const amount=exactUnits(expense.amount,proposed.currency);
+        const paid=Object.values(expense.paidByAmounts).reduce((sum,value)=>sum+exactUnits(value,proposed.currency),0n);
+        if (amount!==paid) fail(400,'INVALID_GUEST_COMMIT','Payer amounts must equal the expense.');
+      }
+      if (expense.sourceCurrency && (!before || publicTrip.currency!==proposed.currency || canonical(before.amount)!==canonical(expense.amount) ||
+          conversionFields.some(key=>canonical(before[key])!==canonical(expense[key])))) {
+        exactUnits(expense.sourceAmount,expense.sourceCurrency);
+        if (expense.exchangeRateTargetCurrency!==proposed.currency || !Decimal.number(expense.exchangeRate) || Decimal.compare(expense.exchangeRate,0)<=0)
+          fail(400,'INVALID_GUEST_CONVERSION','The conversion must explain the expense.');
+        const source=Decimal.parts(String(expense.sourceAmount)), rate=Decimal.parts(String(expense.exchangeRate));
+        let converted;
+        try { converted=Decimal.parse(String(BigInt(source.digits)*BigInt(rate.digits))+'e'+String(source.exponent+rate.exponent)); }
+        catch (_) { fail(400,'INVALID_GUEST_CONVERSION','The conversion is outside the supported range.'); }
+        const digits=new Intl.NumberFormat('en',{style:'currency',currency:proposed.currency}).resolvedOptions().maximumFractionDigits;
+        if (Decimal.units(converted,digits)!==exactUnits(expense.amount,proposed.currency)) fail(400,'INVALID_GUEST_CONVERSION','The conversion must explain the expense.');
+      }
+      const change=this.apply(original,{kind:'upsertExpense',expense},{allowAllMembers:true});
+      recordGuestActivity(original,change,invite,mutationId+':expense:'+expense.id);
+    }
+    for (const settlement of proposed.settlements) {
+      if (publicTrip.currency!==proposed.currency) exactUnits(settlement.amount,proposed.currency);
+      if (publicTrip.settlements.some(row=>row.id===settlement.id)) continue;
+      this.validate({serverInstanceId:'validation',householdId:'validation',invitationId:'validation',tripId:original.id,
+        memberId:invite.member_id,baseRevision:0,mutationId,operation:{kind:'recordSettlement',settlement}});
+      if (![settlement.fromMemberId,settlement.toMemberId].includes(invite.member_id)) fail(403,'SETTLEMENT_PARTY_REQUIRED','Only a party can record this transfer.');
+      exactUnits(settlement.amount,proposed.currency);
+      if (settlement.sourceActionId && proposed.settlements.some(row=>row.id!==settlement.id && row.sourceActionId===settlement.sourceActionId))
+        fail(409,'SETTLEMENT_ID_REUSED','This transfer action already has a settlement.');
+      const duplicate=proposed.settlements.some(row=>row.id!==settlement.id && row.fromMemberId===settlement.fromMemberId && row.toMemberId===settlement.toMemberId && canonical(row.amount)===canonical(settlement.amount));
+      if (duplicate && !operation.confirmedSettlementIds.includes(settlement.id)) fail(409,'SETTLEMENT_REVIEW_REQUIRED','Confirm that this is a distinct transfer.');
+      const change=this.apply(original,{kind:'recordSettlement',settlement});
+      recordGuestActivity(original,change,invite,mutationId+':settlement:'+settlement.id);
+    }
+    // apply() maintains payment request invalidation and private activity.
+    if (original.activity!==undefined) merged.activity=original.activity;
+    if (original.paymentRequestDates!==undefined && (canonical(publicTrip.expenses)!==canonical(proposed.expenses) || canonical(publicTrip.settlements)!==canonical(proposed.settlements))) merged.paymentRequestDates=original.paymentRequestDates;
+    for (const key of Object.keys(original)) if (!Object.hasOwn(merged,key)) delete original[key];
+    Object.assign(original,merged);
+  }
+
+  apply(trip, operation, {allowAllMembers=false} = {}) {
     const members = new Set((trip.members || []).map(member => member.id));
     if (operation.kind === 'upsertExpense') {
       const expense = operation.expense;
       if (Object.keys(expense.paidByAmounts).some(member => !members.has(member)) || expense.splitBetweenIds.some(member => !members.has(member)) ||
-          !expense.splitBetweenIds.length || !Object.values(expense.paidByAmounts).some(amount => Decimal.compare(amount, 0) > 0) && Decimal.compare(expense.amount, 0) > 0) {
+          !expense.splitBetweenIds.length && !allowAllMembers || !Object.values(expense.paidByAmounts).some(amount => Decimal.compare(amount, 0) > 0) && Decimal.compare(expense.amount, 0) > 0) {
         fail(400, 'INVALID_GUEST_EXPENSE', 'Choose current payers and split members.');
       }
       const expenses = trip.expenses || [];
@@ -214,8 +332,11 @@ class GuestTripSync {
       if (!decimalClient && (Decimal.legacyReceiptRisk(input) || Decimal.legacyReceiptRisk(before)))
         fail(428, 'DECIMAL_CLIENT_REQUIRED', 'Use a client with exact decimal support to edit this expense. Your server data has been kept.');
       if (context.trip.isArchived) fail(409, 'TRIP_ARCHIVED', 'This trip is archived.');
-      const change = this.apply(context.trip, input.operation);
-      recordGuestActivity(context.trip, change, invite, input.mutationId);
+      if (input.operation.kind === 'updateTrip') this.applyDocument(context,input.operation,invite,input.mutationId);
+      else {
+        const change = this.apply(context.trip, input.operation);
+        recordGuestActivity(context.trip, change, invite, input.mutationId);
+      }
       Data.state({trips:context.trips});
       this.sync.setState.run(invite.owner_user_id, 'trips', JSON.stringify(context.trips));
       this.sync.validateReferences(invite.owner_user_id);
