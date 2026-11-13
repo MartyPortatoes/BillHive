@@ -16,7 +16,7 @@
   --border2:  #8a7450;
   --text:     #f0e6d0;
   --muted:    #c6b390;
-  --muted2:   #786750;
+  --muted2:   #c6b390;
   --green:    #edba70;
   --blue:     #8fc4dd;
   --orange:   #d18570;
@@ -41,7 +41,7 @@
   --border2:  #b8a578;
   --text:     #2b1d11;
   --muted:    #6b5b43;
-  --muted2:   #a08e72;
+  --muted2:   #6b5b43;
   --green:    #d8923e;
   --blue:     #6fa5c4;
   --orange:   #b8654a;
@@ -67,7 +67,7 @@
     --border2:  #b8a578;
     --text:     #2b1d11;
     --muted:    #6b5b43;
-    --muted2:   #a08e72;
+    --muted2:   #6b5b43;
     --green:    #d8923e;
     --blue:     #6fa5c4;
     --orange:   #b8654a;
@@ -85,9 +85,9 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%237eb8d6' stroke-opacity='0.04' stroke-width='0.5'/%3E%3C/svg%3E");color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;line-height:1.5;transition:background-color .2s,color .2s;}
+body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%237eb8d6' stroke-opacity='0.025' stroke-width='0.5'/%3E%3C/svg%3E");color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh;line-height:1.5;transition:background-color .2s,color .2s;}
 :root[data-theme="light"] body,
-:root[data-theme="system"] body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%23d8923e' stroke-opacity='0.07' stroke-width='0.5'/%3E%3C/svg%3E");}
+:root[data-theme="system"] body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='150'%3E%3Cpath d='M42 99L0 75L0 24L42 0L84 24L84 75ZM42 150L0 126L0 102L42 78L84 102L84 126Z' fill='none' stroke='%23d8923e' stroke-opacity='0.035' stroke-width='0.5'/%3E%3C/svg%3E");}
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -268,7 +268,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0;}
 
 /* ── PERSON CARDS in summary (left-edge stripe, mirrors iOS PersonSummaryCard) ── */
 .person-summary-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 16px 16px 20px;position:relative;overflow:hidden;}
-.person-summary-card::before{content:'';position:absolute;top:0;bottom:0;left:0;width:4px;background:var(--pc, var(--green));}
+.ps-name::before{content:"";display:inline-block;width:10px;height:10px;margin-right:8px;border-radius:50%;background:var(--pc,var(--green));}
 .ps-name{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:600;font-size:15px;margin-bottom:2px;letter-spacing:.01em;}
 .ps-amount{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:28px;line-height:1;margin:8px 0;font-variant-numeric:tabular-nums;}
 .ps-bills{font-size:10px;color:var(--muted);line-height:1.45;}
@@ -499,7 +499,7 @@ nav{gap:6px;padding-top:8px;padding-bottom:8px;background:var(--glass);overflow-
 main{padding-top:28px;padding-bottom:max(32px,env(safe-area-inset-bottom));}
 .page-title{font-size:26px;letter-spacing:-.6px;text-transform:none;font-weight:600;}
 .page-sub{font-size:14px;line-height:1.6;color:var(--muted);}
-.card,.bill-card,.mode-card,.person-summary-card,.receive-card,.send-card{border-radius:24px;border-color:var(--border);background:var(--glass);box-shadow:inset 0 1px 0 var(--edge),0 6px 20px #2b1d1108;}
+.card,.bill-card,.mode-card,.person-summary-card,.receive-card,.send-card{border-radius:24px;border-color:var(--border);background:var(--surface);box-shadow:none;}
 .bill-header{padding:18px;min-height:84px;}
 .bill-icon{width:44px;height:44px;border-radius:14px;}
 .bill-name{font-size:16px;}
@@ -527,7 +527,7 @@ button{min-width:44px;min-height:44px;}
 .auth-panel input{width:100%;margin-bottom:16px;}
 #sync-status{font-size:12px;color:var(--muted);}
 #retry-save,#download-unsaved{display:none;}
-@supports(backdrop-filter:blur(16px)){header,nav,.card,.bill-card,.mode-card{backdrop-filter:blur(16px);}}
+@supports(backdrop-filter:blur(16px)){header,nav{backdrop-filter:blur(16px);}}
 @media(max-width:680px){
   header{padding:12px 16px;flex-wrap:wrap;}
   .header-right{width:100%;justify-content:space-between;gap:8px;}
@@ -555,6 +555,7 @@ button{min-width:44px;min-height:44px;}
 @media(forced-colors:active){.tab.active,.btn,.card,.bill-card{border:1px solid ButtonText;}.tab.active{outline:2px solid Highlight;}}
 
 </style>
+<link rel="stylesheet" href="/design-parity.css">
 <link rel="stylesheet" href="/check-review-page.css">
 </head>
 <body>
@@ -596,15 +597,14 @@ button{min-width:44px;min-height:44px;}
   </div>
 </header>
 
-<nav aria-label="Main navigation">
-  <button type="button" class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></button>
-  <button type="button" class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="2.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="4.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="13.3" x2="15" y2="13.3"/></svg> Summary</button>
-  <button type="button" class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Pay &amp; Collect</button>
-  <button type="button" class="tab" data-page="checks"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg> Checks <span class="badge" id="tab-badge-checks">0</span></button>
-  <button type="button" class="tab" data-page="trips"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg> Trips <span class="badge" id="tab-badge-trips">0</span></button>
-  <button type="button" class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</button>
-  <button type="button" class="tab" data-page="settings"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="1.5" y1="4" x2="14.5" y2="4"/><line x1="1.5" y1="8" x2="14.5" y2="8"/><line x1="1.5" y1="12" x2="14.5" y2="12"/><circle cx="10" cy="4" r="1.75"/><circle cx="5" cy="8" r="1.75"/><circle cx="11" cy="12" r="1.75"/></svg> Settings</button>
-</nav>
+<nav aria-label="Main navigation"><div class="task-tabs" aria-label="Workspace pages">
+<button type="button" class="tab active" data-page="bills"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg> Bills <span class="badge" id="tab-badge-bills">0</span></button>
+<button type="button" class="tab" data-page="summary"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="3" height="6.5" rx="0.75"/><rect x="6.5" y="2.5" width="3" height="9.5" rx="0.75"/><rect x="11.5" y="4.5" width="3" height="7.5" rx="0.75"/><line x1="1" y1="13.3" x2="15" y2="13.3"/></svg> Summary</button>
+<button type="button" class="tab" data-page="sendpay"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4.5" y1="13" x2="4.5" y2="3"/><polyline points="2,6 4.5,3 7,6"/><line x1="11.5" y1="3" x2="11.5" y2="13"/><polyline points="9,10 11.5,13 14,10"/></svg> Pay &amp; Collect</button>
+<button type="button" class="tab" data-page="trends"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,13 5,8 9,10.5 14.5,3.5"/><circle cx="14.5" cy="3.5" r="1.5" fill="currentColor" stroke="none"/></svg> Trends</button>
+<button type="button" class="tab" hidden data-page="checks"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg> Checks <span class="badge" id="tab-badge-checks">0</span></button>
+<button type="button" class="tab" hidden data-page="trips"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg> Trips <span class="badge" id="tab-badge-trips">0</span></button>
+</div><div class="workspace-control"><button type="button" id="workspace-gear" aria-label="Workspaces and Settings" aria-haspopup="menu" aria-expanded="false" aria-controls="workspace-menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-2 .9-2.2-.7-2 3.4 1.7 1.7v2.6L2.2 15l2 3.4 2.3-.7 2 .9L9 21h4l.6-2.4 2-.9 2.2.7 2-3.4-1.7-1.7v-2.6L19.8 9l-2-3.4-2.3.7-2-.9L13 3Z"/><circle cx="11" cy="12" r="3.3"/></svg></button><div id="workspace-menu" role="menu" aria-label="Workspaces and Settings" hidden><button type="button" class="workspace-option" role="menuitem" data-workspace="bills">Bills<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5"/><line x1="5.5" y1="5.5" x2="10.5" y2="5.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5"/><line x1="5.5" y1="11.5" x2="8.5" y2="11.5"/></svg></button><button type="button" class="workspace-option" role="menuitem" data-workspace="checks">Checks<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.75h8v12.5H4z"/><path d="M6 5h4"/><path d="M6 8h4"/><path d="M6 11h2"/></svg></button><button type="button" class="workspace-option" role="menuitem" data-workspace="trips">Trips<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12.5l2-7h7l2 7"/><path d="M5.5 5.5V3.75c0-.7.55-1.25 1.25-1.25h2.5c.7 0 1.25.55 1.25 1.25V5.5"/><path d="M3 12.5h10"/><path d="M6.5 8.5h3"/></svg></button><button type="button" class="workspace-option" role="menuitem" data-workspace="settings">Settings<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 2.4-2 .9-2.2-.7-2 3.4 1.7 1.7v2.6L2.2 15l2 3.4 2.3-.7 2 .9L9 21h4l.6-2.4 2-.9 2.2.7 2-3.4-1.7-1.7v-2.6L19.8 9l-2-3.4-2.3.7-2-.9L13 3Z"/><circle cx="11" cy="12" r="3.3"/></svg></button></div></div></nav>
 
 <main>
 <div id="host-review-attention" class="mode-edit-section" role="status" aria-live="polite" hidden></div>
@@ -685,7 +685,7 @@ button{min-width:44px;min-height:44px;}
     <div class="sr-section-icon send">↑</div>
     <div>
       <div class="sr-section-title">Pay</div>
-      <div class="sr-section-sub">Pay your bills — add a URL to each bill to get a one-click Pay button</div>
+      <div class="sr-section-sub">Open your bill’s payment website, or add a payment link to get started</div>
     </div>
   </div>
 
@@ -1218,7 +1218,7 @@ function _initEvtFns() {
     addPerson, removePerson, togglePerson,
     saveEmailConfig, testEmailConfig, generateDeviceKey, copyDeviceKey,
     revokeDeviceKey, exportData, clearAll,
-    toggleReceiveCard, openZelle, openVenmo, openCashApp, openAppleCash, openPayPal,
+    toggleReceiveCard, openEmailSetup, cancelEmailSetup, openPaymentLink, cancelPaymentLink, openZelle, openVenmo, openCashApp, openAppleCash, openPayPal,
     openPersonEmail, copyPersonEmail, markCheck, toggleCheck,
     togglePayReceived,
     requestPayment, printBillBreakdown,
@@ -4086,13 +4086,13 @@ function renderSummary() {
     const card = document.createElement('div');
     card.className = 'person-summary-card';
     card.style.setProperty('--pc', person.color);
-    if (isPaid) card.style.opacity = '0.6';
+
     card.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
-        <div class="ps-name" style="color:${person.color}">${esc(person.name)}</div>
+        <div class="ps-name">${esc(person.name)}</div>
         ${isPaid ? `<span style="font-size:10px;color:var(--green);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;">✓ paid</span>` : ''}
       </div>
-      <div class="ps-amount" style="color:${isPaid ? 'var(--muted)' : person.color};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
+      <div class="ps-amount" style="color:${isPaid ? 'var(--muted)' : 'var(--text)'};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
       <div class="ps-bills">${billList || 'No bills assigned'}</div>
     `;
     cardsContainer.appendChild(card);
@@ -4130,13 +4130,13 @@ function renderSummary() {
       const billTotal = getBillTotal(bill.id);
       if (billTotal === 0) return;
       html += `<div style="margin-bottom:16px;">
-        <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:${bill.color}">${esc(bill.icon)} ${esc(bill.name)} — ${fmtCurrency(billTotal)} total</div>`;
+        <div style="font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:700;font-size:13px;margin-bottom:6px;color:var(--text)">${esc(bill.icon)} ${esc(bill.name)} — ${fmtCurrency(billTotal)} total</div>`;
       S.people.forEach(p => {
         const amt = split[p.id] || 0;
         if (!amt) return;
         html += `<div class="sum-row" style="padding:6px 0 6px 12px;">
-          <span class="sum-label" style="color:${p.color}">${esc(p.name)}</span>
-          <span style="font-size:13px;color:${p.color}">${fmtCurrency(amt)}</span>
+          <span class="sum-label">${esc(p.name)}</span>
+          <span style="font-size:13px;color:var(--text)">${fmtCurrency(amt)}</span>
         </div>`;
       });
       html += `</div>`;
@@ -4266,8 +4266,8 @@ function renderReceiveCards() {
     }
 
     const emailBtn = person.email
-      ? `<button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">✉️ Email</button>`
-      : `<button class="btn btn-ghost btn-sm" style="opacity:.4;cursor:default" title="Add email in Settings">✉️ Email</button>`;
+      ? `<button class="btn btn-ghost btn-sm" data-click="openPersonEmail('${person.id}')">Send email</button>`
+      : `<button class="btn btn-ghost btn-sm" data-person-id="${esc(person.id)}" data-click="openEmailSetup(this.dataset.personId)">Add email</button>`;
 
     const billRows = d.bills.map(b =>
       `<div class="receive-bill-row"><span style="color:var(--muted)">${esc(b.name)}</span><span style="color:var(--text)">${fmtCurrency(b.amount)}</span></div>`
@@ -4276,27 +4276,32 @@ function renderReceiveCards() {
       ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-style:italic;margin-top:10px;">✈ Requested ${esc(reqLabel)}</div>`
       : '';
 
-    const paidToggle = `<span class="paid-badge ${isPaid ? '' : 'unpaid'}" data-click="event.stopPropagation();togglePayReceived('${person.id}')" title="${isPaid ? 'Mark as unpaid' : 'Mark payment received'}">${isPaid ? '✓ Paid' : 'Mark Paid'}</span>`;
+    const paidToggle = `<button type="button" class="paid-badge ${isPaid ? '' : 'unpaid'}" data-click="event.stopPropagation();togglePayReceived('${person.id}')" title="${isPaid ? 'Mark as unpaid' : 'Mark payment received'}">${isPaid ? '✓ Paid' : 'Mark Paid'}</button>`;
 
     return `
-      <div class="receive-card" id="rc-${person.id}" ${isPaid ? 'style="opacity:.7;"' : ''}>
-        <div class="receive-card-head" data-click="toggleReceiveCard('${person.id}')">
+      <div class="receive-card" id="rc-${person.id}">
+        <div class="receive-card-head">
           <div class="receive-person">
             <div class="receive-person-dot" style="background:${person.color}"></div>
             <div>
-              <div class="receive-person-name" style="color:${person.color}">${esc(person.name)}</div>
+              <div class="receive-person-name">${esc(person.name)}</div>
               <div class="receive-person-method">${payDesc}</div>
             </div>
           </div>
           <div class="receive-actions">
-            <div class="receive-amount" style="color:${isPaid ? 'var(--muted)' : person.color};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
+            <div class="receive-amount" style="color:${isPaid ? 'var(--muted)' : 'var(--text)'};${isPaid ? 'text-decoration:line-through;' : ''}">${fmtCurrency(d.total)}</div>
             ${paidToggle}
             ${emailBtn}
             ${payBtn}
-            <button class="receive-expand" data-click="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
+            <button class="receive-expand" aria-label="Bill breakdown for ${esc(person.name)}" aria-expanded="false" aria-controls="receive-body-${esc(person.id)}" data-click="event.stopPropagation();toggleReceiveCard('${person.id}')">▾</button>
           </div>
         </div>
-        <div class="receive-body">
+        <form class="inline-setup" id="email-setup-${esc(person.id)}" data-email-setup="${esc(person.id)}" hidden novalidate>
+          <label for="email-input-${esc(person.id)}">Email for ${esc(person.name)}</label>
+          <div class="setup-fields"><input id="email-input-${esc(person.id)}" name="email" type="email" autocomplete="email" required aria-describedby="email-error-${esc(person.id)}"><button class="btn btn-green" type="submit">Save</button><button class="btn btn-ghost" type="button" data-person-id="${esc(person.id)}" data-click="cancelEmailSetup(this.dataset.personId)">Cancel</button></div>
+          <p id="email-error-${esc(person.id)}" class="setup-error" role="alert" hidden>Enter a valid email address.</p>
+        </form>
+        <div class="receive-body" id="receive-body-${esc(person.id)}">
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Bill Breakdown</div>
           ${billRows}
           ${requestedHtml}
@@ -4316,7 +4321,7 @@ function renderReceiveCards() {
 
 function toggleReceiveCard(personId) {
   const card = document.getElementById('rc-' + personId);
-  if (card) card.classList.toggle('open');
+  if (card) { const open = card.classList.toggle('open'); card.querySelector('.receive-expand').setAttribute('aria-expanded', String(open)); }
 }
 
 function buildPersonEmail(personId) {
@@ -4543,11 +4548,11 @@ function renderSendCards() {
     // Only allow https URLs, matching the iOS bhSafeWebURL posture.
     const safePayUrl = hasUrl ? safeWebUrl(url) : '';
     const payBtn = safePayUrl
-      ? `<a class="btn btn-green btn-sm" href="${esc(safePayUrl)}" target="_blank" rel="noopener" data-click="markCheck('pay_${bill.id}')">Pay ↗</a>`
-      : `<span style="font-size:10px;color:var(--muted2)">${hasUrl ? 'Invalid URL (must start with https://)' : 'Add URL to get Pay button'}</span>`;
+      ? `<a class="btn btn-green btn-sm" href="${esc(safePayUrl)}" target="_blank" rel="noopener noreferrer" data-click="markCheck('pay_${bill.id}')">Open payment website ↗</a>`
+      : '';
 
     return `
-      <div class="send-card">
+      <div class="send-card" id="send-card-${esc(bill.id)}">
         <div class="send-card-left">
           <div class="send-bill-icon" style="background:${bill.color}22;color:${bill.color}">${esc(bill.icon)}</div>
           <div>
@@ -4556,13 +4561,14 @@ function renderSendCards() {
           </div>
         </div>
         <div class="send-card-right">
-          <input type="url" class="send-url-input ${hasUrl ? 'has-url' : ''}"
-                 placeholder="https://your-bank.com/pay"
-                 value="${esc(url)}"
-                 data-input="updateBillPayUrl('${bill.id}',this.value)"
-                 title="Payment portal URL for this bill">
           ${payBtn}
+          <button class="btn btn-ghost btn-sm" type="button" data-bill-id="${esc(bill.id)}" data-click="openPaymentLink(this.dataset.billId)">${safePayUrl ? 'Edit payment link' : 'Add payment link'}</button>
         </div>
+        <form class="inline-setup" id="payment-setup-${esc(bill.id)}" data-payment-setup="${esc(bill.id)}" hidden novalidate>
+          <label for="payment-input-${esc(bill.id)}">Payment link for ${esc(bill.name)}</label>
+          <div class="setup-fields"><input id="payment-input-${esc(bill.id)}" name="url" type="url" inputmode="url" autocomplete="url" placeholder="https://your-bank.com/pay" value="${esc(url)}" aria-describedby="payment-error-${esc(bill.id)}"><button class="btn btn-green" type="submit">Save</button><button class="btn btn-ghost" type="button" data-bill-id="${esc(bill.id)}" data-click="cancelPaymentLink(this.dataset.billId)">Cancel</button></div>
+          <p id="payment-error-${esc(bill.id)}" class="setup-error" role="alert" hidden>Enter a secure payment website address starting with https://.</p>
+        </form>
       </div>`;
   }).join('');
 }
@@ -4570,41 +4576,59 @@ function renderSendCards() {
 function updateBillPayUrl(billId, url) {
   const bill = S.bills.find(b => b.id === billId);
   if (!bill) return;
-  bill.payUrl = url.trim();
-  // Update the pay button in-place without re-rendering the whole list
-  const card = [...document.querySelectorAll('.send-card')].find(c => c.querySelector(`[data-input*="${billId}"]`));
-  if (card) {
-    const right = card.querySelector('.send-card-right');
-    const input = right.querySelector('input');
-    const hasUrl = bill.payUrl.length > 0;
-    input.classList.toggle('has-url', hasUrl);
-    // Replace everything after the input
-    const existingBtn = right.querySelector('a.btn, span');
-    if (existingBtn) existingBtn.remove();
-    const safePayUrl = safeWebUrl(bill.payUrl);
-    if (safePayUrl) {
-      const a = document.createElement('a');
-      a.className = 'btn btn-green btn-sm';
-      a.href = safePayUrl;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = 'Pay ↗';
-      a.onclick = () => markCheck('pay_' + billId);
-      right.appendChild(a);
-    } else if (hasUrl) {
-      const span = document.createElement('span');
-      span.style.cssText = 'font-size:10px;color:var(--red)';
-      span.textContent = 'Invalid URL (must start with https://)';
-      right.appendChild(span);
-    } else {
-      const span = document.createElement('span');
-      span.style.cssText = 'font-size:10px;color:var(--muted2)';
-      span.textContent = 'Add URL to get Pay button';
-      right.appendChild(span);
-    }
-  }
+  const value = url.trim();
+  if (value && !safeWebUrl(value)) return;
+  bill.payUrl = value;
   save();
 }
+
+function openEmailSetup(id) {
+  const form = document.getElementById('email-setup-' + id);
+  if (!form) return;
+  form.hidden = false;
+  form.elements.email.focus();
+}
+function cancelEmailSetup(id) {
+  const form = document.getElementById('email-setup-' + id);
+  form.hidden = true; form.reset();
+  form.querySelector('.setup-error').hidden = true;
+  form.elements.email.removeAttribute('aria-invalid');
+  document.getElementById('rc-' + id).querySelector('[data-person-id]').focus();
+}
+function openPaymentLink(id) {
+  const form = document.getElementById('payment-setup-' + id);
+  if (!form) return;
+  form.hidden = false; form.elements.url.focus();
+}
+function cancelPaymentLink(id) {
+  const form = document.getElementById('payment-setup-' + id);
+  form.hidden = true; form.reset();
+  form.querySelector('.setup-error').hidden = true;
+  form.elements.url.removeAttribute('aria-invalid');
+  document.getElementById('send-card-' + id).querySelector('[data-bill-id]').focus();
+}
+document.addEventListener('submit', event => {
+  const form = event.target.closest('form[data-email-setup], form[data-payment-setup]');
+  if (!form) return;
+  event.preventDefault();
+  const email = form.hasAttribute('data-email-setup');
+  const input = email ? form.elements.email : form.elements.url;
+  const value = input.value.trim();
+  const valid = email ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) : !value || !!safeWebUrl(value);
+  form.querySelector('.setup-error').hidden = valid;
+  input.setAttribute('aria-invalid', String(!valid));
+  if (!valid) { input.focus(); return; }
+  if (email) {
+    const person = S.people.find(p => p.id === form.dataset.emailSetup);
+    if (!person) return;
+    person.email = value; save(); renderReceiveCards();
+    document.getElementById('rc-' + person.id)?.querySelector('[data-click^="openPersonEmail"]')?.focus();
+  } else {
+    const id = form.dataset.paymentSetup;
+    updateBillPayUrl(id, value); renderSendCards();
+    document.getElementById('send-card-' + id)?.querySelector('[data-bill-id]')?.focus();
+  }
+});
 
 // ── CHECKLIST ───────────────────────────────────
 function buildChecklistDefs() {
@@ -5539,26 +5563,74 @@ function onCurrencyChange(code) {
 // ═══════════════════════════════════════════════
 //  NAVIGATION
 // ═══════════════════════════════════════════════
-// Tab switching — each tab re-renders its content fresh on activation.
-// This avoids stale data and ensures chart instances are properly
-// destroyed/recreated (Chart.js requires this to avoid canvas leaks).
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t === tab ? 'page' : 'false'));
-    const page = tab.dataset.page;
-    document.getElementById(`page-${page}`).classList.add('active');
-    if (page==='bills') renderBills();
-    if (page==='summary') renderSummary();
-    if (page==='sendpay') renderSendPay();
-    if (page==='checks') renderChecks();
-    if (page==='trips') renderTrips();
-    if (page==='trends') renderTrends();
-    if (page==='settings') renderSettings();
+let currentWorkspace = 'bills';
+const gear = document.getElementById('workspace-gear');
+const workspaceMenu = document.getElementById('workspace-menu');
+function closeWorkspaceMenu(restoreFocus = false) {
+  workspaceMenu.hidden = true; gear.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) gear.focus();
+}
+function positionWorkspaceMenu() {
+  const anchor = gear.getBoundingClientRect();
+  const width = workspaceMenu.getBoundingClientRect().width;
+  const left = Math.max(8, Math.min(anchor.right - width, innerWidth - width - 8));
+  workspaceMenu.style.left = (left - anchor.left) + 'px';
+  workspaceMenu.style.right = 'auto';
+  workspaceMenu.style.maxHeight = Math.max(48, innerHeight - anchor.bottom - 20) + 'px';
+}
+function openWorkspaceMenu() {
+  workspaceMenu.hidden = false; gear.setAttribute('aria-expanded', 'true');
+  positionWorkspaceMenu();
+  workspaceMenu.querySelector('[aria-current="page"]')?.focus();
+  if (!workspaceMenu.contains(document.activeElement)) workspaceMenu.querySelector('button').focus();
+}
+function updateWorkspaceNavigation(page) {
+  document.querySelectorAll('.task-tabs .tab').forEach(tab => {
+    const target = tab.dataset.page;
+    tab.hidden = currentWorkspace === 'bills' ? ['checks','trips'].includes(target) : target !== currentWorkspace;
+    tab.classList.toggle('active', target === page);
+    tab.setAttribute('aria-current', target === page ? 'page' : 'false');
   });
+  workspaceMenu.querySelectorAll('button').forEach(button => {
+    button.setAttribute('aria-current', button.dataset.workspace === (page === 'settings' ? 'settings' : currentWorkspace) ? 'page' : 'false');
+  });
+}
+function navigateTo(page) {
+  closeWorkspaceMenu();
+  const current = document.querySelector('.page.active');
+  if (current?.id === 'page-' + page) return;
+  if (page !== 'settings') currentWorkspace = ['checks','trips'].includes(page) ? page : 'bills';
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+  updateWorkspaceNavigation(page);
+  const render = {bills:renderBills, summary:renderSummary, sendpay:renderSendPay, checks:renderChecks, trips:renderTrips, trends:renderTrends, settings:renderSettings};
+  render[page]?.();
+  const heading = document.querySelector('.page.active .page-title');
+  if (heading) { heading.tabIndex = -1; heading.focus({preventScroll:true}); }
+}
+document.querySelectorAll('.task-tabs .tab').forEach(tab => tab.addEventListener('click', () => navigateTo(tab.dataset.page)));
+gear.addEventListener('click', () => workspaceMenu.hidden ? openWorkspaceMenu() : closeWorkspaceMenu(true));
+gear.addEventListener('keydown', event => { if (['ArrowDown','ArrowUp'].includes(event.key)) {event.preventDefault();openWorkspaceMenu();} });
+workspaceMenu.addEventListener('click', event => {
+  const button = event.target.closest('[data-workspace]');
+  if (!button) return;
+  const page = button.dataset.workspace;
+  if (page === currentWorkspace && !document.getElementById('page-settings').classList.contains('active')) closeWorkspaceMenu(true);
+  else navigateTo(page);
 });
+workspaceMenu.addEventListener('keydown', event => {
+  const items = [...workspaceMenu.querySelectorAll('button')];
+  const index = items.indexOf(document.activeElement);
+  if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[next].focus();
+  }
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !workspaceMenu.hidden) {event.preventDefault();closeWorkspaceMenu(true);} });
+document.addEventListener('pointerdown', event => { if (!event.target.closest('.workspace-control')) closeWorkspaceMenu(); });
+document.addEventListener('focusin', event => { if (!event.target.closest('.workspace-control')) closeWorkspaceMenu(); });
+window.addEventListener('resize', () => { if (!workspaceMenu.hidden) positionWorkspaceMenu(); });
+updateWorkspaceNavigation('bills');
 
 document.getElementById('monthSel').addEventListener('change', onMonthChange);
 document.getElementById('yearSel').addEventListener('change', onMonthChange);

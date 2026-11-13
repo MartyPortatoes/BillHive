@@ -52,6 +52,10 @@ class CDP {
   async idle(tab){await until(()=>this.evaluate(tab,"!hostReview.busy && !hostReview.dirty && !hostReview.calculating && !_openingCheckAction"),'Claim action completion');}
   async screenshot(tab,name){await this.evaluate(tab,"(async()=>{document.querySelector('#owner-sharing-recovery .owner-check-sharing, .owner-check-sharing')?.scrollIntoView({block:'start'});await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));})()");const r=await this.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false},tab.session);await fs.writeFile(path.join(output,name+'.png'),Buffer.from(r.data,'base64'));}
 }
+async function openChecksWorkspace(tab) {
+  await cdp.click(tab,'#workspace-gear');
+  await cdp.click(tab,'[data-workspace="checks"]');
+}
 async function launchChrome(){
   const profile=path.join(temp,'profile');await fs.mkdir(profile,{recursive:true});await fs.rm(path.join(profile,'DevToolsActivePort'),{force:true});
   chrome=spawn(chromePath,['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-component-update','--disable-sync','--disable-extensions','--disable-features=Translate','about:blank'],{detached:true,stdio:['ignore','ignore','pipe']});
@@ -76,7 +80,7 @@ async function choose(tab,selector,value){await cdp.evaluate(tab,`(()=>{const e=
 async function type(tab,selector,value){await cdp.click(tab,selector);await cdp.evaluate(tab,`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(document.activeElement!==e)throw Error('Input lost focus: '+document.activeElement.outerHTML);e.select();})()`);await cdp.send('Input.insertText',{text:value},tab.session);await cdp.idle(tab);}
 const row=tab=>cdp.evaluate(tab,'hostReview.client.row');
 const view=tab=>cdp.evaluate(tab,"({error:hostReview.error,storageError:hostReview.storageError,message:hostReview.message,dirty:hostReview.dirty,busy:hostReview.busy,calculating:hostReview.calculating,comparison:!!hostReview.comparison,activeId:hostReview.activeId})");
-async function open(tab){await cdp.click(tab,'.tab[data-page="checks"]');await cdp.click(tab,'.owner-check-sharing button[data-click^="openCheckGuestReview("]');await cdp.idle(tab);assert.ok((await row(tab)).drafts.dinner,JSON.stringify(await view(tab)));}
+async function open(tab){await openChecksWorkspace(tab);await cdp.click(tab,'.owner-check-sharing button[data-click^="openCheckGuestReview("]');await cdp.idle(tab);assert.ok((await row(tab)).drafts.dinner,JSON.stringify(await view(tab)));}
 async function mapAll(tab){await cdp.click(tab,'#host-review-dialog [data-review-tab="guests"]');const sourceIds=await cdp.evaluate(tab,'hostReview.draft.baseline.sources.map(BillHiveCheckReview.sourceId)');
   for(const id of sourceIds){const choice=await cdp.evaluate(tab,`hostReview.working.choices[${JSON.stringify(id)}]`);if(choice?.action==='APPLY')continue;
     await choose(tab,`[data-review-field="action"][data-source="${id}"]`,'APPLY');await choose(tab,`[data-review-field="target"][data-source="${id}"]`,'__new__');}
@@ -143,7 +147,7 @@ try{
   const downloads=path.join(temp,'downloads');await fs.mkdir(downloads,{recursive:true});await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:downloads});await cdp.click(tab,action('export'));
   const exported=await until(async()=>{try{return await fs.readFile(path.join(downloads,'guest-split-review.json'),'utf8');}catch{return null;}},'Host recovery export');assert.equal(exported.includes((await share()).share.token),false);await screen(tab,'pending-phone');
   cdp.socket.close();await stop(chrome,true);chrome=null;dropPayload=null;await write(state=>{state.futureTop={later:true};});await launchChrome();tab=await cdp.tab(base+'/');
-  await cdp.click(tab,'.tab[data-page="checks"]');await type(tab,'textarea[aria-label="Notes"]','Unsaved ordinary household note');
+  await openChecksWorkspace(tab);await type(tab,'textarea[aria-label="Notes"]','Unsaved ordinary household note');
   await until(()=>cdp.evaluate(tab,'!!writer.error'),'Ordinary save blocked by pending split');assert.equal((await household()).state.checks.checks[0].notes,undefined);
   await cdp.click(tab,'#host-review-attention button');await cdp.idle(tab);await cdp.click(tab,action('primary'));await cdp.idle(tab);
   assert.equal(requests.at(-1),original);assert.equal((await row(tab)).pending,null);assert.equal(await cdp.evaluate(tab,"findCheck('dinner').notes"),'Unsaved ordinary household note');assert.equal(await cdp.evaluate(tab,'writer.dirty'),true);assert.deepEqual((await household()).state.futureTop,{later:true});
@@ -181,7 +185,7 @@ try{
   check('corrupt review storage is surfaced at startup and retained after a retry',()=>{});
   assert.deepEqual(await cdp.evaluate(tab,"(()=>{const check={participants:[{id:'a'},{id:'b'},{id:'c'}],items:[{id:'penny',price:'0.01',sharedByParticipantIds:[]}]};const amounts=checkExactAmounts(check);return check.participants.map(p=>checkShareAmount(amounts,p.id));})()"),['EUR 0.01','EUR 0.00','EUR 0.00']);
   check('ordinary Checks participant displays agree with the reviewed penny allocation',()=>{});
-  await cdp.click(tab,'.tab[data-page="checks"]');
+  await openChecksWorkspace(tab);
   await cdp.send('Emulation.setLocaleOverride',{locale:'ja-JP'},tab.session);
   for(const [currency,price,expected] of [['','10.005','USD 10.01'],['JPY','10.5','JPY 11'],['KWD','0.003','KWD 0.003'],['CLF','0.0003','CLF 0.0003']]) {
     const display=await cdp.evaluate(tab,`(()=>{S.settings.currencyCode=${JSON.stringify(currency)};_currFmt=null;

@@ -61,6 +61,8 @@
 - **Monthly checklist** auto-generated from your people and bills — tracks what's been emailed, paid, and collected
 
 **Look & feel**
+- A separate gear switches between **Bills, Checks, Trips, and Settings**, while the task bar stays scoped to the active workspace
+- Readable neutral balances, opaque financial cards, and inline email/payment-link setup with Save and Cancel
 - **Light, dark, and system** themes — toggle in Settings, persisted per user. Mirrors the iOS app's design language
 - Real-time multi-device sync via Server-Sent Events — open the app in two tabs and watch one update the other instantly
 

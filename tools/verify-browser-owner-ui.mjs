@@ -52,6 +52,10 @@ class CDP {
   async idle(tab){await until(()=>this.evaluate(tab,"ownerSharing.busy === null && !_reloading && !_stateDirty && !writer.dirty"),'Claim action completion');}
   async screenshot(tab,name){await this.evaluate(tab,"(async()=>{document.querySelector('#owner-sharing-recovery .owner-check-sharing, .owner-check-sharing')?.scrollIntoView({block:'start'});await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));})()");const r=await this.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false},tab.session);await fs.writeFile(path.join(output,name+'.png'),Buffer.from(r.data,'base64'));}
 }
+async function openChecksWorkspace(tab) {
+  await cdp.click(tab,'#workspace-gear');
+  await cdp.click(tab,'[data-workspace="checks"]');
+}
 async function launchChrome(){
   const profile=path.join(temp,'profile');await fs.mkdir(profile,{recursive:true});await fs.rm(path.join(profile,'DevToolsActivePort'),{force:true});
   chrome=spawn(chromePath,['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-component-update','--disable-sync','--disable-extensions','--disable-features=Translate','about:blank'],{detached:true,stdio:['ignore','ignore','pipe']});
@@ -91,7 +95,7 @@ try {
   });});await new Promise(r=>proxy.listen(0,'127.0.0.1',r));base='http://127.0.0.1:'+proxy.address().port;
   await write(state=>Object.assign(state,{people:[{id:'me',name:'Host',color:'#d8923e',payMethod:'none',payId:'',email:'',greeting:''}],bills:[],settings:{currencyCode:'EUR'},futureTop:{kept:true},
     checks:{checks:[{id:'dinner',name:'Dinner with a descriptive name',icon:'🍽️',dateISO:'2026-09-27',isCompleted:false,items:[{id:'soup',name:'Soup',price:12,sharedByParticipantIds:['host']}],participants:[{id:'host',name:'Host'}],taxAmount:1,tipAmount:2,discountAmount:0,compAmount:0,serviceFeeAmount:0}]}}));
-  const initial=await household();await launchChrome();let tab=await cdp.tab(base+'/');await cdp.click(tab,'.tab[data-page="checks"]');
+  const initial=await household();await launchChrome();let tab=await cdp.tab(base+'/');await openChecksWorkspace(tab);
   await cdp.click(tab,button('createCheckShareWeb'));await cdp.idle(tab);
   assert.ok((await share()).share,await message(tab));assert.equal((await row(tab)).pending,null);assert.deepEqual((await household()).state,initial.state);
   check('actual owner Generate control creates a protected link without changing household data',()=>{});await cdp.screenshot(tab,'owner-link-phone');

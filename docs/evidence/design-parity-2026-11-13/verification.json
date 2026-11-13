@@ -1,0 +1,16 @@
+{
+  "browser": "Chrome/154.0.8037.93",
+  "synthetic": true,
+  "passes": [
+    "Gear choices, keyboard controls, focus return, current workspace retains Summary",
+    "All workspaces and Settings remain accessible",
+    "Inline email validates and persists without sending",
+    "Payment setup validates HTTPS, persists Save, and discards Cancel",
+    "Setup actions do not mark payments or send email",
+    "Outside click dismisses menu",
+    "Responsive layout, readable neutral amounts, opaque cards",
+    "Reduced motion and no browser runtime errors"
+  ],
+  "errors": [],
+  "sourceSHA256": "a447b348014dad241a3442acdb11b017a7e1e7612617c1197c3ad7d2fc59187c"
+}
