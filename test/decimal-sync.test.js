@@ -171,3 +171,13 @@ test('public Bills and Check sharing projections retain large four-digit money a
   assert.equal(String(check.check.items[0].price),'999999999999.0003');
   assert.equal(check.userId,undefined); assert.equal(check.state,undefined);
 });
+
+test('portable export excludes joined invitations and retains exact owner records', async () => {
+  const headers = {'remote-user':'private-export-fixture','X-BillHive-Decimal-JSON':'1'};
+  const before = await snapshot(headers);
+  const state = Decimal.parse('{"sharedBills":[{"token":"old-device-only"}],"futureOwnerAmount":1e-400}');
+  assert.equal((await commit(commitBody(before.data,{state}),headers)).status,200);
+  const result = Decimal.parse(await (await request('/api/export',{headers})).text());
+  assert.equal(Object.hasOwn(result.state,'sharedBills'),false);
+  assert.equal(String(result.state.futureOwnerAmount),'1e-400');
+});

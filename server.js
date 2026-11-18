@@ -1107,12 +1107,15 @@ app.get('/api/export', (req, res) => {
   const snapshot = sync.snapshot(req.userId);
   res.setHeader('ETag', sync.etag(snapshot));
   res.setHeader('Content-Disposition', `attachment; filename="billhive-backup-${req.userId}-${Date.now()}.json"`);
-  res.json({user:req.userId, exportedAt:new Date().toISOString(), state:snapshot.state, monthly:snapshot.monthly});
+  const {sharedBills: _privateGuestAccess, ...state} = snapshot.state;
+  if (state.trips && Object.hasOwn(state.trips, 'sharedTrips')) state.trips = {...state.trips, sharedTrips:[]};
+  res.json({user:req.userId, exportedAt:new Date().toISOString(), state, monthly:snapshot.monthly});
 });
 
 app.post('/api/import', (req, res) => {
   try { Data.backup(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
-  const { state, monthly } = req.body;
+  const {sharedBills: _privateGuestAccess, ...state} = req.body.state;
+  const {monthly} = req.body;
   // Whitelist state keys we manage; reject anything else so a crafted backup
   // can't pollute user_state with arbitrary rows.
   const ALLOWED_STATE_KEYS = new Set(['settings', 'people', 'bills', 'checklist', 'requestDates', 'checks', 'trips', 'sharedBills', 'currentMode', 'hasSeenModeHint', 'webPreferences']);
